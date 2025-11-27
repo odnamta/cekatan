@@ -1,0 +1,184 @@
+# Implementation Plan
+
+- [x] 1. Initialize Next.js project with core dependencies
+  - Create Next.js 14+ project with App Router and TypeScript strict mode
+  - Install dependencies: @supabase/supabase-js, @supabase/ssr, zod, lucide-react
+  - Install dev dependencies: vitest, fast-check, @testing-library/react
+  - Configure Tailwind CSS with Slate-900 dark mode default
+  - Set up environment variables template for Supabase
+  - _Requirements: Tech Stack specification_
+
+- [x] 2. Set up Supabase client utilities
+  - [x] 2.1 Create server-side Supabase client
+    - Implement `lib/supabase/server.ts` with cookie-based auth
+    - Add `getUser()` helper function
+    - _Requirements: 1.1, 1.2_
+  - [x] 2.2 Create browser-side Supabase client
+    - Implement `lib/supabase/client.ts` for client components
+    - _Requirements: 1.1, 1.2_
+
+- [x] 3. Implement database schema and types
+  - [x] 3.1 Create SQL schema file
+    - Write `schema.sql` with decks and cards tables
+    - Include all RLS policies for both tables
+    - Add performance indexes
+    - _Requirements: 2.4, 3.3, 3.4, 8.1, 8.2, 8.3_
+  - [x] 3.2 Create TypeScript type definitions
+    - Implement `types/database.ts` with Deck, Card, DeckWithDueCount interfaces
+    - Implement `types/actions.ts` with ActionResult, NextCardResult types
+    - _Requirements: 3.1_
+
+- [x] 4. Implement Zod validation schemas
+  - [x] 4.1 Create validation schemas
+    - Implement `lib/validations.ts` with loginSchema, registerSchema, createDeckSchema, createCardSchema, ratingSchema
+    - _Requirements: 1.3, 9.1, 9.2, 9.3_
+  - [x] 4.2 Write property test for Zod validation
+    - **Property 13: Zod Validation Rejects Invalid Inputs**
+    - **Validates: Requirements 1.3, 9.1, 9.2**
+
+- [x] 5. Implement SM-2 algorithm
+  - [x] 5.1 Create SM-2 calculation function
+    - Implement `lib/sm2.ts` with calculateNextReview function
+    - Implement serializeCardState and deserializeCardState functions
+    - Handle all four rating cases (Again, Hard, Good, Easy)
+    - Enforce ease factor minimum of 1.3
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+  - [x] 5.2 Write property test for SM-2 "Again" rating
+    - **Property 1: SM-2 "Again" Rating Resets Interval**
+    - **Validates: Requirements 4.1**
+  - [x] 5.3 Write property test for SM-2 "Hard" rating
+    - **Property 2: SM-2 "Hard" Rating Multiplies Interval**
+    - **Validates: Requirements 4.2**
+  - [x] 5.4 Write property test for SM-2 "Good" rating
+    - **Property 3: SM-2 "Good" Rating Uses Ease Factor**
+    - **Validates: Requirements 4.3**
+  - [x] 5.5 Write property test for SM-2 "Easy" rating
+    - **Property 4: SM-2 "Easy" Rating Increases Interval and Ease**
+    - **Validates: Requirements 4.4**
+  - [x] 5.6 Write property test for ease factor minimum invariant
+    - **Property 5: Ease Factor Minimum Invariant**
+    - **Validates: Requirements 4.5**
+  - [x] 5.7 Write property test for card state serialization round-trip
+    - **Property 6: Card State Serialization Round-Trip**
+    - **Validates: Requirements 4.6**
+
+- [x] 6. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 7. Create UI components
+  - [x] 7.1 Create Button component
+    - Implement `components/ui/Button.tsx` with variants (primary, secondary, ghost) and sizes
+    - Style with Tailwind CSS dark mode
+    - _Requirements: UI specification_
+  - [x] 7.2 Create Input component
+    - Implement `components/ui/Input.tsx` with label, error display, and types
+    - _Requirements: 1.3, 9.2_
+  - [x] 7.3 Create Card component
+    - Implement `components/ui/Card.tsx` as a container component
+    - _Requirements: UI specification_
+  - [x] 7.4 Create Textarea component
+    - Implement `components/ui/Textarea.tsx` with label and error display
+    - _Requirements: 3.1, 3.2_
+
+- [x] 8. Implement authentication
+  - [x] 8.1 Create auth Server Actions
+    - Implement `actions/auth-actions.ts` with loginAction, registerAction, logoutAction
+    - Add Zod validation for all inputs
+    - _Requirements: 1.1, 1.2, 1.5, 9.3_
+  - [x] 8.2 Create login page
+    - Implement `app/(auth)/login/page.tsx` with login/register forms
+    - Add client-side form handling with error display
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [x] 8.3 Create auth layout with middleware
+    - Implement `app/(auth)/layout.tsx`
+    - Add middleware for protected route redirection
+    - _Requirements: 1.4_
+
+- [x] 9. Implement deck management
+  - [x] 9.1 Create deck Server Actions
+    - Implement `actions/deck-actions.ts` with createDeckAction, deleteDeckAction
+    - Add Zod validation
+    - _Requirements: 2.1, 2.3, 9.3_
+  - [x] 9.2 Create dashboard page
+    - Implement `app/(app)/dashboard/page.tsx` as React Server Component
+    - Fetch user decks with due counts
+    - Display deck list with due count badges
+    - Clicking a deck navigates to Deck Details Page (`/decks/[deckId]`)
+    - Handle empty state with prompt to create new deck
+    - _Requirements: 2.2, 6.1, 6.2, 6.4_
+  - [x] 9.3 Write property test for due count calculation
+    - **Property 12: Due Count Calculation Correctness**
+    - **Validates: Requirements 6.2**
+
+- [x] 10. Implement card management
+  - [x] 10.1 Create card Server Actions
+    - Implement `actions/card-actions.ts` with createCardAction
+    - Add Zod validation
+    - Ensure default SM-2 values on creation
+    - _Requirements: 3.1, 3.2, 9.3_
+  - [x] 10.2 Create CreateCardForm component
+    - Implement `components/cards/CreateCardForm.tsx` as Client Component
+    - Include Textarea for Front content
+    - Include Textarea for Back content
+    - Include Text Input for Image URL (optional)
+    - Connect to createCardAction with form validation
+    - Display success/error feedback
+    - _Requirements: 3.1, 3.2_
+  - [x] 10.3 Create Deck Details page
+    - Implement `app/(app)/decks/[deckId]/page.tsx` as React Server Component
+    - Display deck title and card count
+    - List all existing cards in the deck (showing front preview)
+    - Include CreateCardForm component for adding new cards
+    - Add "Study Now" button that navigates to `/study/[deckId]`
+    - Add "Back to Dashboard" navigation
+    - _Requirements: 3.1, 3.2, 6.3_
+  - [x] 10.4 Write property test for card default values
+    - **Property 10: Card Default Values on Creation**
+    - **Validates: Requirements 3.1**
+
+- [x] 11. Implement study mode
+  - [x] 11.1 Create study Server Actions
+    - Implement `actions/study-actions.ts` with rateCardAction
+    - Integrate SM-2 algorithm for card updates
+    - Return next due card after rating
+    - _Requirements: 5.4_
+  - [x] 11.2 Create Flashcard component
+    - Implement `components/study/Flashcard.tsx` with front/back display
+    - Handle reveal state and image rendering
+    - _Requirements: 5.2, 5.3, 5.6_
+  - [x] 11.3 Create RatingButtons component
+    - Implement `components/study/RatingButtons.tsx` with Again, Hard, Good, Easy buttons
+    - Connect to rateCardAction
+    - _Requirements: 5.4_
+  - [x] 11.4 Create study page
+    - Implement `app/(app)/study/[deckId]/page.tsx` as React Server Component
+    - Fetch due cards for deck
+    - Handle study session flow and completion state
+    - Add "Back to Deck" navigation
+    - _Requirements: 5.1, 5.5_
+  - [x] 11.5 Write property test for due card filtering
+    - **Property 11: Due Card Filtering Correctness**
+    - **Validates: Requirements 5.1**
+
+- [x] 12. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 13. Implement landing page
+  - [x] 13.1 Create landing page
+    - Implement `app/page.tsx` with hero section
+    - Add Login button navigation
+    - Style with Slate-900 dark mode
+    - _Requirements: 7.1, 7.2_
+
+- [x] 14. Create app layout and navigation
+  - [x] 14.1 Create root layout
+    - Implement `app/layout.tsx` with dark mode defaults
+    - Add global styles and font configuration
+    - _Requirements: Tech Stack specification_
+  - [x] 14.2 Create app layout
+    - Implement `app/(app)/layout.tsx` with navigation header
+    - Add logout functionality
+    - _Requirements: 1.5_
+
+- [x] 15. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
