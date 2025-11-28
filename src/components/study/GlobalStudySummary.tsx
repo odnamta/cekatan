@@ -1,107 +1,116 @@
 'use client'
 
 import Link from 'next/link'
-import { Flame, Home, Play } from 'lucide-react'
+import { Flame, CheckCircle, XCircle } from 'lucide-react'
 
-interface GlobalStudySummaryProps {
+export interface GlobalStudySummaryProps {
   correctCount: number
   incorrectCount: number
   currentStreak: number
   remainingDueCount: number
+  onContinue?: () => void
+  nextBatchUrl?: string
 }
 
 /**
- * GlobalStudySummary Component
- * Displays session results with navigation options.
+ * Global Study Summary Component
+ * Displays end-of-session statistics for global study sessions.
  * Requirements: 6.1, 6.2, 6.3, 6.4, 7.4
  * 
- * Feature: v3-ux-overhaul
+ * - 6.1: Display correct count, incorrect count, streak progress
+ * - 6.2: Large "Return to Dashboard" button
+ * - 6.3: Conditional "Continue Studying" button when remainingDueCount > 0
+ * - 6.4: Hide "Continue Studying" when no more due cards
+ * - 7.4: Mobile-first with 44px minimum tap targets
  */
 export function GlobalStudySummary({
   correctCount,
   incorrectCount,
   currentStreak,
   remainingDueCount,
+  onContinue,
+  nextBatchUrl,
 }: GlobalStudySummaryProps) {
   const totalAnswered = correctCount + incorrectCount
-  const scorePercent = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0
+  const accuracy = totalAnswered > 0 
+    ? Math.round((correctCount / totalAnswered) * 100) 
+    : 0
 
   return (
-    <div className="text-center py-8 px-4 bg-slate-100/50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-xl">
-      {/* Celebration */}
-      <div className="text-5xl mb-4">🎉</div>
+    <div className="bg-slate-100/50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center">
+      {/* Celebration emoji */}
+      <div className="text-4xl mb-4">🎉</div>
       
-      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-        Great work today!
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
+        Session Complete!
       </h2>
       
+      {/* Total cards reviewed */}
       <p className="text-slate-600 dark:text-slate-400 mb-6">
-        You completed {totalAnswered} {totalAnswered === 1 ? 'card' : 'cards'} this session.
+        You reviewed <span className="text-blue-600 dark:text-blue-400 font-semibold">{totalAnswered}</span> {totalAnswered === 1 ? 'card' : 'cards'} this session.
       </p>
 
-      {/* Score breakdown - Requirement 6.1 */}
-      <div className="flex justify-center gap-8 mb-6">
-        <div className="text-center">
-          <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-            {correctCount}
+      {/* Correct/Incorrect breakdown - Requirement 6.1 */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-700/50 rounded-lg p-4">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <span className="text-2xl font-bold text-green-600 dark:text-green-400">{correctCount}</span>
           </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">Correct</div>
+          <div className="text-sm text-green-600/70 dark:text-green-400/70">Correct</div>
         </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-            {incorrectCount}
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50 rounded-lg p-4">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <span className="text-2xl font-bold text-red-600 dark:text-red-400">{incorrectCount}</span>
           </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">Incorrect</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-            {scorePercent}%
-          </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">Score</div>
+          <div className="text-sm text-red-600/70 dark:text-red-400/70">Incorrect</div>
         </div>
       </div>
 
-      {/* Streak display */}
-      {currentStreak > 0 && (
-        <div className="flex items-center justify-center gap-2 mb-6 py-3 px-4 bg-orange-100 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/30 rounded-lg inline-flex mx-auto">
-          <Flame className="w-5 h-5 text-orange-500 dark:text-orange-400" />
-          <span className="text-orange-600 dark:text-orange-400 font-medium">
-            {currentStreak} day streak!
-          </span>
+      {/* Accuracy percentage */}
+      {totalAnswered > 0 && (
+        <div className="mb-6 text-slate-600 dark:text-slate-400">
+          Accuracy: <span className="font-semibold text-slate-900 dark:text-slate-100">{accuracy}%</span>
         </div>
       )}
 
-      {/* Action buttons - Requirements 6.2, 6.3, 6.4, 7.4 */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        {/* Return to Dashboard - always visible (Requirement 6.2) */}
-        <Link
-          href="/dashboard"
-          className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors min-h-[56px] min-w-[200px]"
-        >
-          <Home className="w-5 h-5" />
-          Return to Dashboard
-        </Link>
+      {/* Streak display - Requirement 6.1 */}
+      <div className="flex items-center justify-center gap-2 mb-6 py-3 bg-orange-100 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/30 rounded-lg">
+        <Flame className="w-5 h-5 text-orange-500 dark:text-orange-400" />
+        <span className="text-orange-700 dark:text-orange-300 font-bold">
+          {currentStreak} day{currentStreak !== 1 ? 's' : ''} streak
+        </span>
+      </div>
 
-        {/* Continue Studying - conditional (Requirements 6.3, 6.4) */}
-        {remainingDueCount > 0 && (
+      {/* Action buttons - Requirements 6.2, 6.3, 6.4, 7.4 */}
+      <div className="space-y-3">
+        {/* Continue Studying button - only shown when remainingDueCount > 0 (Requirements 6.3, 6.4) */}
+        {remainingDueCount > 0 && nextBatchUrl && (
           <Link
-            href="/study/global"
-            className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-slate-100 font-semibold rounded-lg transition-colors min-h-[56px] min-w-[200px]"
+            href={nextBatchUrl}
+            className="block w-full min-h-[44px] px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors text-center"
           >
-            <Play className="w-5 h-5" />
-            Continue Studying ({remainingDueCount} left)
+            Continue Studying ({remainingDueCount} remaining)
           </Link>
         )}
+        {remainingDueCount > 0 && onContinue && !nextBatchUrl && (
+          <button
+            onClick={onContinue}
+            className="w-full min-h-[44px] px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Continue Studying ({remainingDueCount} remaining)
+          </button>
+        )}
+        
+        {/* Return to Dashboard button - Requirement 6.2, 7.4 (44px min tap target) */}
+        <Link 
+          href="/dashboard"
+          className="block w-full min-h-[44px] px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors text-center"
+        >
+          Return to Dashboard
+        </Link>
       </div>
     </div>
   )
-}
-
-/**
- * Helper function to determine if continue button should be visible.
- * Used for property testing.
- * Requirements: 6.3, 6.4
- */
-export function shouldShowContinueButton(remainingDueCount: number): boolean {
-  return remainingDueCount > 0
 }

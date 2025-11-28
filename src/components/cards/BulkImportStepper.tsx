@@ -1,22 +1,24 @@
 'use client'
 
-import { FileText, MousePointer, PlusCircle, Check } from 'lucide-react'
+import { FileText, MousePointer, PlusCircle, Check, ExternalLink } from 'lucide-react'
 
 interface BulkImportStepperProps {
   currentStep: 1 | 2 | 3
   linkedSourceName?: string | null
+  linkedSourceUrl?: string | null
 }
 
 /**
  * BulkImportStepper Component
  * Visual breadcrumb for bulk import workflow.
- * Requirements: 4.1, 4.2, 4.3
+ * Requirements: 4.1, 4.2, 4.3, 4.4
  * 
  * Feature: v3-ux-overhaul
  */
 export function BulkImportStepper({
   currentStep,
   linkedSourceName,
+  linkedSourceUrl,
 }: BulkImportStepperProps) {
   const steps = [
     { number: 1, label: 'Upload PDF', icon: FileText },
@@ -67,12 +69,25 @@ export function BulkImportStepper({
         })}
       </div>
 
-      {/* Linked source banner - Requirements 4.2, 4.3 */}
+      {/* Linked source banner - Requirements 4.2, 4.3, 4.4 */}
       {linkedSourceName && (
         <div className="flex items-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <span className="text-lg">📖</span>
           <span className="text-green-700 dark:text-green-400 font-medium">
-            Linked Source: {linkedSourceName}
+            Linked Source:{' '}
+            {linkedSourceUrl ? (
+              <a
+                href={linkedSourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 underline hover:text-green-800 dark:hover:text-green-300 transition-colors"
+              >
+                {linkedSourceName}
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : (
+              linkedSourceName
+            )}
           </span>
         </div>
       )}

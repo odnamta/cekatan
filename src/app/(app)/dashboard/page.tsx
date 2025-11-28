@@ -1,12 +1,11 @@
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
-import { CreateDeckForm } from '@/components/decks/CreateDeckForm'
-import { DeckCard } from '@/components/decks/DeckCard'
+import { DashboardHero } from '@/components/dashboard/DashboardHero'
+import { LibrarySection } from '@/components/dashboard/LibrarySection'
 import { StudyHeatmap } from '@/components/dashboard/StudyHeatmap'
-import { CourseCard, CreateCourseForm } from '@/components/course'
 import type { CourseWithProgress } from '@/components/course'
 import { calculateDueCount } from '@/lib/due-count'
 import { getStudyLogs, getUserStats } from '@/actions/stats-actions'
-import { Flame, BookOpen, Layers } from 'lucide-react'
+import { getGlobalStats } from '@/actions/global-study-actions'
 import type { DeckWithDueCount, Course, Lesson, LessonProgress } from '@/types/database'
 
 /**
@@ -29,6 +28,9 @@ export default async function DashboardPage() {
 
   // Fetch user stats for streak display (Requirement 1.7)
   const { stats: userStats } = await getUserStats()
+
+  // Fetch global stats for DashboardHero (Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8)
+  const globalStats = await getGlobalStats()
 
   // Fetch user's courses with units and lessons for progress calculation (Requirement 6.1)
   const { data: courses, error: coursesError } = await supabase
@@ -143,88 +145,26 @@ export default async function DashboardPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Current Streak Display (Requirement 1.7) */}
-      {userStats && userStats.current_streak > 0 && (
-        <div className="mb-6 flex items-center gap-2 p-4 bg-orange-100 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/30 rounded-lg">
-          <Flame className="w-6 h-6 text-orange-500 dark:text-orange-400" />
-          <span className="text-orange-600 dark:text-orange-400 font-medium">Current Streak:</span>
-          <span className="text-orange-700 dark:text-orange-300 font-bold text-lg">
-            {userStats.current_streak} day{userStats.current_streak !== 1 ? 's' : ''}
-          </span>
-        </div>
-      )}
+      {/* Dashboard Hero - First element (Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 3.5) */}
+      <DashboardHero
+        globalDueCount={globalStats.totalDueCount}
+        completedToday={globalStats.completedToday}
+        dailyGoal={null}
+        currentStreak={globalStats.currentStreak}
+        hasNewCards={globalStats.hasNewCards}
+      />
 
       {/* Study Heatmap (Requirement 2.2) */}
       <div className="mb-8 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
         <StudyHeatmap studyLogs={studyLogs} />
       </div>
 
-      {/* Courses Section (Requirement 6.1) */}
-      <div className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <BookOpen className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Courses</h2>
-        </div>
-        <p className="text-slate-600 dark:text-slate-400 mb-4">
-          Follow structured learning paths with lessons and progress tracking.
-        </p>
-
-        {/* Create Course Form */}
-        <div className="mb-6 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
-          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Create New Course</h3>
-          <CreateCourseForm />
-        </div>
-
-        {/* Course List */}
-        {coursesWithProgress.length === 0 ? (
-          <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
-            <BookOpen className="w-10 h-10 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
-            <p className="text-slate-600 dark:text-slate-400 mb-1">No courses yet</p>
-            <p className="text-slate-500 dark:text-slate-500 text-sm">
-              Create your first course above to start a structured learning path!
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {coursesWithProgress.map((course) => (
-              <CourseCard key={course.id} course={course} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Decks Section */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Layers className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Decks</h2>
-        </div>
-        <p className="text-slate-600 dark:text-slate-400 mb-4">
-          Create and manage flashcard decks for spaced repetition practice.
-        </p>
-
-        {/* Create Deck Form */}
-        <div className="mb-6 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
-          <CreateDeckForm />
-        </div>
-
-        {/* Deck List */}
-        {decksWithDueCounts.length === 0 ? (
-          <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
-            <Layers className="w-10 h-10 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
-            <p className="text-slate-600 dark:text-slate-400 mb-1">No decks yet</p>
-            <p className="text-slate-500 dark:text-slate-500 text-sm">
-              Create your first deck above to start studying!
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {decksWithDueCounts.map((deck) => (
-              <DeckCard key={deck.id} deck={deck} />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Library Section - Collapsible courses and decks (Requirements 3.1, 3.2, 3.3, 3.4) */}
+      <LibrarySection
+        courses={coursesWithProgress}
+        decks={decksWithDueCounts}
+        defaultExpanded={false}
+      />
     </div>
   )
 }

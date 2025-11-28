@@ -6,22 +6,32 @@ import { GlobalStudySession } from '@/components/study/GlobalStudySession'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
+interface GlobalStudyPageProps {
+  searchParams: Promise<{ batch?: string }>
+}
+
 /**
  * Global Study Page - React Server Component
  * Fetches due cards across all decks and renders GlobalStudySession.
- * Requirements: 2.1, 2.2, 2.3
+ * Accepts optional `batch` query parameter for pagination.
+ * Requirements: 2.1, 2.2, 2.3, 2.4
  * 
  * Feature: v3-ux-overhaul
  */
-export default async function GlobalStudyPage() {
+export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageProps) {
   const user = await getUser()
   
   if (!user) {
     redirect('/login')
   }
 
-  // Fetch global due cards
-  const { cards, totalDue, isNewCardsFallback, error } = await getGlobalDueCards()
+  // Parse batch number from query params (default to 0)
+  const params = await searchParams
+  const batchNumber = params.batch ? parseInt(params.batch, 10) : 0
+  const validBatchNumber = isNaN(batchNumber) || batchNumber < 0 ? 0 : batchNumber
+
+  // Fetch global due cards with batch pagination
+  const { cards, totalDue, hasMoreBatches, isNewCardsFallback, error } = await getGlobalDueCards(validBatchNumber)
   
   // Fetch user stats for streak
   const { stats } = await getUserStats()
@@ -45,10 +55,19 @@ export default async function GlobalStudyPage() {
     )
   }
 
-  // Handle empty state - redirect to dashboard
+  // Handle empty state - redirect to dashboard with message
   if (cards.length === 0) {
-    redirect('/dashboard')
+    redirect('/dashboard?message=no-cards')
   }
+
+  // Calculate remaining due cards after this batch
+  // For batch 0: totalDue - cards.length
+  // For batch N: totalDue - (N * 50 + cards.length)
+  const cardsInPreviousBatches = validBatchNumber * 50
+  const totalDueRemaining = Math.max(0, totalDue - cardsInPreviousBatches)
+
+  // Handler for continue studying - navigate to next batch
+  const nextBatchUrl = hasMoreBatches ? `/study/global?batch=${validBatchNumber + 1}` : undefined
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -71,16 +90,19 @@ export default async function GlobalStudyPage() {
         <p className="text-slate-600 dark:text-slate-400">
           {isNewCardsFallback 
             ? `Starting with ${cards.length} new cards`
-            : `${totalDue} cards due across all decks`
+            : validBatchNumber > 0
+              ? `Batch ${validBatchNumber + 1} • ${cards.length} cards in this batch • ${totalDue} total due`
+              : `${totalDue} cards due across all decks`
           }
         </p>
       </div>
 
       {/* Study session */}
       <GlobalStudySession
-        initialCards={cards as any}
-        totalDueRemaining={totalDue}
+        initialCards={cards}
+        totalDueRemaining={totalDueRemaining}
         currentStreak={currentStreak}
+        nextBatchUrl={nextBatchUrl}
       />
     </div>
   )

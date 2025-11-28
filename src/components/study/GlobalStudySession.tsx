@@ -1,166 +1,174 @@
 'use client'
 
-import { useState } from 'react'
-import { MCQQuestion } from './MCQQuestion'
+import { useState, useEffect, useCallback } from 'react'
 import { Flashcard } from './Flashcard'
+import { MCQQuestion } from './MCQQuestion'
+import { RatingButtons } from './RatingButtons'
 import { GlobalStudySummary } from './GlobalStudySummary'
-import { Button } from '@/components/ui/Button'
-import { answerMCQAction } from '@/actions/mcq-actions'
 import { rateCardAction } from '@/actions/study-actions'
+import { 
+  saveSessionState, 
+  clearSessionState, 
+  type CachedSessionState 
+} from '@/lib/session-state'
+import { useToast } from '@/components/ui/Toast'
 import type { Card, MCQCard } from '@/types/database'
 
-// Extended card type with card_type discriminator
-type StudyCard = (Card & { card_type: 'flashcard' }) | (MCQCard & { card_type: 'mcq' })
-
-interface GlobalStudySessionProps {
-  initialCards: StudyCard[]
+export interface GlobalStudySessionProps {
+  initialCards: Card[]
   totalDueRemaining: number
   currentStreak: number
-}
-
-interface GlobalSessionState {
-  currentIndex: number
-  correctCount: number
-  incorrectCount: number
-  isComplete: boolean
-  isRevealed: boolean // For flashcards
-  isAnswered: boolean // For MCQs
-  selectedIndex: number | null
-  correctIndex: number | null
+  onContinue?: () => void
+  nextBatchUrl?: string
 }
 
 /**
- * GlobalStudySession Component
- * Manages cross-deck study session with mixed card types.
- * Requirements: 2.4, 2.5, 2.6
+ * Global Study Session Component
+ * Manages the interactive study session for cards across all decks.
+ * Requirements: 2.5, 2.6, 2.7
  * 
- * Feature: v3-ux-overhaul
+ * - 2.5: Reuse existing MCQQuestion and Flashcard components
+ * - 2.6: Display lightweight summary showing correct/incorrect counts
+ * - 2.7: Redirect to dashboard with toast on completion
  */
 export function GlobalStudySession({
   initialCards,
   totalDueRemaining,
   currentStreak,
+  onContinue,
+  nextBatchUrl,
 }: GlobalStudySessionProps) {
-  const [cards] = useState<StudyCard[]>(initialCards)
-  const [sessionState, setSessionState] = useState<GlobalSessionState>({
-    currentIndex: 0,
-    correctCount: 0,
-    incorrectCount: 0,
-    isComplete: false,
-    isRevealed: false,
-    isAnswered: false,
-    selectedIndex: null,
-    correctIndex: null,
-  })
+  const { showToast } = useToast()
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [correctCount, setCorrectCount] = useState(0)
+  const [incorrectCount, setIncorrectCount] = useState(0)
+  const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  
+  // Flashcard-specific state
+  const [isRevealed, setIsRevealed] = useState(false)
+  
+  // MCQ-specific state
+  const [isAnswered, setIsAnswered] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
-  const currentCard = cards[sessionState.currentIndex]
-  const totalCards = cards.length
+  const currentCard = initialCards[currentIndex] || null
+  const remainingInBatch = initialCards.length - currentIndex - 1
+  const remainingDueCount = totalDueRemaining - (currentIndex + 1)
+
+  // Persist session state to localStorage on each change
+  const persistState = useCallback(() => {
+    const state: CachedSessionState = {
+      currentIndex,
+      correctCount,
+      incorrectCount,
+      cardIds: initialCards.map(c => c.id),
+      timestamp: new Date().toISOString(),
+    }
+    saveSessionState(state)
+  }, [currentIndex, correctCount, incorrectCount, initialCards])
+
+  useEffect(() => {
+    if (!isComplete) {
+      persistState()
+    }
+  }, [persistState, isComplete])
+
+  // Clear localStorage and show toast when session completes
+  // Requirement 2.7: Display toast notification "Great work today!" on completion
+  useEffect(() => {
+    if (isComplete) {
+      clearSessionState()
+      showToast('Great work today!', 'success')
+    }
+  }, [isComplete, showToast])
+
+  // Check if current card is MCQ
   const isMCQ = currentCard?.card_type === 'mcq'
 
-  // Handle MCQ answer
-  const handleMCQAnswer = async (selectedIndex: number) => {
-    if (sessionState.isAnswered || isLoading) return
-
-    setIsLoading(true)
-    setError(null)
-
-    const result = await answerMCQAction(currentCard.id, selectedIndex)
-
-    setIsLoading(false)
-
-    if (!result.success) {
-      setError(result.error || 'Failed to submit answer')
-      return
+  // Move to next card or complete session
+  const moveToNext = () => {
+    if (currentIndex < initialCards.length - 1) {
+      setCurrentIndex(prev => prev + 1)
+      setIsRevealed(false)
+      setIsAnswered(false)
+      setSelectedIndex(null)
+    } else {
+      setIsComplete(true)
     }
-
-    setSessionState(prev => ({
-      ...prev,
-      isAnswered: true,
-      selectedIndex,
-      correctIndex: result.correctIndex ?? null,
-      correctCount: result.isCorrect ? prev.correctCount + 1 : prev.correctCount,
-      incorrectCount: !result.isCorrect ? prev.incorrectCount + 1 : prev.incorrectCount,
-    }))
   }
 
   // Handle flashcard reveal
   const handleReveal = () => {
-    setSessionState(prev => ({ ...prev, isRevealed: true }))
+    setIsRevealed(true)
   }
 
-  // Handle flashcard rating
-  const handleFlashcardRating = async (rating: 1 | 2 | 3 | 4) => {
-    if (isLoading) return
+  // Handle flashcard rating (1=again, 2=hard, 3=good, 4=easy)
+  const handleRate = async (rating: 1 | 2 | 3 | 4) => {
+    if (!currentCard) return
 
-    setIsLoading(true)
     setError(null)
-
     const result = await rateCardAction(currentCard.id, rating)
 
-    setIsLoading(false)
-
     if (!result.success) {
-      setError(result.error || 'Failed to submit rating')
+      setError(result.error || 'Failed to rate card')
       return
     }
 
-    // Consider ratings 3 and 4 as "correct" for summary purposes
-    const isCorrect = rating >= 3
+    // Track correct/incorrect based on rating
+    // Rating 1 (again) = incorrect, ratings 2-4 = correct
+    if (rating === 1) {
+      setIncorrectCount(prev => prev + 1)
+    } else {
+      setCorrectCount(prev => prev + 1)
+    }
 
-    setSessionState(prev => ({
-      ...prev,
-      correctCount: isCorrect ? prev.correctCount + 1 : prev.correctCount,
-      incorrectCount: !isCorrect ? prev.incorrectCount + 1 : prev.incorrectCount,
-    }))
-
-    moveToNextCard()
+    moveToNext()
   }
 
-  // Move to next card or complete session
-  const moveToNextCard = () => {
-    const nextIndex = sessionState.currentIndex + 1
+  // Handle MCQ answer
+  const handleMCQAnswer = async (selectedIdx: number) => {
+    if (!currentCard || isAnswered) return
 
-    if (nextIndex >= totalCards) {
-      setSessionState(prev => ({ ...prev, isComplete: true }))
+    setSelectedIndex(selectedIdx)
+    setIsAnswered(true)
+
+    const isCorrect = selectedIdx === currentCard.correct_index
+
+    // Track correct/incorrect
+    if (isCorrect) {
+      setCorrectCount(prev => prev + 1)
     } else {
-      setSessionState(prev => ({
-        ...prev,
-        currentIndex: nextIndex,
-        isRevealed: false,
-        isAnswered: false,
-        selectedIndex: null,
-        correctIndex: null,
-      }))
+      setIncorrectCount(prev => prev + 1)
+    }
+
+    // Rate the card based on correctness
+    // Correct = rating 3 (good), Incorrect = rating 1 (again)
+    const rating = isCorrect ? 3 : 1
+    setError(null)
+    const result = await rateCardAction(currentCard.id, rating as 1 | 2 | 3 | 4)
+
+    if (!result.success) {
+      setError(result.error || 'Failed to rate card')
     }
   }
 
-  // Handle "Next" button for MCQs
-  const handleNextQuestion = () => {
-    moveToNextCard()
+  // Handle MCQ continue (after viewing explanation)
+  const handleMCQContinue = () => {
+    moveToNext()
   }
 
-  // Session complete - show summary
-  if (sessionState.isComplete) {
-    const remainingAfterSession = Math.max(0, totalDueRemaining - totalCards)
-    
+  // Show summary when complete
+  if (isComplete || !currentCard) {
     return (
       <GlobalStudySummary
-        correctCount={sessionState.correctCount}
-        incorrectCount={sessionState.incorrectCount}
+        correctCount={correctCount}
+        incorrectCount={incorrectCount}
         currentStreak={currentStreak}
-        remainingDueCount={remainingAfterSession}
+        remainingDueCount={Math.max(0, remainingDueCount)}
+        onContinue={onContinue}
+        nextBatchUrl={nextBatchUrl}
       />
-    )
-  }
-
-  // No cards to study
-  if (!currentCard) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-slate-600 dark:text-slate-400">No cards to study.</p>
-      </div>
     )
   }
 
@@ -169,14 +177,9 @@ export function GlobalStudySession({
       {/* Progress indicator */}
       <div className="mb-6 text-center">
         <span className="text-sm text-slate-600 dark:text-slate-400">
-          Card {sessionState.currentIndex + 1} of {totalCards}
+          Card {currentIndex + 1} of {initialCards.length}
+          {remainingInBatch > 0 && ` • ${remainingInBatch} remaining in batch`}
         </span>
-        <div className="mt-2 w-full max-w-md mx-auto bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-          <div
-            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${((sessionState.currentIndex + (sessionState.isAnswered || sessionState.isRevealed ? 1 : 0)) / totalCards) * 100}%` }}
-          />
-        </div>
       </div>
 
       {/* Error display */}
@@ -186,57 +189,42 @@ export function GlobalStudySession({
         </div>
       )}
 
-      {/* Card display based on type */}
+      {/* Render appropriate card type */}
       {isMCQ ? (
         <>
           <MCQQuestion
             card={currentCard as MCQCard}
             onAnswer={handleMCQAnswer}
-            isAnswered={sessionState.isAnswered}
-            selectedIndex={sessionState.selectedIndex}
-            correctIndex={sessionState.correctIndex}
+            isAnswered={isAnswered}
+            selectedIndex={selectedIndex}
+            correctIndex={isAnswered ? currentCard.correct_index : null}
           />
-          {sessionState.isAnswered && (
+          {/* Continue button after MCQ answer */}
+          {isAnswered && (
             <div className="mt-6 flex justify-center">
-              <Button onClick={handleNextQuestion} size="lg">
-                {sessionState.currentIndex + 1 >= totalCards ? 'Finish Session' : 'Next Card'}
-              </Button>
+              <button
+                onClick={handleMCQContinue}
+                className="min-h-[44px] px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Continue
+              </button>
             </div>
           )}
         </>
       ) : (
         <>
           <Flashcard
-            front={(currentCard as Card).front}
-            back={(currentCard as Card).back}
-            imageUrl={(currentCard as Card).image_url}
-            isRevealed={sessionState.isRevealed}
+            front={currentCard.front}
+            back={currentCard.back}
+            imageUrl={currentCard.image_url}
+            isRevealed={isRevealed}
             onReveal={handleReveal}
           />
-          {sessionState.isRevealed && (
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <Button onClick={() => handleFlashcardRating(1)} variant="ghost" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50">
-                Again
-              </Button>
-              <Button onClick={() => handleFlashcardRating(2)} variant="ghost" className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50">
-                Hard
-              </Button>
-              <Button onClick={() => handleFlashcardRating(3)} variant="ghost" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50">
-                Good
-              </Button>
-              <Button onClick={() => handleFlashcardRating(4)} variant="ghost" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50">
-                Easy
-              </Button>
-            </div>
+          {/* Rating buttons - only show when revealed */}
+          {isRevealed && (
+            <RatingButtons cardId={currentCard.id} onRate={handleRate} />
           )}
         </>
-      )}
-
-      {/* Loading indicator */}
-      {isLoading && (
-        <div className="mt-4 text-center text-slate-500 dark:text-slate-400">
-          Processing...
-        </div>
       )}
     </div>
   )

@@ -1,201 +1,239 @@
 'use server'
 
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
-import { computeGlobalDueCount } from '@/lib/global-due-count'
-import { computeDailyProgress } from '@/lib/daily-progress'
-import type { Card, MCQCard } from '@/types/database'
+import type { Card } from '@/types/database'
+
+const BATCH_SIZE = 50
+const NEW_CARDS_FALLBACK_LIMIT = 10
 
 /**
- * Global Study Server Actions
- * Server actions for cross-deck study functionality.
- * Requirements: 2.2, 2.3
- * 
- * Feature: v3-ux-overhaul
+ * Result type for getGlobalDueCards
  */
-
 export interface GlobalDueCardsResult {
-  cards: (Card | MCQCard)[]
+  success: boolean
+  cards: Card[]
   totalDue: number
+  hasMoreBatches: boolean
   isNewCardsFallback: boolean
   error?: string
 }
 
+/**
+ * Result type for getGlobalStats
+ */
 export interface GlobalStatsResult {
+  success: boolean
   totalDueCount: number
   completedToday: number
+  currentStreak: number
   hasNewCards: boolean
   error?: string
 }
 
 /**
- * Fetches due cards across all user decks.
- * Orders by next_review ASC, limits to 50 cards.
- * Falls back to 10 new cards if no due cards exist.
- * Requirements: 2.2, 2.3
+ * Fetches due cards across all user decks for global study session.
+ * Orders by next_review ASC, limits to 50 cards per batch.
+ * Falls back to new cards if no due cards exist.
+ * 
+ * Requirements: 2.2, 2.3, 2.4
  */
-export async function getGlobalDueCards(): Promise<GlobalDueCardsResult> {
+export async function getGlobalDueCards(batchNumber: number = 0): Promise<GlobalDueCardsResult> {
   const user = await getUser()
   if (!user) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false, error: 'Authentication required' }
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: 'Authentication required',
+    }
   }
 
   const supabase = await createSupabaseServerClient()
   const now = new Date().toISOString()
 
-  // Fetch user's deck IDs first
+  // First, get all user's deck IDs
   const { data: decks, error: decksError } = await supabase
     .from('decks')
     .select('id')
     .eq('user_id', user.id)
 
   if (decksError) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false, error: decksError.message }
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: decksError.message,
+    }
   }
 
-  const deckIds = (decks || []).map(d => d.id)
-  
-  if (deckIds.length === 0) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false }
+  if (!decks || decks.length === 0) {
+    return {
+      success: true,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+    }
   }
 
-  // Fetch due flashcards across all decks
+  const deckIds = decks.map(d => d.id)
+
+  // Get total count of due cards
+  const { count: totalDueCount, error: countError } = await supabase
+    .from('cards')
+    .select('*', { count: 'exact', head: true })
+    .in('deck_id', deckIds)
+    .lte('next_review', now)
+
+  if (countError) {
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: countError.message,
+    }
+  }
+
+  const totalDue = totalDueCount || 0
+
+  // If no due cards, fall back to new cards
+  if (totalDue === 0) {
+    const { data: newCards, error: newCardsError } = await supabase
+      .from('cards')
+      .select('*')
+      .in('deck_id', deckIds)
+      .order('created_at', { ascending: true })
+      .limit(NEW_CARDS_FALLBACK_LIMIT)
+
+    if (newCardsError) {
+      return {
+        success: false,
+        cards: [],
+        totalDue: 0,
+        hasMoreBatches: false,
+        isNewCardsFallback: false,
+        error: newCardsError.message,
+      }
+    }
+
+    return {
+      success: true,
+      cards: (newCards || []) as Card[],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: true,
+    }
+  }
+
+  // Fetch due cards with pagination
+  const offset = batchNumber * BATCH_SIZE
   const { data: dueCards, error: cardsError } = await supabase
     .from('cards')
     .select('*')
     .in('deck_id', deckIds)
     .lte('next_review', now)
     .order('next_review', { ascending: true })
-    .limit(50)
+    .range(offset, offset + BATCH_SIZE - 1)
 
   if (cardsError) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false, error: cardsError.message }
-  }
-
-  // Fetch due MCQ cards across all decks
-  const { data: dueMCQs, error: mcqError } = await supabase
-    .from('mcq_cards')
-    .select('*')
-    .in('deck_id', deckIds)
-    .lte('next_review', now)
-    .order('next_review', { ascending: true })
-    .limit(50)
-
-  if (mcqError) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false, error: mcqError.message }
-  }
-
-  // Combine and sort all due cards
-  const allDueCards = [
-    ...(dueCards || []).map(c => ({ ...c, card_type: 'flashcard' as const })),
-    ...(dueMCQs || []).map(c => ({ ...c, card_type: 'mcq' as const }))
-  ].sort((a, b) => new Date(a.next_review).getTime() - new Date(b.next_review).getTime())
-    .slice(0, 50)
-
-  // If we have due cards, return them
-  if (allDueCards.length > 0) {
-    // Get total due count for stats
-    const { count: totalFlashcardsDue } = await supabase
-      .from('cards')
-      .select('*', { count: 'exact', head: true })
-      .in('deck_id', deckIds)
-      .lte('next_review', now)
-
-    const { count: totalMCQsDue } = await supabase
-      .from('mcq_cards')
-      .select('*', { count: 'exact', head: true })
-      .in('deck_id', deckIds)
-      .lte('next_review', now)
-
     return {
-      cards: allDueCards as (Card | MCQCard)[],
-      totalDue: (totalFlashcardsDue || 0) + (totalMCQsDue || 0),
-      isNewCardsFallback: false
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: cardsError.message,
     }
   }
 
-  // Fallback: fetch up to 10 new cards (never reviewed)
-  // New cards have next_review equal to created_at (default)
-  const { data: newCards, error: newCardsError } = await supabase
-    .from('cards')
-    .select('*')
-    .in('deck_id', deckIds)
-    .order('created_at', { ascending: true })
-    .limit(10)
-
-  if (newCardsError) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false, error: newCardsError.message }
-  }
-
-  const { data: newMCQs, error: newMCQsError } = await supabase
-    .from('mcq_cards')
-    .select('*')
-    .in('deck_id', deckIds)
-    .order('created_at', { ascending: true })
-    .limit(10)
-
-  if (newMCQsError) {
-    return { cards: [], totalDue: 0, isNewCardsFallback: false, error: newMCQsError.message }
-  }
-
-  const allNewCards = [
-    ...(newCards || []).map(c => ({ ...c, card_type: 'flashcard' as const })),
-    ...(newMCQs || []).map(c => ({ ...c, card_type: 'mcq' as const }))
-  ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    .slice(0, 10)
+  const hasMoreBatches = totalDue > (offset + BATCH_SIZE)
 
   return {
-    cards: allNewCards as (Card | MCQCard)[],
-    totalDue: 0,
-    isNewCardsFallback: true
+    success: true,
+    cards: (dueCards || []) as Card[],
+    totalDue,
+    hasMoreBatches,
+    isNewCardsFallback: false,
   }
 }
 
 /**
  * Fetches global stats for the dashboard hero.
- * Returns total due count, completed today, and whether new cards exist.
- * Requirements: 1.2, 1.3, 1.4
+ * Returns totalDueCount, completedToday, currentStreak, and hasNewCards.
+ * 
+ * Requirements: 1.2, 1.3, 1.4, 1.5
  */
 export async function getGlobalStats(): Promise<GlobalStatsResult> {
   const user = await getUser()
   if (!user) {
-    return { totalDueCount: 0, completedToday: 0, hasNewCards: false, error: 'Authentication required' }
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: 'Authentication required',
+    }
   }
 
   const supabase = await createSupabaseServerClient()
   const now = new Date().toISOString()
   const todayDateStr = new Date().toISOString().split('T')[0]
 
-  // Fetch user's deck IDs
+  // Get all user's deck IDs
   const { data: decks, error: decksError } = await supabase
     .from('decks')
     .select('id')
     .eq('user_id', user.id)
 
   if (decksError) {
-    return { totalDueCount: 0, completedToday: 0, hasNewCards: false, error: decksError.message }
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: decksError.message,
+    }
   }
 
-  const deckIds = (decks || []).map(d => d.id)
-
-  // Calculate total due count across all decks
-  let totalDueCount = 0
-  if (deckIds.length > 0) {
-    const { count: flashcardsDue } = await supabase
-      .from('cards')
-      .select('*', { count: 'exact', head: true })
-      .in('deck_id', deckIds)
-      .lte('next_review', now)
-
-    const { count: mcqsDue } = await supabase
-      .from('mcq_cards')
-      .select('*', { count: 'exact', head: true })
-      .in('deck_id', deckIds)
-      .lte('next_review', now)
-
-    totalDueCount = (flashcardsDue || 0) + (mcqsDue || 0)
+  if (!decks || decks.length === 0) {
+    return {
+      success: true,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+    }
   }
 
-  // Fetch today's study log for completed count
+  const deckIds = decks.map(d => d.id)
+
+  // Get total due count across all decks
+  const { count: totalDueCount, error: dueCountError } = await supabase
+    .from('cards')
+    .select('*', { count: 'exact', head: true })
+    .in('deck_id', deckIds)
+    .lte('next_review', now)
+
+  if (dueCountError) {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: dueCountError.message,
+    }
+  }
+
+  // Get completed today from study_logs
   const { data: studyLog, error: logError } = await supabase
     .from('study_logs')
     .select('cards_reviewed')
@@ -203,44 +241,79 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
     .eq('study_date', todayDateStr)
     .single()
 
+  // PGRST116 = no rows returned, which is expected if no study today
   if (logError && logError.code !== 'PGRST116') {
-    return { totalDueCount: 0, completedToday: 0, hasNewCards: false, error: logError.message }
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: logError.message,
+    }
   }
 
-  const completedToday = computeDailyProgress(studyLog)
+  const completedToday = studyLog?.cards_reviewed || 0
 
-  // Check if any cards exist (for empty state detection)
-  let hasNewCards = false
-  if (deckIds.length > 0) {
-    const { count: totalCards } = await supabase
-      .from('cards')
-      .select('*', { count: 'exact', head: true })
-      .in('deck_id', deckIds)
+  // Get current streak from user_stats
+  const { data: userStats, error: statsError } = await supabase
+    .from('user_stats')
+    .select('current_streak')
+    .eq('user_id', user.id)
+    .single()
 
-    const { count: totalMCQs } = await supabase
-      .from('mcq_cards')
-      .select('*', { count: 'exact', head: true })
-      .in('deck_id', deckIds)
-
-    hasNewCards = ((totalCards || 0) + (totalMCQs || 0)) > 0
+  // PGRST116 = no rows returned, which is expected for new users
+  if (statsError && statsError.code !== 'PGRST116') {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: statsError.message,
+    }
   }
+
+  const currentStreak = userStats?.current_streak || 0
+
+  // Check if there are any new cards (cards that exist)
+  const { count: totalCardsCount, error: cardsCountError } = await supabase
+    .from('cards')
+    .select('*', { count: 'exact', head: true })
+    .in('deck_id', deckIds)
+
+  if (cardsCountError) {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: cardsCountError.message,
+    }
+  }
+
+  const hasNewCards = (totalCardsCount || 0) > 0
 
   return {
-    totalDueCount,
+    success: true,
+    totalDueCount: totalDueCount || 0,
     completedToday,
-    hasNewCards
+    currentStreak,
+    hasNewCards,
   }
 }
 
 /**
- * Placeholder server action for AI-powered MCQ drafting.
- * Returns a dummy MCQ object (not wired to AI yet).
- * Requirements: 5.4, 5.5
+ * Placeholder server action for AI draft feature.
+ * Returns a predictable dummy MCQ object.
+ * 
+ * Requirements: 5.5, 5.6
  */
 export async function draftMCQFromText(text: string): Promise<{
   success: boolean
   mcq?: {
-    question_stem: string
+    stem: string
     options: string[]
     correct_index: number
     explanation: string
@@ -248,19 +321,14 @@ export async function draftMCQFromText(text: string): Promise<{
   error?: string
 }> {
   // Placeholder implementation - returns dummy MCQ
-  // TODO: Wire to AI service in future
+  // This will be replaced with actual AI implementation later
   return {
     success: true,
     mcq: {
-      question_stem: text.slice(0, 200) + (text.length > 200 ? '...' : ''),
-      options: [
-        'Option A (placeholder)',
-        'Option B (placeholder)',
-        'Option C (placeholder)',
-        'Option D (placeholder)'
-      ],
+      stem: 'AI Draft Placeholder',
+      options: ['A', 'B', 'C', 'D'],
       correct_index: 0,
-      explanation: 'This is a placeholder explanation. AI integration coming soon.'
-    }
+      explanation: 'AI explanation placeholder.',
+    },
   }
 }

@@ -1,41 +1,28 @@
 /**
- * Daily Progress Computation
- * Pure function for calculating cards completed today.
- * Requirements: 1.3, 1.4
+ * Daily Progress Calculation Utility
  * 
- * Feature: v3-ux-overhaul
+ * This module provides functions for calculating daily study progress.
+ * Extracted for testability via property-based testing.
+ * 
+ * Requirements: 1.3, 1.4
  */
 
-/**
- * Computes the daily progress (cards reviewed today) from a study log.
- * Returns 0 if no study log exists for today.
- * 
- * @param studyLog - Study log entry for today, or null if none exists
- * @returns Number of cards reviewed today
- */
-export function computeDailyProgress(
-  studyLog: { cards_reviewed: number } | null
-): number {
-  if (!studyLog) {
-    return 0
-  }
-  return studyLog.cards_reviewed
+export interface StudyLogForProgress {
+  cards_reviewed: number;
 }
 
 /**
- * Computes the progress percentage toward a daily goal.
- * Returns null if no daily goal is set.
+ * Computes the daily progress (cards reviewed today) from a study log entry.
+ * Returns the cards_reviewed count if a log exists, or 0 if no log exists.
  * 
- * @param completedToday - Number of cards completed today
- * @param dailyGoal - Daily goal target, or null if not set
- * @returns Progress percentage (0-100), capped at 100, or null if no goal
+ * @param studyLog - The study log entry for today, or null if none exists
+ * @returns The count of cards reviewed today
+ * 
+ * Requirements: 1.3, 1.4
  */
-export function computeProgressPercent(
-  completedToday: number,
-  dailyGoal: number | null
-): number | null {
-  if (dailyGoal === null || dailyGoal <= 0) {
-    return null
+export function computeDailyProgress(studyLog: StudyLogForProgress | null): number {
+  if (studyLog === null) {
+    return 0;
   }
-  return Math.min(100, Math.round((completedToday / dailyGoal) * 100))
+  return studyLog.cards_reviewed;
 }

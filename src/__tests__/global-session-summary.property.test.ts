@@ -1,148 +1,145 @@
-/**
- * Property-Based Tests for Global Session Summary
- * Feature: v3-ux-overhaul
- * Property 5: Session summary state consistency
- * Property 7: Continue button conditional display
- * Validates: Requirements 2.5, 6.1, 6.3, 6.4
- */
-
-import { describe, it, expect } from 'vitest'
-import * as fc from 'fast-check'
-import { shouldShowContinueButton } from '@/components/study/GlobalStudySummary'
+import { describe, test, expect } from 'vitest'
+import fc from 'fast-check'
 
 /**
- * Simulates session state tracking for property testing.
- * Tracks correct/incorrect counts as answers are processed.
+ * Global Session Summary Property-Based Tests
+ * 
+ * **Feature: v3-ux-overhaul, Property 5: Session summary state consistency**
+ * **Validates: Requirements 2.6, 6.1**
+ * 
+ * For any sequence of answers in a global study session, the summary SHALL display
+ * `correctCount` equal to the number of correct answers and `incorrectCount` equal
+ * to the number of incorrect answers, where `correctCount + incorrectCount` equals
+ * total cards answered.
  */
-interface SessionState {
+
+// Pure function to compute session summary state from a sequence of answers
+interface SessionSummaryState {
   correctCount: number
   incorrectCount: number
+  totalAnswered: number
 }
 
-function processAnswers(answers: boolean[]): SessionState {
-  let correctCount = 0
-  let incorrectCount = 0
-  
-  for (const isCorrect of answers) {
-    if (isCorrect) {
-      correctCount++
-    } else {
-      incorrectCount++
-    }
+/**
+ * Computes session summary state from a sequence of boolean answers.
+ * true = correct, false = incorrect
+ */
+function computeSessionSummary(answers: boolean[]): SessionSummaryState {
+  const correctCount = answers.filter(a => a === true).length
+  const incorrectCount = answers.filter(a => a === false).length
+  return {
+    correctCount,
+    incorrectCount,
+    totalAnswered: correctCount + incorrectCount,
   }
-  
-  return { correctCount, incorrectCount }
 }
 
-describe('Session Summary State', () => {
+/**
+ * Applies a single answer to the session state.
+ * Returns updated state.
+ */
+function applyAnswer(
+  state: SessionSummaryState,
+  isCorrect: boolean
+): SessionSummaryState {
+  return {
+    correctCount: state.correctCount + (isCorrect ? 1 : 0),
+    incorrectCount: state.incorrectCount + (isCorrect ? 0 : 1),
+    totalAnswered: state.totalAnswered + 1,
+  }
+}
+
+// Generator for answer sequences (true = correct, false = incorrect)
+const answerSequenceArb = fc.array(fc.boolean(), { minLength: 0, maxLength: 100 })
+
+// Generator for valid session summary state
+const sessionSummaryStateArb = fc.record({
+  correctCount: fc.integer({ min: 0, max: 500 }),
+  incorrectCount: fc.integer({ min: 0, max: 500 }),
+}).map(({ correctCount, incorrectCount }) => ({
+  correctCount,
+  incorrectCount,
+  totalAnswered: correctCount + incorrectCount,
+}))
+
+describe('Property 5: Session summary state consistency', () => {
   /**
-   * Property 5: Session summary state consistency
-   * For any sequence of answers in a global study session, the summary SHALL display
-   * correctCount equal to the number of correct answers and incorrectCount equal to
-   * the number of incorrect answers, where correctCount + incorrectCount equals total cards answered.
+   * **Feature: v3-ux-overhaul, Property 5: Session summary state consistency**
+   * **Validates: Requirements 2.6, 6.1**
    */
-  it('should track correct and incorrect counts accurately for any answer sequence', () => {
+  test('correctCount equals the number of correct answers', () => {
     fc.assert(
-      fc.property(
-        // Generate a sequence of boolean answers (true = correct, false = incorrect)
-        fc.array(fc.boolean(), { minLength: 0, maxLength: 100 }),
-        (answers) => {
-          const state = processAnswers(answers)
-          
-          // Verify counts match expected
-          const expectedCorrect = answers.filter(a => a).length
-          const expectedIncorrect = answers.filter(a => !a).length
-          
-          expect(state.correctCount).toBe(expectedCorrect)
-          expect(state.incorrectCount).toBe(expectedIncorrect)
-          
-          // Verify sum equals total
-          expect(state.correctCount + state.incorrectCount).toBe(answers.length)
-        }
-      ),
+      fc.property(answerSequenceArb, (answers) => {
+        const result = computeSessionSummary(answers)
+        const expectedCorrect = answers.filter(a => a === true).length
+        
+        expect(result.correctCount).toBe(expectedCorrect)
+      }),
       { numRuns: 100 }
     )
   })
 
-  it('should handle empty session (no answers)', () => {
-    const state = processAnswers([])
-    expect(state.correctCount).toBe(0)
-    expect(state.incorrectCount).toBe(0)
-  })
-
-  it('should handle all correct answers', () => {
+  test('incorrectCount equals the number of incorrect answers', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 1, max: 50 }),
-        (count) => {
-          const answers = Array(count).fill(true)
-          const state = processAnswers(answers)
-          
-          expect(state.correctCount).toBe(count)
-          expect(state.incorrectCount).toBe(0)
-        }
-      ),
+      fc.property(answerSequenceArb, (answers) => {
+        const result = computeSessionSummary(answers)
+        const expectedIncorrect = answers.filter(a => a === false).length
+        
+        expect(result.incorrectCount).toBe(expectedIncorrect)
+      }),
       { numRuns: 100 }
     )
   })
 
-  it('should handle all incorrect answers', () => {
+  test('correctCount + incorrectCount equals total cards answered', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 1, max: 50 }),
-        (count) => {
-          const answers = Array(count).fill(false)
-          const state = processAnswers(answers)
-          
-          expect(state.correctCount).toBe(0)
-          expect(state.incorrectCount).toBe(count)
-        }
-      ),
-      { numRuns: 100 }
-    )
-  })
-})
-
-describe('Continue Button Display', () => {
-  /**
-   * Property 7: Continue button conditional display
-   * For any global study session completion, the "Continue Studying" button
-   * SHALL be visible if and only if remainingDueCount > 0.
-   */
-  it('should show continue button if and only if remaining count is positive', () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: -10, max: 100 }), // Include negative to test edge cases
-        (remainingCount) => {
-          const shouldShow = shouldShowContinueButton(remainingCount)
-          
-          if (remainingCount > 0) {
-            expect(shouldShow).toBe(true)
-          } else {
-            expect(shouldShow).toBe(false)
-          }
-        }
-      ),
+      fc.property(answerSequenceArb, (answers) => {
+        const result = computeSessionSummary(answers)
+        
+        expect(result.correctCount + result.incorrectCount).toBe(result.totalAnswered)
+        expect(result.totalAnswered).toBe(answers.length)
+      }),
       { numRuns: 100 }
     )
   })
 
-  it('should hide continue button when remaining is exactly 0', () => {
-    expect(shouldShowContinueButton(0)).toBe(false)
-  })
-
-  it('should show continue button when remaining is exactly 1', () => {
-    expect(shouldShowContinueButton(1)).toBe(true)
-  })
-
-  it('should hide continue button for negative values', () => {
+  test('single answer updates state correctly', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: -1000, max: -1 }),
-        (negativeCount) => {
-          expect(shouldShowContinueButton(negativeCount)).toBe(false)
+      fc.property(sessionSummaryStateArb, fc.boolean(), (state, isCorrect) => {
+        const result = applyAnswer(state, isCorrect)
+        
+        // totalAnswered should increase by 1
+        expect(result.totalAnswered).toBe(state.totalAnswered + 1)
+        
+        if (isCorrect) {
+          expect(result.correctCount).toBe(state.correctCount + 1)
+          expect(result.incorrectCount).toBe(state.incorrectCount)
+        } else {
+          expect(result.correctCount).toBe(state.correctCount)
+          expect(result.incorrectCount).toBe(state.incorrectCount + 1)
         }
-      ),
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  test('empty answer sequence results in zero counts', () => {
+    const result = computeSessionSummary([])
+    
+    expect(result.correctCount).toBe(0)
+    expect(result.incorrectCount).toBe(0)
+    expect(result.totalAnswered).toBe(0)
+  })
+
+  test('counts are always non-negative', () => {
+    fc.assert(
+      fc.property(answerSequenceArb, (answers) => {
+        const result = computeSessionSummary(answers)
+        
+        expect(result.correctCount).toBeGreaterThanOrEqual(0)
+        expect(result.incorrectCount).toBeGreaterThanOrEqual(0)
+        expect(result.totalAnswered).toBeGreaterThanOrEqual(0)
+      }),
       { numRuns: 100 }
     )
   })

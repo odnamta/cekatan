@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { BulkImportStepper } from '@/components/cards/BulkImportStepper'
 import { TextToStemButton } from '@/components/cards/TextToStemButton'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { Sparkles } from 'lucide-react'
 
 /**
@@ -19,38 +20,26 @@ import { Sparkles } from 'lucide-react'
 export default function BulkImportPage() {
   const params = useParams()
   const deckId = params.deckId as string
+  const { showToast } = useToast()
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
   const [questionStem, setQuestionStem] = useState('')
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(2) // Default to step 2 (Select Text)
-
-  // Show toast message
-  const showToast = (message: string) => {
-    setToastMessage(message)
-    setTimeout(() => setToastMessage(null), 3000)
-  }
 
   // Handle text selection transfer
   const handleTextSelected = (text: string) => {
     setQuestionStem(text)
     setCurrentStep(3)
-    showToast('Text copied to Question Stem!')
+    showToast('Text copied to Question Stem!', 'success')
   }
 
-  // Handle no selection
+  // Handle no selection - Requirement 5.3
   const handleNoSelection = () => {
-    showToast('Select text in the left box first.')
+    showToast('Select text in the left box first.', 'error')
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Toast notification */}
-      {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 px-4 py-3 bg-slate-800 dark:bg-slate-700 text-white rounded-lg shadow-lg animate-fade-in">
-          {toastMessage}
-        </div>
-      )}
 
       {/* Header with navigation */}
       <div className="mb-6">
@@ -99,15 +88,16 @@ export default function BulkImportPage() {
           onNoSelection={handleNoSelection}
         />
         
-        {/* AI Draft placeholder - Requirements 5.4, 5.5 */}
+        {/* AI Draft placeholder - Requirements 5.4, 5.5, 5.6 */}
         <Button
           type="button"
           variant="ghost"
           disabled
+          title="Coming soon"
           className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-400 dark:text-purple-500 border border-purple-200 dark:border-purple-800 cursor-not-allowed"
         >
           <Sparkles className="w-4 h-4" />
-          AI Draft (Coming Soon)
+          ✨ AI Draft (Coming Soon)
         </Button>
       </div>
 
@@ -165,17 +155,12 @@ function BulkMCQForm({ deckId, initialStem }: { deckId: string; initialStem: str
   const [explanation, setExplanation] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [lastInitialStem, setLastInitialStem] = useState(initialStem)
 
-  // Update stem when initialStem changes
-  useState(() => {
-    if (initialStem) {
-      setStem(initialStem)
-    }
-  })
-
-  // Sync with initialStem prop
-  if (initialStem && initialStem !== stem && stem === '') {
+  // Sync with initialStem prop when it changes from parent
+  if (initialStem !== lastInitialStem) {
     setStem(initialStem)
+    setLastInitialStem(initialStem)
   }
 
   const handleOptionChange = (index: number, value: string) => {
