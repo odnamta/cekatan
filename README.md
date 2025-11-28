@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Celline's OBGYN Prep
+
+A spaced repetition learning app for OBGYN exam preparation, featuring flashcards, multiple-choice questions, and gamification elements like streaks and study heatmaps.
+
+## Features
+
+- **Spaced Repetition (SM-2)** — Optimized review scheduling based on your performance
+- **Flashcards & MCQs** — Support for both card types with markdown rendering
+- **Bulk Import** — Create MCQs quickly from PDF source materials
+- **Gamification** — Daily streaks, study heatmaps, and progress tracking
+- **Dark Mode** — Full dark mode support with WCAG AA contrast compliance
+- **Mobile-First** — Responsive design optimized for studying on any device
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Database:** Supabase (PostgreSQL + Auth + RLS)
+- **Styling:** Tailwind CSS 4
+- **Testing:** Vitest + fast-check (property-based testing)
+- **Validation:** Zod
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20+
+- A Supabase project ([create one here](https://supabase.com/dashboard))
+
+### 1. Clone and Install
+
+```bash
+git clone <your-repo-url>
+cd cellines-obgyn-prep
+npm install
+```
+
+### 2. Set Up Supabase
+
+1. Create a new Supabase project
+2. Go to **SQL Editor** and run the contents of `schema.sql` to create all tables and RLS policies
+3. Enable Email Auth in **Authentication > Providers**
+
+### 3. Configure Environment Variables
+
+Copy the example env file and fill in your Supabase credentials:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Required variables:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+Find these in your Supabase dashboard under **Settings > API**.
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run test` | Run tests once |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run lint` | Run ESLint |
+| `npm run seed` | Seed database with sample data |
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── actions/        # Server Actions (mutations)
+├── app/            # Next.js App Router pages
+├── components/     # React components
+│   ├── cards/      # Card creation components
+│   ├── course/     # Course hierarchy (WIP)
+│   ├── dashboard/  # Dashboard widgets
+│   ├── decks/      # Deck management
+│   ├── study/      # Study session components
+│   └── ui/         # Reusable UI primitives
+├── lib/            # Pure functions & utilities
+├── types/          # TypeScript type definitions
+└── __tests__/      # Property-based tests
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project uses property-based testing with fast-check to verify correctness properties:
 
-## Deploy on Vercel
+```bash
+npm run test
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Tests cover core algorithms like SM-2 spaced repetition, streak calculation, and session state management.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+Private project.

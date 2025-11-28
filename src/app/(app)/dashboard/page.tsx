@@ -23,8 +23,8 @@ export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient()
   const now = new Date().toISOString()
 
-  // Fetch study logs for heatmap (Requirement 2.2)
-  const { logs: studyLogs } = await getStudyLogs(60)
+  // Fetch study logs for heatmap - full year (Requirement 2.2)
+  const { logs: studyLogs } = await getStudyLogs(365)
 
   // Fetch user stats for streak display (Requirement 1.7)
   const { stats: userStats } = await getUserStats()
@@ -152,11 +152,12 @@ export default async function DashboardPage() {
         dailyGoal={null}
         currentStreak={globalStats.currentStreak}
         hasNewCards={globalStats.hasNewCards}
+        userName={user.user_metadata?.name || user.email?.split('@')[0]}
       />
 
       {/* Study Heatmap (Requirement 2.2) */}
       <div className="mb-8 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
-        <StudyHeatmap studyLogs={studyLogs} />
+        <StudyHeatmap studyLogs={studyLogs} currentYear={new Date().getFullYear()} />
       </div>
 
       {/* Library Section - Collapsible courses and decks (Requirements 3.1, 3.2, 3.3, 3.4) */}

@@ -58,6 +58,7 @@ export interface DashboardHeroProps {
   dailyGoal: number | null
   currentStreak: number
   hasNewCards: boolean
+  userName?: string
 }
 
 /**
@@ -71,6 +72,7 @@ export function DashboardHero({
   dailyGoal,
   currentStreak,
   hasNewCards,
+  userName,
 }: DashboardHeroProps) {
   const [hasUnfinishedSession, setHasUnfinishedSession] = useState(false)
 
@@ -91,7 +93,7 @@ export function DashboardHero({
     <Card variant="elevated" padding="lg" className="mb-8">
       {/* Greeting - Requirement 1.1 */}
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-        Hi Celline 👋 Ready to study?
+        {userName ? `Hi ${userName} 👋` : 'Hey there 👋'} Ready to study?
       </h1>
 
       {/* Stats Row */}
