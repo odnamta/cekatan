@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { FileText, MessageSquare, Sparkles } from 'lucide-react'
+import { FileText, MessageSquare, Sparkles, Layers } from 'lucide-react'
 
 interface SelectionTooltipProps {
   position: { x: number; y: number }
@@ -16,6 +16,7 @@ interface SelectionTooltipProps {
 /**
  * SelectionTooltip - Floating tooltip for PDF text selection actions
  * Requirements: V5 Feature Set 2 - Req 2.7, 2.11
+ * V6.2: Batch Draft is now the primary/prominent button
  */
 export function SelectionTooltip({
   position,
@@ -52,65 +53,69 @@ export function SelectionTooltip({
 
   // Calculate position to keep tooltip in viewport
   const tooltipStyle = {
-    left: `${Math.max(10, Math.min(position.x - 100, window.innerWidth - 220))}px`,
+    left: `${Math.max(10, Math.min(position.x - 100, window.innerWidth - 280))}px`,
     top: `${Math.max(10, position.y - 50)}px`,
   }
 
   return (
     <div
       ref={tooltipRef}
-      className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-1 flex gap-1"
+      className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-1.5 flex flex-wrap gap-1"
       style={tooltipStyle}
     >
-      <button
-        onClick={() => {
-          onToStem()
-          onClose()
-        }}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-        title="Copy to question stem"
-      >
-        <FileText className="w-4 h-4" />
-        <span className="hidden sm:inline">To Stem</span>
-      </button>
-      
-      <button
-        onClick={() => {
-          onToExplanation()
-          onClose()
-        }}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-        title="Copy to explanation"
-      >
-        <MessageSquare className="w-4 h-4" />
-        <span className="hidden sm:inline">To Explanation</span>
-      </button>
-      
-      <button
-        onClick={() => {
-          onToAIDraft()
-          onClose()
-        }}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-        title="Generate 1 MCQ with AI"
-      >
-        <Sparkles className="w-4 h-4" />
-        <span className="hidden sm:inline">AI Draft</span>
-      </button>
-      
+      {/* V6.2: Batch Draft is now PRIMARY - larger, more prominent */}
       {onToAIBatch && (
         <button
           onClick={() => {
             onToAIBatch()
             onClose()
           }}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors"
-          title="Generate up to 5 MCQs with AI"
+          className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors min-h-[48px] min-w-[120px] justify-center"
+          title="Generate up to 5 MCQs with AI (⇧⌘↵)"
         >
-          <Sparkles className="w-4 h-4" />
-          <span className="hidden sm:inline">AI Batch</span>
+          <Layers className="w-5 h-5" />
+          <span>Batch Draft</span>
         </button>
       )}
+      
+      {/* Secondary actions - smaller */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => {
+            onToAIDraft()
+            onClose()
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+          title="Generate 1 MCQ with AI"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span className="hidden sm:inline">AI Draft</span>
+        </button>
+        
+        <button
+          onClick={() => {
+            onToStem()
+            onClose()
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+          title="Copy to question stem"
+        >
+          <FileText className="w-4 h-4" />
+          <span className="hidden sm:inline">To Stem</span>
+        </button>
+        
+        <button
+          onClick={() => {
+            onToExplanation()
+            onClose()
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+          title="Copy to explanation"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span className="hidden sm:inline">To Explanation</span>
+        </button>
+      </div>
     </div>
   )
 }

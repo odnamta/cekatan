@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useParams } from 'next/navigation'
@@ -14,14 +14,24 @@ import { draftMCQFromText } from '@/actions/ai-actions'
 import { draftBatchMCQFromText } from '@/actions/batch-mcq-actions'
 import { RATE_LIMIT_MS } from '@/lib/ai-config'
 import { SelectionTooltip } from '@/components/pdf/SelectionTooltip'
+import { SessionHUD } from '@/components/pdf/SessionHUD'
+import { ModeToggle } from '@/components/ai/ModeToggle'
+import { ImageDropZone } from '@/components/ai/ImageDropZone'
 import { uploadSourceAction } from '@/actions/source-actions'
 import { useSessionTags } from '@/hooks/use-session-tags'
 import { TagSelector } from '@/components/tags/TagSelector'
 import { BatchReviewPanel } from '@/components/batch/BatchReviewPanel'
 import { toUIFormatArray, type MCQBatchDraftUI } from '@/lib/batch-mcq-schema'
 import { useHotkeys, getPlatformModifier } from '@/hooks/use-hotkeys'
+import { getAIMode, type AIMode } from '@/lib/ai-mode-storage'
+import { 
+  getSessionCardCount, 
+  addToSessionCardCount, 
+  resetSessionCardCount 
+} from '@/lib/session-hud-storage'
+import type { ProcessedImage } from '@/lib/image-processing'
 
-// Dynamic import PDFViewer to avoid SSR issues with react-pdf (DOMMatrix not defined)
+// Dynamic import PDFViewer to avoid SSR issues with react-pdf
 const PDFViewer = dynamic(
   () => import('@/components/pdf/PDFViewer').then(mod => ({ default: mod.PDFViewer })),
   { 
@@ -35,13 +45,13 @@ const PDFViewer = dynamic(
   }
 )
 
+
 /**
  * Bulk Import Page - Client Component
  * Enhanced UI for PDF-assisted MCQ creation with text selection helper.
- * Requirements: 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 7.3, 9.1, 9.4, 10.1, 10.2, 10.3, 10.4
- * 
- * Feature: v3-ux-overhaul, v4-ai-brain
+ * V6.2: Hyperflow features, Brain Toggle, Vision MVP
  */
+
 // Linked source state type
 interface LinkedSource {
   id: string
@@ -62,9 +72,10 @@ export default function BulkImportPage() {
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
   const formRef = useRef<HTMLDivElement>(null)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1) // Start at step 1 (Upload PDF)
+  const pdfContainerRef = useRef<HTMLDivElement>(null)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
   
-  // Linked source state - Requirements 4.1, 4.2, 4.3
+  // Linked source state
   const [linkedSource, setLinkedSource] = useState<LinkedSource | null>(null)
   const [showUploadDropzone, setShowUploadDropzone] = useState(true)
   
@@ -73,32 +84,57 @@ export default function BulkImportPage() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // PDF selection state - Requirements V5 2.7, 2.11
+  // PDF selection state
   const [pdfSelection, setPdfSelection] = useState<SelectionState | null>(null)
 
-  // MCQ form state - lifted up for toolbar integration
+  // MCQ form state
   const [questionStem, setQuestionStem] = useState('')
-  const [options, setOptions] = useState(['', '', '', '', '']) // 5 options for AI compatibility
+  const [options, setOptions] = useState(['', '', '', '', ''])
   const [explanation, setExplanation] = useState('')
   const [correctIndex, setCorrectIndex] = useState(0)
 
-  // AI Draft state - Requirements FR-1, FR-5.2
+  // AI Draft state
   const [isGenerating, setIsGenerating] = useState(false)
   const [lastGenerateTime, setLastGenerateTime] = useState(0)
 
-  // V6: Session Tags - Requirements R2.1
+  // V6: Session Tags
   const { sessionTagIds, setSessionTagIds, sessionTagNames, isLoading: isLoadingTags } = useSessionTags(deckId)
 
-  // V6: Batch AI Draft state - Requirements R1.1, R1.3
+  // V6: Batch AI Draft state
   const [batchDrafts, setBatchDrafts] = useState<MCQBatchDraftUI[]>([])
   const [isBatchPanelOpen, setIsBatchPanelOpen] = useState(false)
   const [isBatchGenerating, setIsBatchGenerating] = useState(false)
   const [lastBatchTime, setLastBatchTime] = useState(0)
 
-  // Refs for form fields (for auto-focus)
+  // V6.2: AI Mode (Brain Toggle)
+  const [aiMode, setAIMode] = useState<AIMode>('extract')
+  
+  // V6.2: Session HUD - track cards created in this session
+  const [sessionCardCount, setSessionCardCount] = useState(0)
+  
+  // V6.2: Vision MVP - image state
+  const [processedImage, setProcessedImage] = useState<ProcessedImage | null>(null)
+
+  // V6.2: Scroll position preservation
+  const [savedScrollPosition, setSavedScrollPosition] = useState(0)
+
+  // Refs for form fields
   const stemRef = useRef<HTMLTextAreaElement>(null)
   const optionRefs = useRef<(HTMLInputElement | null)[]>([])
   const explanationRef = useRef<HTMLTextAreaElement>(null)
+
+  // Load saved AI mode and session count on mount
+  useEffect(() => {
+    setAIMode(getAIMode())
+  }, [])
+
+  // Load session card count when source changes
+  useEffect(() => {
+    if (linkedSource?.id) {
+      setSessionCardCount(getSessionCardCount(linkedSource.id))
+    }
+  }, [linkedSource?.id])
+
 
   // Handle successful PDF upload
   const handleUploadSuccess = useCallback((source: LinkedSource) => {
@@ -115,19 +151,11 @@ export default function BulkImportPage() {
     setUploadError(null)
   }, [])
 
-  // Handle file selection and upload - Requirements 9.1, 9.2
+  // Handle file selection and upload
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    
-    // Reset file input so same file can be selected again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-    
-    // If no file selected (user cancelled), do nothing
+    if (fileInputRef.current) fileInputRef.current.value = ''
     if (!file) return
-    
-    // Validate it's a real File object
     if (!(file instanceof File)) {
       setUploadError('Invalid file selected')
       return
@@ -147,7 +175,6 @@ export default function BulkImportPage() {
       if (!result.success) {
         setUploadError(result.error || 'Upload failed')
       } else if (result.data) {
-        // Only set linked source and show success on actual upload completion
         const source = result.data as { id: string; title: string; file_url?: string }
         handleUploadSuccess({
           id: source.id,
@@ -173,24 +200,23 @@ export default function BulkImportPage() {
     }
   }, [deckId, handleUploadSuccess])
 
-  // Handle upload button click - just opens file picker
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click()
   }, [])
 
-  // Handle PDF text selection - Requirements V5 2.7
+  // Handle PDF text selection
   const handlePdfTextSelect = useCallback((text: string, position: { x: number; y: number }) => {
     setPdfSelection({ text, position })
   }, [])
 
-  // Scroll to form on mobile - Requirements V5 2.6
+  // Scroll to form on mobile
   const scrollToForm = useCallback(() => {
     if (window.innerWidth < 1024 && formRef.current) {
       formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [])
 
-  // Handle "To Stem" from PDF selection - Requirements V5 2.8
+  // Handle "To Stem" from PDF selection
   const handlePdfToStem = useCallback(() => {
     if (pdfSelection) {
       setQuestionStem(pdfSelection.text)
@@ -201,7 +227,7 @@ export default function BulkImportPage() {
     }
   }, [pdfSelection, showToast, scrollToForm])
 
-  // Handle "To Explanation" from PDF selection - Requirements V5 2.9
+  // Handle "To Explanation" from PDF selection
   const handlePdfToExplanation = useCallback(() => {
     if (pdfSelection) {
       setExplanation(pdfSelection.text)
@@ -212,13 +238,12 @@ export default function BulkImportPage() {
     }
   }, [pdfSelection, showToast, scrollToForm])
 
-  // Handle "To AI Draft" from PDF selection - Requirements V5 2.10
+
+  // Handle "To AI Draft" from PDF selection
   const handlePdfToAIDraft = useCallback(async () => {
     if (!pdfSelection) return
     
     const selectedText = pdfSelection.text
-    
-    // Check rate limit
     const now = Date.now()
     if (now - lastGenerateTime < RATE_LIMIT_MS) {
       showToast('Please wait a moment before generating again', 'error')
@@ -234,6 +259,8 @@ export default function BulkImportPage() {
         sourceText: selectedText,
         deckId,
         deckName: linkedSource?.fileName?.replace('.pdf', ''),
+        mode: aiMode,
+        imageBase64: processedImage?.base64 || undefined,
       })
 
       if (result.ok) {
@@ -260,35 +287,40 @@ export default function BulkImportPage() {
     } finally {
       setIsGenerating(false)
     }
-  }, [pdfSelection, lastGenerateTime, deckId, linkedSource?.fileName, showToast, scrollToForm])
+  }, [pdfSelection, lastGenerateTime, deckId, linkedSource?.fileName, aiMode, processedImage, showToast, scrollToForm])
 
-  // Close PDF selection tooltip - Requirements V5 2.11, 2.12
+  // Close PDF selection tooltip
   const handleClosePdfSelection = useCallback(() => {
     setPdfSelection(null)
   }, [])
 
-  // V6: Handle "AI Batch Draft" from PDF selection - Requirements R1.1
+  // V6: Handle "AI Batch Draft" from PDF selection
   const handlePdfToAIBatch = useCallback(async () => {
     if (!pdfSelection) return
     
     const selectedText = pdfSelection.text
-    
-    // Check rate limit
     const now = Date.now()
     if (now - lastBatchTime < RATE_LIMIT_MS) {
       showToast('Please wait a moment before generating again', 'error')
       return
     }
 
+    // V6.2: Save scroll position before opening modal
+    if (pdfContainerRef.current) {
+      setSavedScrollPosition(pdfContainerRef.current.scrollTop)
+    }
+
     setIsBatchGenerating(true)
     setLastBatchTime(now)
-    setPdfSelection(null) // Close tooltip
+    setPdfSelection(null)
 
     try {
       const result = await draftBatchMCQFromText({
         deckId,
         text: selectedText,
         defaultTags: sessionTagNames,
+        mode: aiMode,
+        imageBase64: processedImage?.base64 || undefined,
       })
 
       if (result.ok) {
@@ -308,32 +340,57 @@ export default function BulkImportPage() {
     } finally {
       setIsBatchGenerating(false)
     }
-  }, [pdfSelection, lastBatchTime, deckId, sessionTagNames, showToast])
+  }, [pdfSelection, lastBatchTime, deckId, sessionTagNames, aiMode, processedImage, showToast])
 
-  // V6: Handle batch save success - Requirements R1.4
-  const handleBatchSaveSuccess = useCallback((_count: number) => {
+  // V6.2: Handle batch save success - update session count and restore scroll
+  const handleBatchSaveSuccess = useCallback((count: number) => {
     setBatchDrafts([])
     setIsBatchPanelOpen(false)
-    // Focus PDF viewer container after save
+    
+    // Update session card count
+    if (linkedSource?.id) {
+      const newTotal = addToSessionCardCount(linkedSource.id, count)
+      setSessionCardCount(newTotal)
+    }
+    
+    // V6.2: Restore scroll position after modal closes
+    setTimeout(() => {
+      if (pdfContainerRef.current) {
+        pdfContainerRef.current.scrollTop = savedScrollPosition
+      }
+      pdfContainerRef.current?.focus()
+    }, 100)
+  }, [linkedSource?.id, savedScrollPosition])
+
+  // V6.2: Handle session HUD reset
+  const handleResetSessionCount = useCallback(() => {
+    if (linkedSource?.id) {
+      resetSessionCardCount(linkedSource.id)
+      setSessionCardCount(0)
+      showToast('Session count reset', 'success')
+    }
+  }, [linkedSource?.id, showToast])
+
+  // V6.2: Handle single card save success
+  const handleSingleCardSaveSuccess = useCallback(() => {
+    if (linkedSource?.id) {
+      const newTotal = addToSessionCardCount(linkedSource.id, 1)
+      setSessionCardCount(newTotal)
+    }
     pdfContainerRef.current?.focus()
-  }, [])
+  }, [linkedSource?.id])
 
-  // Ref for PDF viewer container (for focus management) - Requirements R3.2
-  const pdfContainerRef = useRef<HTMLDivElement>(null)
 
-  // V6: Hotkeys integration - Requirements R3.1, R3.2
+  // V6: Hotkeys integration
   const platformMod = getPlatformModifier()
   
-  // Handler for single-card submit via hotkey
   const handleHotkeySubmit = useCallback(() => {
-    // Find and click the submit button in the form
     const submitBtn = formRef.current?.querySelector('button[type="submit"]') as HTMLButtonElement | null
     if (submitBtn && !submitBtn.disabled) {
       submitBtn.click()
     }
   }, [])
 
-  // Handler for batch draft via hotkey
   const handleHotkeyBatchDraft = useCallback(() => {
     if (pdfSelection?.text) {
       handlePdfToAIBatch()
@@ -342,7 +399,6 @@ export default function BulkImportPage() {
     }
   }, [pdfSelection?.text, handlePdfToAIBatch, showToast])
 
-  // Handler for Escape key
   const handleHotkeyEscape = useCallback(() => {
     if (isBatchPanelOpen) {
       setIsBatchPanelOpen(false)
@@ -353,28 +409,25 @@ export default function BulkImportPage() {
 
   useHotkeys([
     {
-      // Cmd/Ctrl+Enter → submit single-card form
       key: 'Enter',
       modifiers: [platformMod],
       handler: handleHotkeySubmit,
       enabled: !isBatchPanelOpen,
     },
     {
-      // Shift+Cmd/Ctrl+Enter → trigger batch draft
       key: 'Enter',
       modifiers: ['shift', platformMod],
       handler: handleHotkeyBatchDraft,
       enabled: !isBatchPanelOpen && !isBatchGenerating,
     },
     {
-      // Escape → close batch panel or clear selection tooltip
       key: 'Escape',
       handler: handleHotkeyEscape,
       enabled: true,
     },
   ])
 
-  // Handle copy to field from toolbar - Requirements 5.2, 5.3
+  // Handle copy to field from toolbar
   const handleCopyToField = useCallback((field: TargetField, text: string) => {
     switch (field) {
       case 'stem':
@@ -400,7 +453,6 @@ export default function BulkImportPage() {
     setCurrentStep(3)
     showToast(`Text copied to ${field === 'stem' ? 'Question Stem' : field}!`, 'success')
 
-    // Auto-focus next field - Requirement 5.3
     const nextField = getNextField(field)
     setTimeout(() => {
       if (nextField === 'stem') stemRef.current?.focus()
@@ -412,14 +464,12 @@ export default function BulkImportPage() {
     }, 50)
   }, [showToast])
 
-  // Handle no selection - Requirement 5.3
   const handleNoSelection = useCallback(() => {
     showToast('Select text in the left box first.', 'error')
   }, [showToast])
 
-  // Handle AI Draft button click - Requirements FR-1, FR-4, FR-5
+  // Handle AI Draft button click (from toolbar)
   const handleAIDraft = useCallback(async () => {
-    // Check if text is selected (FR-1.1, FR-4.3)
     const selectedText = textAreaRef.current
       ? textAreaRef.current.value.substring(
           textAreaRef.current.selectionStart,
@@ -432,14 +482,12 @@ export default function BulkImportPage() {
       return
     }
 
-    // Check rate limit (FR-5.2)
     const now = Date.now()
     if (now - lastGenerateTime < RATE_LIMIT_MS) {
       showToast('Please wait a moment before generating again', 'error')
       return
     }
 
-    // Start generation (FR-1.2, FR-1.3)
     setIsGenerating(true)
     setLastGenerateTime(now)
 
@@ -448,10 +496,11 @@ export default function BulkImportPage() {
         sourceText: selectedText,
         deckId,
         deckName: linkedSource?.fileName?.replace('.pdf', ''),
+        mode: aiMode,
+        imageBase64: processedImage?.base64 || undefined,
       })
 
       if (result.ok) {
-        // Populate form with draft (FR-3.1, FR-3.2, FR-3.3)
         setQuestionStem(result.draft.stem)
         setOptions(result.draft.options)
         setCorrectIndex(result.draft.correct_index)
@@ -459,7 +508,6 @@ export default function BulkImportPage() {
         setCurrentStep(3)
         showToast('MCQ draft generated! Review and edit before saving.', 'success')
       } else {
-        // Show error toast based on error type (FR-4.1, FR-4.2)
         switch (result.error) {
           case 'TEXT_TOO_SHORT':
             showToast('Please select a longer paragraph (at least 50 characters)', 'error')
@@ -467,10 +515,8 @@ export default function BulkImportPage() {
           case 'NOT_CONFIGURED':
             showToast('AI is not configured yet. Please set OPENAI_API_KEY in .env.local', 'error')
             break
-          case 'OPENAI_ERROR':
-          case 'PARSE_ERROR':
+          default:
             showToast('Something went wrong. Please try again.', 'error')
-            break
         }
       }
     } catch {
@@ -478,11 +524,11 @@ export default function BulkImportPage() {
     } finally {
       setIsGenerating(false)
     }
-  }, [deckId, linkedSource?.fileName, lastGenerateTime, showToast])
+  }, [deckId, linkedSource?.fileName, lastGenerateTime, aiMode, processedImage, showToast])
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-
       {/* Header with navigation */}
       <div className="mb-6">
         <Link 
@@ -503,14 +549,14 @@ export default function BulkImportPage() {
         </p>
       </div>
 
-      {/* Workflow Stepper - Requirements 4.1, 4.2, 4.3 */}
+      {/* Workflow Stepper */}
       <BulkImportStepper 
         currentStep={currentStep}
         linkedSourceName={linkedSource?.fileName}
         linkedSourceUrl={linkedSource?.fileUrl}
       />
 
-      {/* Source Bar or Upload Dropzone - Requirements 4.1, 4.2, 4.3 */}
+      {/* Source Bar or Upload Dropzone */}
       <div className="mb-6">
         {linkedSource && !showUploadDropzone ? (
           <SourceBar
@@ -528,7 +574,6 @@ export default function BulkImportPage() {
               <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
                 This helps track where your MCQs come from
               </p>
-              {/* Hidden file input for PDF selection */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -574,7 +619,7 @@ export default function BulkImportPage() {
         )}
       </div>
 
-      {/* V6: Session Tags Selector - Requirements R2.1 */}
+      {/* V6: Session Tags Selector */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
           Session Tags
@@ -592,6 +637,28 @@ export default function BulkImportPage() {
         )}
       </div>
 
+      {/* V6.2: AI Mode Toggle (Brain Toggle) */}
+      <div className="mb-6 flex flex-wrap items-center gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            AI Mode
+          </label>
+          <ModeToggle value={aiMode} onChange={setAIMode} />
+        </div>
+        
+        {/* V6.2: Vision MVP - Image Drop Zone */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Add Image (optional)
+          </label>
+          <ImageDropZone 
+            onImageProcessed={setProcessedImage}
+            disabled={isGenerating || isBatchGenerating}
+          />
+        </div>
+      </div>
+
+
       {/* Helper Instructions */}
       <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
@@ -605,7 +672,7 @@ export default function BulkImportPage() {
         </ol>
       </div>
 
-      {/* Text Selection Toolbar - Requirements 5.1, 5.2, 5.3 */}
+      {/* Text Selection Toolbar */}
       <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
         <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-3">
           Select text in the PDF area, then click a button to copy it to that field
@@ -616,7 +683,7 @@ export default function BulkImportPage() {
           onNoSelection={handleNoSelection}
         />
         
-        {/* AI Draft Buttons - Requirements FR-1, FR-5, R1.1 */}
+        {/* AI Draft Buttons */}
         <div className="mt-3 flex flex-col items-center gap-2">
           <div className="flex gap-2">
             <Button
@@ -638,7 +705,6 @@ export default function BulkImportPage() {
                 </>
               )}
             </Button>
-            {/* V6: AI Batch Draft Button - Requirements R1.1 */}
             <Button
               type="button"
               variant="secondary"
@@ -660,23 +726,31 @@ export default function BulkImportPage() {
               )}
             </Button>
           </div>
-          {/* Helper text - Requirement FR-5.1, FR-5.3 */}
           <p className="text-xs text-slate-500 dark:text-slate-400">
             AI Draft: 1 MCQ | AI Batch Draft: up to 5 MCQs
           </p>
         </div>
       </div>
 
-      {/* Split-view layout - Requirements 10.1, 10.3, 7.3, V5 2.5, 2.6 */}
+      {/* Split-view layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left side: PDF Viewer or text paste area */}
         <div 
           ref={pdfContainerRef}
           tabIndex={-1}
-          className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 relative"
         >
+          {/* V6.2: Session HUD */}
+          {linkedSource && sessionCardCount > 0 && (
+            <div className="absolute top-2 right-2 z-10">
+              <SessionHUD 
+                cardCount={sessionCardCount} 
+                onReset={handleResetSessionCount}
+              />
+            </div>
+          )}
+          
           {linkedSource?.fileUrl ? (
-            /* Integrated PDF Viewer - Requirements V5 2.1-2.4 */
             <>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
                 {linkedSource.fileName}
@@ -693,31 +767,16 @@ export default function BulkImportPage() {
               </p>
             </>
           ) : (
-            /* Fallback: Manual text paste area */
             <>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
                 PDF Text Reference
               </h2>
-              
               <textarea
                 ref={textAreaRef}
-                placeholder="Paste text from your PDF here...
-
-Example:
-1. A 32-year-old G2P1 woman at 28 weeks gestation presents with...
-
-A) Option A
-B) Option B  
-C) Option C
-D) Option D
-
-Answer: C
-
-Explanation: The correct answer is C because..."
+                placeholder="Paste text from your PDF here..."
                 className="w-full min-h-[400px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono text-sm resize-y"
                 onClick={() => setCurrentStep(2)}
               />
-              
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
                 Select text and click the copy button above to transfer it to the form.
               </p>
@@ -730,8 +789,6 @@ Explanation: The correct answer is C because..."
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
             Create MCQ
           </h2>
-          
-          {/* Inline MCQ form with pre-filled values */}
           <BulkMCQForm 
             deckId={deckId} 
             stem={questionStem}
@@ -746,12 +803,12 @@ Explanation: The correct answer is C because..."
             optionRefs={optionRefs}
             explanationRef={explanationRef}
             sessionTagIds={sessionTagIds}
-            onSaveSuccess={() => pdfContainerRef.current?.focus()}
+            onSaveSuccess={handleSingleCardSaveSuccess}
           />
         </div>
       </div>
 
-      {/* PDF Selection Tooltip - Requirements V5 2.7, 2.11 */}
+      {/* PDF Selection Tooltip */}
       {pdfSelection && (
         <SelectionTooltip
           position={pdfSelection.position}
@@ -764,7 +821,7 @@ Explanation: The correct answer is C because..."
         />
       )}
 
-      {/* V6: Batch Review Panel - Requirements R1.3, R1.4 */}
+      {/* V6: Batch Review Panel */}
       <BatchReviewPanel
         isOpen={isBatchPanelOpen}
         onClose={() => setIsBatchPanelOpen(false)}
@@ -774,10 +831,12 @@ Explanation: The correct answer is C because..."
         sessionTagNames={sessionTagNames}
         deckId={deckId}
         onSaveSuccess={handleBatchSaveSuccess}
+        sessionTotal={sessionCardCount}
       />
     </div>
   )
 }
+
 
 // Inline MCQ form component with controlled state from parent
 interface BulkMCQFormProps {
@@ -793,8 +852,8 @@ interface BulkMCQFormProps {
   stemRef: React.RefObject<HTMLTextAreaElement | null>
   optionRefs: React.MutableRefObject<(HTMLInputElement | null)[]>
   explanationRef: React.RefObject<HTMLTextAreaElement | null>
-  sessionTagIds?: string[] // V6: Session tags to apply
-  onSaveSuccess?: () => void // V6: Callback after successful save for focus management
+  sessionTagIds?: string[]
+  onSaveSuccess?: () => void
 }
 
 function BulkMCQForm({ 
@@ -836,7 +895,6 @@ function BulkMCQForm({
       formData.append('correctIndex', correctIndex.toString())
       formData.append('explanation', explanation)
       options.forEach((opt, i) => formData.append(`option_${i}`, opt))
-      // V6: Include session tags - Requirements R2.2
       sessionTagIds.forEach((tagId, i) => formData.append(`tagId_${i}`, tagId))
 
       const { createMCQAction } = await import('@/actions/mcq-actions')
@@ -844,12 +902,10 @@ function BulkMCQForm({
 
       if (result.success) {
         setMessage({ type: 'success', text: 'MCQ created successfully!' })
-        // Reset form - use parent setters (5 options for AI compatibility)
         setStem('')
         setOptions(['', '', '', '', ''])
         setCorrectIndex(0)
         setExplanation('')
-        // V6: Focus back to PDF viewer - Requirements R3.2
         onSaveSuccess?.()
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to create MCQ' })
@@ -863,7 +919,6 @@ function BulkMCQForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Message */}
       {message && (
         <div className={`p-3 rounded-lg text-sm ${
           message.type === 'success' 
@@ -874,7 +929,6 @@ function BulkMCQForm({
         </div>
       )}
 
-      {/* Stem */}
       <div>
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
           Question Stem
@@ -889,7 +943,6 @@ function BulkMCQForm({
         />
       </div>
 
-      {/* Options - Dynamic with add/remove */}
       <div className="space-y-3">
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
           Answer Options
@@ -913,14 +966,12 @@ function BulkMCQForm({
               placeholder={`Option ${String.fromCharCode(65 + index)}`}
               className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            {/* Remove button - only show if more than 2 options */}
             {options.length > 2 && (
               <button
                 type="button"
                 onClick={() => {
                   const newOptions = options.filter((_, i) => i !== index)
                   setOptions(newOptions)
-                  // Adjust correct index if needed
                   if (correctIndex >= newOptions.length) {
                     setCorrectIndex(newOptions.length - 1)
                   } else if (correctIndex > index) {
@@ -938,7 +989,6 @@ function BulkMCQForm({
           </div>
         ))}
         
-        {/* Add option button - max 5 options (A-E) */}
         {options.length < 5 && (
           <button
             type="button"
@@ -957,7 +1007,6 @@ function BulkMCQForm({
         </p>
       </div>
 
-      {/* Explanation */}
       <div>
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
           Explanation (optional)
@@ -972,7 +1021,6 @@ function BulkMCQForm({
         />
       </div>
 
-      {/* Submit */}
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Adding MCQ...' : 'Add MCQ'}

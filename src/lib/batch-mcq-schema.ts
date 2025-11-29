@@ -5,8 +5,16 @@ import { z } from 'zod'
  * 
  * Zod schemas for validating batch AI MCQ drafting input and output.
  * 
- * Requirements: R1.2 - Multi-Question Output
+ * Requirements: R1.2 - Multi-Question Output, V6.2 Brain Toggle
  */
+
+/**
+ * AI Mode type for Brain Toggle feature.
+ * - extract: Extract existing MCQs from Q&A text (verbatim)
+ * - generate: Generate new MCQs from textbook content
+ */
+export const aiModeSchema = z.enum(['extract', 'generate']).default('extract')
+export type AIMode = z.infer<typeof aiModeSchema>
 
 /**
  * Schema for a single MCQ draft item from batch AI response.
@@ -44,6 +52,7 @@ export type MCQBatchDraft = z.infer<typeof mcqBatchDraftSchema>
 /**
  * Input schema for draftBatchMCQFromText server action.
  * Validates deckId, text (50-10000 chars), and optional defaultTags.
+ * V6.2: Added mode for Brain Toggle, imageBase64/imageUrl for Vision MVP
  */
 export const draftBatchInputSchema = z.object({
   deckId: z.string().uuid('Invalid deck ID'),
@@ -52,6 +61,9 @@ export const draftBatchInputSchema = z.object({
     .min(50, 'Text must be at least 50 characters')
     .max(10000, 'Text must be at most 10000 characters'),
   defaultTags: z.array(z.string()).optional(),
+  mode: aiModeSchema.optional(),
+  imageBase64: z.string().optional(),
+  imageUrl: z.string().url().optional(),
 })
 
 export type DraftBatchInput = z.infer<typeof draftBatchInputSchema>

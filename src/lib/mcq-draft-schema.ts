@@ -6,12 +6,21 @@ import { MIN_SOURCE_TEXT_LENGTH } from './ai-config'
  * 
  * Zod schemas for validating AI MCQ drafting input and output.
  * 
- * Requirements: FR-2.5, FR-2.6
+ * Requirements: FR-2.5, FR-2.6, V6.2 Brain Toggle
  */
+
+/**
+ * AI Mode type for Brain Toggle feature.
+ * - extract: Extract existing MCQs from Q&A text (verbatim)
+ * - generate: Generate new MCQs from textbook content
+ */
+export const aiModeSchema = z.enum(['extract', 'generate']).default('extract')
+export type AIMode = z.infer<typeof aiModeSchema>
 
 /**
  * Input schema for draftMCQFromText server action.
  * Validates the source text and deck information.
+ * V6.2: Added mode for Brain Toggle, imageBase64/imageUrl for Vision MVP
  */
 export const draftMCQInputSchema = z.object({
   sourceText: z
@@ -19,6 +28,9 @@ export const draftMCQInputSchema = z.object({
     .min(MIN_SOURCE_TEXT_LENGTH, `Select at least ${MIN_SOURCE_TEXT_LENGTH} characters`),
   deckId: z.string().uuid('Invalid deck ID'),
   deckName: z.string().optional(),
+  mode: aiModeSchema.optional(),
+  imageBase64: z.string().optional(),
+  imageUrl: z.string().url().optional(),
 })
 
 export type DraftMCQInput = z.infer<typeof draftMCQInputSchema>

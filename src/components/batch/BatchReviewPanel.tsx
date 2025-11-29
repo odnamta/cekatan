@@ -6,7 +6,6 @@ import { BatchDraftCard } from './BatchDraftCard'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { bulkCreateMCQ } from '@/actions/batch-mcq-actions'
-import { mergeAndDeduplicateTags } from '@/lib/tag-merge'
 import type { MCQBatchDraftUI } from '@/lib/batch-mcq-schema'
 
 interface BatchReviewPanelProps {
@@ -18,12 +17,15 @@ interface BatchReviewPanelProps {
   sessionTagNames: string[]
   deckId: string
   onSaveSuccess: (count: number) => void
+  /** V6.2: Current session total for toast message */
+  sessionTotal?: number
 }
 
 /**
  * BatchReviewPanel - Modal for reviewing and saving batch MCQ drafts
  * 
  * Requirements: R1.3 - Batch Review Panel, R1.4 - Atomic Bulk Save
+ * V6.2: Auto-close on save success, show session total in toast
  */
 export function BatchReviewPanel({
   isOpen,
@@ -34,6 +36,7 @@ export function BatchReviewPanel({
   sessionTagNames,
   deckId,
   onSaveSuccess,
+  sessionTotal = 0,
 }: BatchReviewPanelProps) {
   const { showToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
@@ -73,10 +76,12 @@ export function BatchReviewPanel({
     [drafts, onDraftsChange]
   )
 
+  // V6.2: Count only included cards
   const selectedCount = drafts.filter((d) => d.include).length
   const totalCount = drafts.length
 
   const handleSave = async () => {
+    // V6.2: Only include cards where include === true
     const selectedDrafts = drafts.filter((d) => d.include)
     if (selectedDrafts.length === 0) return
 
@@ -100,8 +105,14 @@ export function BatchReviewPanel({
       })
 
       if (result.ok) {
-        showToast(`Saved ${result.createdCount} MCQs!`, 'success')
+        // V6.2: Calculate new session total and show in toast
+        const newSessionTotal = sessionTotal + result.createdCount
+        showToast(
+          `Saved ${result.createdCount} card${result.createdCount !== 1 ? 's' : ''} · Session total: ${newSessionTotal}`,
+          'success'
+        )
         onSaveSuccess(result.createdCount)
+        // V6.2: Auto-close modal on success
         onClose()
       } else {
         // V6.1: Enhanced error feedback with error code
@@ -184,6 +195,7 @@ export function BatchReviewPanel({
             >
               Discard All
             </Button>
+            {/* V6.2: Disable save when N = 0 */}
             <Button
               type="button"
               onClick={handleSave}

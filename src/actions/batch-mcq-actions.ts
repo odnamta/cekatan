@@ -14,28 +14,13 @@ import {
   type BulkCreateInput,
   type BulkCreateResult,
   type MCQBatchItem,
+  type AIMode,
 } from '@/lib/batch-mcq-schema'
-import { z } from 'zod'
 
 /**
- * System prompt for batch MCQ generation.
- * Instructs the AI to extract multiple MCQs from source text.
- * Requirements: R1.2, V6.1 Medical Integrity
+ * V6.1 Data Integrity Rules - shared across all modes
  */
-const BATCH_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
-Given source text from a medical textbook or reference, extract MULTIPLE distinct 
-high-quality multiple-choice questions (MCQs) suitable for board-style exams.
-
-Return a JSON object with a "questions" array containing up to 5 MCQs.
-Each MCQ must have:
-- stem: The question text (clinical vignette or direct question, at least 10 characters)
-- options: Array of 2-5 answer choices
-- correctIndex: Index of correct answer (0-based, 0-4)
-- explanation: Brief teaching explanation (optional but recommended)
-- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy")
-  - Format: Use PascalCase without spaces (e.g., GestationalDiabetes, PregnancyInducedHypertension)
-  - Do NOT generate structural tags (e.g., Chapter1, Lange, Section2) - these are handled separately
-
+const DATA_INTEGRITY_RULES = `
 CRITICAL DATA INTEGRITY RULES:
 1. UNITS: Maintain ALL original units (imperial or metric) EXACTLY as found in the source text.
    - Do NOT convert lb to kg, inches to cm, or any other unit conversions.
@@ -45,14 +30,30 @@ CRITICAL DATA INTEGRITY RULES:
    - Do NOT add vital signs, lab values, or measurements not present in the source.
 3. VERBATIM EXTRACTION: Extract clinical data verbatim from the source material.
    - Do NOT "improve" or rephrase clinical data.
-   - Preserve exact wording for medical terminology and values.
+   - Preserve exact wording for medical terminology and values.`
 
-Guidelines:
-- Extract as many distinct, high-quality MCQs as the text supports (up to 5)
-- Write at board exam difficulty level
-- Include relevant clinical details in stems
-- Make distractors plausible but clearly incorrect
-- If the text doesn't contain enough content for MCQs, return {"questions": []}
+/**
+ * System prompt for EXTRACT mode (Q&A sources) - batch version.
+ * V6.2: Extracts existing MCQs verbatim from Q&A text.
+ */
+const BATCH_EXTRACT_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
+Your task is to EXTRACT existing multiple-choice questions from the provided text.
+
+Return a JSON object with a "questions" array containing up to 5 MCQs.
+Each MCQ must have:
+- stem: The question text (extracted verbatim, fix obvious OCR spacing only)
+- options: Array of 2-5 answer choices (extracted verbatim)
+- correctIndex: Index of correct answer (0-based, 0-4)
+- explanation: The explanation from the source, or a brief teaching point if none provided
+- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy")
+
+EXTRACTION RULES:
+- Identify any existing multiple-choice questions already present in the selected text.
+- Extract the question stems and options VERBATIM (fix obvious OCR spacing only).
+- Do NOT create new questions or add options that aren't clearly present in the text.
+- If the text contains questions with fewer than 5 options, that's fine (2-5 options allowed).
+- If no clear MCQs are found, return {"questions": []}.
+${DATA_INTEGRITY_RULES}
 
 Example response format:
 {
@@ -68,27 +69,114 @@ Example response format:
 }`
 
 /**
+ * System prompt for GENERATE mode (Textbook sources) - batch version.
+ * V6.2: Creates new MCQs from textbook content.
+ */
+const BATCH_GENERATE_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
+Your task is to CREATE multiple high-yield board-style MCQs from the provided textbook passage.
+
+Return a JSON object with a "questions" array containing up to 5 MCQs.
+Each MCQ must have:
+- stem: The question text (clinical vignette or direct question, at least 10 characters)
+- options: Array of 2-5 answer choices
+- correctIndex: Index of correct answer (0-based, 0-4)
+- explanation: Brief teaching explanation (optional but recommended)
+- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy")
+  - Format: Use PascalCase without spaces (e.g., GestationalDiabetes, PregnancyInducedHypertension)
+  - Do NOT generate structural tags (e.g., Chapter1, Lange, Section2) - these are handled separately
+
+GENERATION RULES:
+- Read the textbook-like passage carefully.
+- Create up to 5 distinct high-yield board-style MCQs that test key concepts from this passage.
+- All clinical facts, thresholds, and units used in questions and answer options MUST come from the passage.
+- Never invent new numbers or units not present in the source.
+- Invent plausible distractors (wrong answers), but they must be conceptually related to the passage.
+- Distractors must not contradict medical facts stated in the passage.
+- Write at board exam difficulty level.
+- If the text doesn't contain enough content for MCQs, return {"questions": []}.
+${DATA_INTEGRITY_RULES}
+
+Example response format:
+{
+  "questions": [
+    {
+      "stem": "A 28-year-old G1P0 at 32 weeks presents with...",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 2,
+      "explanation": "The correct answer is C because...",
+      "tags": ["PretermLabor", "Tocolytics"]
+    }
+  ]
+}`
+
+/**
+ * Get the appropriate system prompt based on mode.
+ */
+function getBatchSystemPrompt(mode: AIMode = 'extract'): string {
+  switch (mode) {
+    case 'extract':
+      return BATCH_EXTRACT_SYSTEM_PROMPT
+    case 'generate':
+      return BATCH_GENERATE_SYSTEM_PROMPT
+    default:
+      return BATCH_EXTRACT_SYSTEM_PROMPT
+  }
+}
+
+/**
  * Build user prompt with source text and optional context.
  */
-function buildBatchUserPrompt(text: string, defaultTags?: string[]): string {
+function buildBatchUserPrompt(text: string, defaultTags?: string[], mode: AIMode = 'extract'): string {
   let prompt = `Source text:\n${text}`
   
   if (defaultTags && defaultTags.length > 0) {
     prompt += `\n\nContext tags (for reference): ${defaultTags.join(', ')}`
   }
   
-  prompt += '\n\nExtract up to 5 distinct MCQs from this content. Return JSON with "questions" array.'
+  if (mode === 'extract') {
+    prompt += '\n\nExtract up to 5 existing MCQs from this content. Return JSON with "questions" array.'
+  } else {
+    prompt += '\n\nGenerate up to 5 distinct MCQs from this content. Return JSON with "questions" array.'
+  }
   
   return prompt
 }
 
 /**
+ * Build OpenAI message content with optional image.
+ * V6.2: Vision MVP support
+ */
+function buildMessageContent(
+  text: string,
+  imageBase64?: string,
+  imageUrl?: string
+): string | Array<{ type: string; text?: string; image_url?: { url: string } }> {
+  // If no image, return plain text
+  if (!imageBase64 && !imageUrl) {
+    return text
+  }
+
+  // Build multimodal content
+  const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+    { type: 'text', text },
+  ]
+
+  if (imageUrl) {
+    content.push({ type: 'image_url', image_url: { url: imageUrl } })
+  } else if (imageBase64) {
+    content.push({ type: 'image_url', image_url: { url: imageBase64 } })
+  }
+
+  return content
+}
+
+/**
  * Server Action: Generate multiple MCQ drafts from source text using OpenAI.
  * 
- * @param input - Source text, deck ID, and optional default tags
+ * @param input - Source text, deck ID, optional default tags, mode, and image
  * @returns DraftBatchResult - Either { ok: true, drafts } or { ok: false, error }
  * 
- * Requirements: R1.1, R1.2, NFR-2
+ * Requirements: R1.1, R1.2, NFR-2, V6.2 Brain Toggle, V6.2 Vision MVP
  */
 export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<DraftBatchResult> {
   // Check if OpenAI API key is configured
@@ -111,17 +199,24 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
     }
   }
   
-  const { text, defaultTags } = validationResult.data
+  const { text, defaultTags, mode = 'extract', imageBase64, imageUrl } = validationResult.data
   
   try {
+    // Build message content (with optional image for Vision MVP)
+    const userContent = buildMessageContent(
+      buildBatchUserPrompt(text, defaultTags, mode),
+      imageBase64,
+      imageUrl
+    )
+
     // Call OpenAI API with JSON mode (R1.2)
     const response = await openai.chat.completions.create({
       model: MCQ_MODEL,
       temperature: MCQ_TEMPERATURE,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: BATCH_SYSTEM_PROMPT },
-        { role: 'user', content: buildBatchUserPrompt(text, defaultTags) },
+        { role: 'system', content: getBatchSystemPrompt(mode) },
+        { role: 'user', content: userContent as string },
       ],
     })
     
@@ -297,7 +392,7 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
       }
     }
     
-    // Step 2: Prepare card rows with SM-2 defaults
+    // Step 3: Prepare card rows with SM-2 defaults
     const defaults = getCardDefaults()
     const cardRows = cards.map((card) => ({
       deck_id: deckId,
@@ -314,7 +409,7 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
       next_review: defaults.next_review.toISOString(),
     }))
     
-    // Step 3: Insert all cards atomically (Property 11)
+    // Step 4: Insert all cards atomically (Property 11)
     const { data: insertedCards, error: insertError } = await supabase
       .from('cards')
       .insert(cardRows)
@@ -325,7 +420,7 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
       return { ok: false, error: { message: 'Failed to create cards', code: 'DB_ERROR' } }
     }
     
-    // Step 4: Insert card_tags join rows
+    // Step 5: Insert card_tags join rows
     // V6.1: Each card gets session tags + its own AI tags (deduplicated)
     const cardTagRows: { card_id: string; tag_id: string }[] = []
     const seenCardTagPairs = new Set<string>()
