@@ -83,27 +83,34 @@ export function BatchReviewPanel({
     setIsSaving(true)
 
     try {
-      // Prepare cards with merged tags
+      // Prepare cards with AI tags only (session tags passed separately for atomic merge)
       const cards = selectedDrafts.map((draft) => ({
         stem: draft.stem,
         options: draft.options,
         correctIndex: draft.correctIndex,
         explanation: draft.explanation || undefined,
-        tagNames: mergeAndDeduplicateTags(sessionTagNames, draft.aiTags),
+        tagNames: draft.aiTags, // V6.1: AI tags only, session tags merged server-side
       }))
 
-      const result = await bulkCreateMCQ({ deckId, cards })
+      // V6.1: Pass sessionTags separately for atomic server-side merging
+      const result = await bulkCreateMCQ({ 
+        deckId, 
+        sessionTags: sessionTagNames,
+        cards,
+      })
 
       if (result.ok) {
         showToast(`Saved ${result.createdCount} MCQs!`, 'success')
         onSaveSuccess(result.createdCount)
         onClose()
       } else {
-        showToast(result.error.message || 'Failed to save cards', 'error')
+        // V6.1: Enhanced error feedback with error code
+        const errorCode = result.error.code || 'UNKNOWN'
+        showToast(`Save failed. Please check your connection. (Error: ${errorCode})`, 'error')
       }
     } catch (error) {
       console.error('Save error:', error)
-      showToast('An error occurred while saving', 'error')
+      showToast('Save failed. Please check your connection. (Error: NETWORK)', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -185,7 +192,7 @@ export function BatchReviewPanel({
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
+                  Saving {selectedCount} Card{selectedCount !== 1 ? 's' : ''}...
                 </>
               ) : (
                 `Save Selected (${selectedCount})`

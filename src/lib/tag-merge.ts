@@ -4,11 +4,13 @@
  * Merges session tags and AI-suggested tags with normalization and deduplication.
  * 
  * Requirements: R1.5 - Tag Handling for Batch Drafts, R2.3 - Interaction with Existing Tags
+ * V6.1: Case-insensitive deduplication to prevent 'Anatomy' vs 'anatomy' duplicates
  */
 
 /**
  * Normalize a tag name for comparison.
- * Trims whitespace and converts to lowercase.
+ * Trims whitespace and converts to lowercase for case-insensitive matching.
+ * V6.1: Used to match DB unique index on (user_id, LOWER(name))
  */
 export function normalizeTagName(tag: string): string {
   return tag.trim().toLowerCase()

@@ -327,6 +327,11 @@ CREATE POLICY "Users can manage own tags" ON tags
 -- Index on user_id
 CREATE INDEX idx_tags_user_id ON tags(user_id);
 
+-- V6.1: Case-insensitive unique index for tag deduplication
+-- Prevents 'Anatomy' vs 'anatomy' duplicates per user
+CREATE UNIQUE INDEX IF NOT EXISTS tags_user_id_lower_name_idx 
+  ON tags (user_id, LOWER(name));
+
 
 -- Card tags join table (links cards to tags)
 CREATE TABLE card_tags (

@@ -58,10 +58,12 @@ export type DraftBatchInput = z.infer<typeof draftBatchInputSchema>
 
 /**
  * Input schema for bulkCreateMCQ server action.
- * Validates deckId and array of cards (1-5) with merged tags.
+ * Validates deckId, sessionTags, and array of cards (1-5) with merged tags.
+ * V6.1: Added sessionTags for atomic tag merging
  */
 export const bulkCreateInputSchema = z.object({
   deckId: z.string().uuid('Invalid deck ID'),
+  sessionTags: z.array(z.string()).optional().default([]),
   cards: z
     .array(
       z.object({

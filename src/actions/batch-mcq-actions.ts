@@ -20,7 +20,7 @@ import { z } from 'zod'
 /**
  * System prompt for batch MCQ generation.
  * Instructs the AI to extract multiple MCQs from source text.
- * Requirements: R1.2
+ * Requirements: R1.2, V6.1 Medical Integrity
  */
 const BATCH_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
 Given source text from a medical textbook or reference, extract MULTIPLE distinct 
@@ -32,8 +32,20 @@ Each MCQ must have:
 - options: Array of 2-5 answer choices
 - correctIndex: Index of correct answer (0-based, 0-4)
 - explanation: Brief teaching explanation (optional but recommended)
-- tags: Array of 1-3 short clinical topic tags (e.g., "Preeclampsia", "Gestational Diabetes")
-  - Tags should be clinical topics, NOT book names or chapter titles
+- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy")
+  - Format: Use PascalCase without spaces (e.g., GestationalDiabetes, PregnancyInducedHypertension)
+  - Do NOT generate structural tags (e.g., Chapter1, Lange, Section2) - these are handled separately
+
+CRITICAL DATA INTEGRITY RULES:
+1. UNITS: Maintain ALL original units (imperial or metric) EXACTLY as found in the source text.
+   - Do NOT convert lb to kg, inches to cm, or any other unit conversions.
+   - Do NOT round numbers. If the source says "142 lb", use "142 lb" not "64 kg".
+2. NO HALLUCINATION: Never invent, infer, or guess new clinical numbers.
+   - If a value is missing in the source text, leave it missing in the question.
+   - Do NOT add vital signs, lab values, or measurements not present in the source.
+3. VERBATIM EXTRACTION: Extract clinical data verbatim from the source material.
+   - Do NOT "improve" or rephrase clinical data.
+   - Preserve exact wording for medical terminology and values.
 
 Guidelines:
 - Extract as many distinct, high-quality MCQs as the text supports (up to 5)
@@ -50,7 +62,7 @@ Example response format:
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctIndex": 2,
       "explanation": "The correct answer is C because...",
-      "tags": ["Preterm Labor", "Tocolytics"]
+      "tags": ["PretermLabor", "Tocolytics"]
     }
   ]
 }`
@@ -162,10 +174,10 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
 /**
  * Server Action: Create multiple MCQ cards atomically.
  * 
- * @param input - Deck ID and array of cards with merged tags
+ * @param input - Deck ID, sessionTags, and array of cards with merged tags
  * @returns BulkCreateResult - Either { ok: true, createdCount, deckId } or { ok: false, error }
  * 
- * Requirements: R1.4, R1.5, NFR-2
+ * Requirements: R1.4, R1.5, NFR-2, V6.1 Atomic Tag Merging
  */
 export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateResult> {
   // Validate input with Zod schema
@@ -182,7 +194,7 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
     }
   }
   
-  const { deckId, cards } = validationResult.data
+  const { deckId, sessionTags = [], cards } = validationResult.data
   
   // Get authenticated user
   const user = await getUser()
@@ -205,78 +217,83 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
   }
   
   try {
-    // Step 1: Resolve all tag names to tag IDs (R1.5)
-    // Collect all unique tag names across all cards
+    // Step 1: Collect all unique tag names (session + per-card AI tags)
+    // V6.1: Merge session tags with per-card tags using case-insensitive deduplication
     const allTagNames = new Set<string>()
+    
+    // Add session tags first (they take precedence)
+    for (const tagName of sessionTags) {
+      const trimmed = tagName.trim()
+      if (trimmed) {
+        allTagNames.add(trimmed)
+      }
+    }
+    
+    // Add per-card AI tags
     for (const card of cards) {
       for (const tagName of card.tagNames) {
-        const normalized = tagName.trim()
-        if (normalized) {
-          allTagNames.add(normalized)
-        }
-      }
-    }
-    
-    // Fetch existing tags for this user
-    const { data: existingTags } = await supabase
-      .from('tags')
-      .select('id, name')
-      .eq('user_id', user.id)
-    
-    // Build name -> id map (case-insensitive)
-    const tagNameToId = new Map<string, string>()
-    for (const tag of existingTags || []) {
-      tagNameToId.set(tag.name.toLowerCase(), tag.id)
-    }
-    
-    // Create missing tags (Property 14)
-    // Note: We need to handle case-sensitivity carefully since DB has UNIQUE(user_id, name)
-    const tagsToCreate: string[] = []
-    for (const tagName of allTagNames) {
-      if (!tagNameToId.has(tagName.toLowerCase())) {
-        tagsToCreate.push(tagName)
-      }
-    }
-    
-    if (tagsToCreate.length > 0) {
-      // Insert tags one by one to handle potential duplicates gracefully
-      for (const tagName of tagsToCreate) {
-        // Skip if we already have this tag (case-insensitive)
-        if (tagNameToId.has(tagName.toLowerCase())) {
-          continue
-        }
-        
-        // Try to insert the tag
-        const { data: newTag, error: createTagError } = await supabase
-          .from('tags')
-          .insert({
-            user_id: user.id,
-            name: tagName.trim(),
-            color: 'blue', // Default color for AI-created tags
-          })
-          .select('id, name')
-          .single()
-        
-        if (createTagError) {
-          // If it's a duplicate error, try to fetch the existing tag
-          if (createTagError.code === '23505') { // Unique violation
-            const { data: existingTag } = await supabase
-              .from('tags')
-              .select('id, name')
-              .eq('user_id', user.id)
-              .ilike('name', tagName.trim())
-              .single()
-            
-            if (existingTag) {
-              tagNameToId.set(existingTag.name.toLowerCase(), existingTag.id)
-            }
-          } else {
-            console.error('Failed to create tag:', tagName, createTagError)
-            // Continue with other tags instead of failing completely
+        const trimmed = tagName.trim()
+        if (trimmed) {
+          // Case-insensitive check: only add if not already present
+          const lowerTrimmed = trimmed.toLowerCase()
+          const alreadyExists = Array.from(allTagNames).some(
+            existing => existing.toLowerCase() === lowerTrimmed
+          )
+          if (!alreadyExists) {
+            allTagNames.add(trimmed)
           }
-        } else if (newTag) {
-          tagNameToId.set(newTag.name.toLowerCase(), newTag.id)
         }
+      }
+    }
+    
+    // Step 2: Resolve tag names to IDs using atomic upsert
+    // V6.1: Use case-insensitive matching with atomic operations
+    const tagNameToId = new Map<string, string>()
+    
+    for (const tagName of allTagNames) {
+      // First, try to find existing tag (case-insensitive)
+      const { data: existingTag } = await supabase
+        .from('tags')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .ilike('name', tagName)
+        .single()
+      
+      if (existingTag) {
+        tagNameToId.set(tagName.toLowerCase(), existingTag.id)
+        continue
+      }
+      
+      // Tag doesn't exist, create it atomically
+      // The unique index on (user_id, LOWER(name)) prevents race condition duplicates
+      const { data: newTag, error: createTagError } = await supabase
+        .from('tags')
+        .insert({
+          user_id: user.id,
+          name: tagName,
+          color: 'purple', // V6.1: Purple for AI-generated concept tags
+        })
+        .select('id, name')
+        .single()
+      
+      if (createTagError) {
+        // Handle race condition: another request created the tag
+        if (createTagError.code === '23505') { // Unique violation
+          const { data: raceTag } = await supabase
+            .from('tags')
+            .select('id, name')
+            .eq('user_id', user.id)
+            .ilike('name', tagName)
+            .single()
+          
+          if (raceTag) {
+            tagNameToId.set(tagName.toLowerCase(), raceTag.id)
+          }
+        } else {
+          console.error('Failed to create tag:', tagName, createTagError)
+        }
+      } else if (newTag) {
+        tagNameToId.set(newTag.name.toLowerCase(), newTag.id)
       }
     }
     
@@ -309,16 +326,36 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
     }
     
     // Step 4: Insert card_tags join rows
+    // V6.1: Each card gets session tags + its own AI tags (deduplicated)
     const cardTagRows: { card_id: string; tag_id: string }[] = []
+    const seenCardTagPairs = new Set<string>()
+    
     for (let i = 0; i < insertedCards.length; i++) {
       const cardId = insertedCards[i].id
-      const tagNames = cards[i].tagNames
       
-      for (const tagName of tagNames) {
+      // Add session tags first
+      for (const tagName of sessionTags) {
         const normalized = tagName.trim().toLowerCase()
         const tagId = tagNameToId.get(normalized)
         if (tagId) {
-          cardTagRows.push({ card_id: cardId, tag_id: tagId })
+          const pairKey = `${cardId}:${tagId}`
+          if (!seenCardTagPairs.has(pairKey)) {
+            seenCardTagPairs.add(pairKey)
+            cardTagRows.push({ card_id: cardId, tag_id: tagId })
+          }
+        }
+      }
+      
+      // Add per-card AI tags
+      for (const tagName of cards[i].tagNames) {
+        const normalized = tagName.trim().toLowerCase()
+        const tagId = tagNameToId.get(normalized)
+        if (tagId) {
+          const pairKey = `${cardId}:${tagId}`
+          if (!seenCardTagPairs.has(pairKey)) {
+            seenCardTagPairs.add(pairKey)
+            cardTagRows.push({ card_id: cardId, tag_id: tagId })
+          }
         }
       }
     }
