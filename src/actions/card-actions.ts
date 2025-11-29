@@ -241,3 +241,200 @@ export async function deleteCard(cardId: string): Promise<CardActionResult> {
 
   return { ok: true }
 }
+
+
+/**
+ * Server Action for duplicating a card.
+ * Creates a new card with all data copied and "(copy)" appended to stem/front.
+ * Requirements: B.2, B.3, B.4
+ */
+export async function duplicateCard(cardId: string): Promise<CardActionResult> {
+  // Get authenticated user
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Fetch original card with ownership check
+  const { data: card, error: cardError } = await supabase
+    .from('cards')
+    .select('*, decks!inner(user_id)')
+    .eq('id', cardId)
+    .single()
+
+  if (cardError || !card) {
+    return { ok: false, error: 'Card not found' }
+  }
+
+  // Check ownership
+  const deckData = card.decks as unknown as { user_id: string }
+  if (deckData.user_id !== user.id) {
+    return { ok: false, error: 'Access denied' }
+  }
+
+  // Build new card data with "(copy)" suffix
+  const defaults = getCardDefaults()
+  const newCardData: Record<string, unknown> = {
+    deck_id: card.deck_id,
+    card_type: card.card_type,
+    interval: defaults.interval,
+    ease_factor: defaults.ease_factor,
+    next_review: defaults.next_review.toISOString(),
+  }
+
+  if (card.card_type === 'mcq') {
+    newCardData.stem = (card.stem || '') + ' (copy)'
+    newCardData.options = card.options
+    newCardData.correct_index = card.correct_index
+    newCardData.explanation = card.explanation
+    // MCQ cards need front/back to satisfy NOT NULL constraint (empty strings like createMCQAction)
+    newCardData.front = card.front || ''
+    newCardData.back = card.back || ''
+  } else {
+    newCardData.front = (card.front || '') + ' (copy)'
+    newCardData.back = card.back
+    newCardData.image_url = card.image_url
+  }
+
+  // Insert new card (Supabase generates new UUID)
+  const { error: insertError } = await supabase
+    .from('cards')
+    .insert(newCardData)
+
+  if (insertError) {
+    return { ok: false, error: insertError.message }
+  }
+
+  // Revalidate deck page
+  revalidatePath(`/decks/${card.deck_id}`)
+
+  return { ok: true }
+}
+
+
+/**
+ * Server Action for bulk deleting cards.
+ * Requirements: C.4, C.5
+ */
+export async function bulkDeleteCards(cardIds: string[]): Promise<CardActionResult & { count?: number }> {
+  if (!cardIds.length) {
+    return { ok: false, error: 'No cards selected' }
+  }
+
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Verify ownership of all cards via deck join
+  const { data: cards, error: fetchError } = await supabase
+    .from('cards')
+    .select('id, deck_id, decks!inner(user_id)')
+    .in('id', cardIds)
+
+  if (fetchError || !cards) {
+    return { ok: false, error: 'Could not verify card ownership' }
+  }
+
+  // Check all cards belong to user
+  const unauthorized = cards.some((card) => {
+    const deckData = card.decks as unknown as { user_id: string }
+    return deckData.user_id !== user.id
+  })
+
+  if (unauthorized) {
+    return { ok: false, error: 'Access denied to one or more cards' }
+  }
+
+  // Delete all cards
+  const { error: deleteError } = await supabase
+    .from('cards')
+    .delete()
+    .in('id', cardIds)
+
+  if (deleteError) {
+    return { ok: false, error: deleteError.message }
+  }
+
+  // Revalidate affected deck pages
+  const deckIds = [...new Set(cards.map((c) => c.deck_id))]
+  for (const deckId of deckIds) {
+    revalidatePath(`/decks/${deckId}`)
+  }
+
+  return { ok: true, count: cardIds.length }
+}
+
+/**
+ * Server Action for bulk moving cards to another deck.
+ * Requirements: C.6, C.7
+ */
+export async function bulkMoveCards(
+  cardIds: string[],
+  targetDeckId: string
+): Promise<CardActionResult & { count?: number }> {
+  if (!cardIds.length) {
+    return { ok: false, error: 'No cards selected' }
+  }
+
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Verify ownership of target deck
+  const { data: targetDeck, error: targetError } = await supabase
+    .from('decks')
+    .select('id')
+    .eq('id', targetDeckId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (targetError || !targetDeck) {
+    return { ok: false, error: 'Target deck not found or access denied' }
+  }
+
+  // Verify ownership of all source cards
+  const { data: cards, error: fetchError } = await supabase
+    .from('cards')
+    .select('id, deck_id, decks!inner(user_id)')
+    .in('id', cardIds)
+
+  if (fetchError || !cards) {
+    return { ok: false, error: 'Could not verify card ownership' }
+  }
+
+  const unauthorized = cards.some((card) => {
+    const deckData = card.decks as unknown as { user_id: string }
+    return deckData.user_id !== user.id
+  })
+
+  if (unauthorized) {
+    return { ok: false, error: 'Access denied to one or more cards' }
+  }
+
+  // Move all cards to target deck
+  const { error: updateError } = await supabase
+    .from('cards')
+    .update({ deck_id: targetDeckId })
+    .in('id', cardIds)
+
+  if (updateError) {
+    return { ok: false, error: updateError.message }
+  }
+
+  // Revalidate source and target deck pages
+  const sourceDeckIds = [...new Set(cards.map((c) => c.deck_id))]
+  for (const deckId of sourceDeckIds) {
+    revalidatePath(`/decks/${deckId}`)
+  }
+  revalidatePath(`/decks/${targetDeckId}`)
+
+  return { ok: true, count: cardIds.length }
+}

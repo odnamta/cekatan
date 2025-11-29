@@ -98,7 +98,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
         {cardsError ? (
           <p className="text-red-600 dark:text-red-400">Error loading cards: {cardsError.message}</p>
         ) : (
-          <CardList cards={cardList} deckId={deckId} />
+          <CardList cards={cardList} deckId={deckId} deckTitle={deckData.title} />
         )}
       </div>
     </div>
