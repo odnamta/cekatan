@@ -158,3 +158,68 @@ export interface CardTag {
 export interface CardWithTags extends Card {
   tags: Tag[];
 }
+
+
+// ============================================
+// Shared Library Types (V6.4)
+// ============================================
+
+export type DeckVisibility = 'private' | 'public';
+
+export interface DeckTemplate {
+  id: string;
+  title: string;
+  description: string | null;
+  visibility: DeckVisibility;
+  author_id: string;
+  legacy_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CardTemplate {
+  id: string;
+  deck_template_id: string;
+  stem: string;
+  options: string[];
+  correct_index: number;
+  explanation: string | null;
+  source_meta: Record<string, unknown> | null;
+  legacy_id: string | null;
+  created_at: string;
+}
+
+export interface CardTemplateTag {
+  card_template_id: string;
+  tag_id: string;
+  created_at: string;
+}
+
+export interface UserDeck {
+  id: string;
+  user_id: string;
+  deck_template_id: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserCardProgress {
+  user_id: string;
+  card_template_id: string;
+  interval: number;
+  ease_factor: number;
+  repetitions: number;
+  next_review: string;
+  last_answered_at: string | null;
+  suspended: boolean;
+}
+
+// Extended CardTemplate type with tags included
+export interface CardTemplateWithTags extends CardTemplate {
+  tags: Tag[];
+}
+
+// Extended DeckTemplate type with due count
+export interface DeckTemplateWithDueCount extends DeckTemplate {
+  due_count: number;
+}

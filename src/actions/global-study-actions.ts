@@ -1,10 +1,13 @@
 'use server'
 
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
-import type { Card } from '@/types/database'
+import type { Card, CardTemplate, UserCardProgress } from '@/types/database'
 
 const BATCH_SIZE = 50
 const NEW_CARDS_FALLBACK_LIMIT = 10
+
+// Feature flag for V2 schema - set to true to use new template tables
+const USE_V2_SCHEMA = true
 
 /**
  * Result type for getGlobalDueCards
@@ -331,4 +334,377 @@ export async function draftMCQFromText(text: string): Promise<{
       explanation: 'AI explanation placeholder.',
     },
   }
+}
+
+
+// ============================================
+// V6.4: Shared Library V2 Functions
+// ============================================
+
+/**
+ * Card with progress - combines template and user progress for study
+ */
+export interface CardWithProgress {
+  id: string // card_template_id
+  deck_template_id: string
+  stem: string
+  options: string[]
+  correct_index: number
+  explanation: string | null
+  // SRS fields from user_card_progress (or defaults)
+  interval: number
+  ease_factor: number
+  next_review: string
+  // For compatibility with existing Card type
+  deck_id: string // alias for deck_template_id
+  card_type: 'mcq'
+  front: string // alias for stem
+  back: string // alias for explanation
+  image_url: string | null
+  created_at: string
+}
+
+/**
+ * Fetches due cards using V2 schema (card_templates + user_card_progress).
+ * Falls back to V1 if USE_V2_SCHEMA is false.
+ * 
+ * Requirements: V6.4 Read Path
+ */
+export async function getGlobalDueCardsV2(batchNumber: number = 0): Promise<GlobalDueCardsResult> {
+  if (!USE_V2_SCHEMA) {
+    return getGlobalDueCards(batchNumber)
+  }
+
+  const user = await getUser()
+  if (!user) {
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: 'Authentication required',
+    }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const now = new Date().toISOString()
+
+  // Get user's subscribed deck_templates via user_decks
+  const { data: userDecks, error: userDecksError } = await supabase
+    .from('user_decks')
+    .select('deck_template_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  if (userDecksError) {
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: userDecksError.message,
+    }
+  }
+
+  if (!userDecks || userDecks.length === 0) {
+    return {
+      success: true,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+    }
+  }
+
+  const deckTemplateIds = userDecks.map(d => d.deck_template_id)
+
+  // Get total count of due cards from user_card_progress
+  const { count: totalDueCount, error: countError } = await supabase
+    .from('user_card_progress')
+    .select('card_template_id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .lte('next_review', now)
+    .eq('suspended', false)
+
+  if (countError) {
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: countError.message,
+    }
+  }
+
+  const totalDue = totalDueCount || 0
+
+  // If no due cards, fall back to new cards (cards without progress)
+  if (totalDue === 0) {
+    // Get card_templates that don't have user_card_progress yet
+    const { data: newCardTemplates, error: newCardsError } = await supabase
+      .from('card_templates')
+      .select('*')
+      .in('deck_template_id', deckTemplateIds)
+      .order('created_at', { ascending: true })
+      .limit(NEW_CARDS_FALLBACK_LIMIT)
+
+    if (newCardsError) {
+      return {
+        success: false,
+        cards: [],
+        totalDue: 0,
+        hasMoreBatches: false,
+        isNewCardsFallback: false,
+        error: newCardsError.message,
+      }
+    }
+
+    // Filter out cards that already have progress
+    const { data: existingProgress } = await supabase
+      .from('user_card_progress')
+      .select('card_template_id')
+      .eq('user_id', user.id)
+
+    const existingCardIds = new Set((existingProgress || []).map(p => p.card_template_id))
+    const trulyNewCards = (newCardTemplates || []).filter(c => !existingCardIds.has(c.id))
+
+    // Convert to Card-compatible format
+    const cards = trulyNewCards.slice(0, NEW_CARDS_FALLBACK_LIMIT).map(ct => templateToCard(ct))
+
+    return {
+      success: true,
+      cards,
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: true,
+    }
+  }
+
+  // Fetch due cards with pagination - join card_templates with user_card_progress
+  const offset = batchNumber * BATCH_SIZE
+  const { data: progressRecords, error: progressError } = await supabase
+    .from('user_card_progress')
+    .select(`
+      *,
+      card_templates!inner(*)
+    `)
+    .eq('user_id', user.id)
+    .lte('next_review', now)
+    .eq('suspended', false)
+    .order('next_review', { ascending: true })
+    .range(offset, offset + BATCH_SIZE - 1)
+
+  if (progressError) {
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: progressError.message,
+    }
+  }
+
+  // Convert to Card-compatible format
+  const cards = (progressRecords || []).map(record => {
+    const ct = record.card_templates as unknown as CardTemplate
+    return templateToCard(ct, record as unknown as UserCardProgress)
+  })
+
+  const hasMoreBatches = totalDue > (offset + BATCH_SIZE)
+
+  return {
+    success: true,
+    cards,
+    totalDue,
+    hasMoreBatches,
+    isNewCardsFallback: false,
+  }
+}
+
+/**
+ * Converts a CardTemplate (with optional progress) to Card-compatible format.
+ * Used for backward compatibility with existing UI components.
+ */
+function templateToCard(
+  template: CardTemplate,
+  progress?: UserCardProgress
+): Card {
+  return {
+    id: template.id,
+    deck_id: template.deck_template_id,
+    card_type: 'mcq',
+    front: template.stem,
+    back: template.explanation || '',
+    stem: template.stem,
+    options: template.options,
+    correct_index: template.correct_index,
+    explanation: template.explanation,
+    image_url: null,
+    interval: progress?.interval ?? 0,
+    ease_factor: progress?.ease_factor ?? 2.5,
+    next_review: progress?.next_review ?? new Date().toISOString(),
+    created_at: template.created_at,
+  }
+}
+
+/**
+ * Fetches global stats using V2 schema.
+ * 
+ * Requirements: V6.4 Read Path
+ */
+export async function getGlobalStatsV2(): Promise<GlobalStatsResult> {
+  if (!USE_V2_SCHEMA) {
+    return getGlobalStats()
+  }
+
+  const user = await getUser()
+  if (!user) {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: 'Authentication required',
+    }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const now = new Date().toISOString()
+  const todayDateStr = new Date().toISOString().split('T')[0]
+
+  // Get total due count from user_card_progress
+  const { count: totalDueCount, error: dueCountError } = await supabase
+    .from('user_card_progress')
+    .select('card_template_id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .lte('next_review', now)
+    .eq('suspended', false)
+
+  if (dueCountError) {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: dueCountError.message,
+    }
+  }
+
+  // Get completed today from study_logs (unchanged)
+  const { data: studyLog, error: logError } = await supabase
+    .from('study_logs')
+    .select('cards_reviewed')
+    .eq('user_id', user.id)
+    .eq('study_date', todayDateStr)
+    .single()
+
+  if (logError && logError.code !== 'PGRST116') {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: logError.message,
+    }
+  }
+
+  const completedToday = studyLog?.cards_reviewed || 0
+
+  // Get current streak from user_stats (unchanged)
+  const { data: userStats, error: statsError } = await supabase
+    .from('user_stats')
+    .select('current_streak')
+    .eq('user_id', user.id)
+    .single()
+
+  if (statsError && statsError.code !== 'PGRST116') {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: statsError.message,
+    }
+  }
+
+  const currentStreak = userStats?.current_streak || 0
+
+  // Check if there are any card_templates in user's decks
+  const { data: userDecks } = await supabase
+    .from('user_decks')
+    .select('deck_template_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  let hasNewCards = false
+  if (userDecks && userDecks.length > 0) {
+    const deckTemplateIds = userDecks.map(d => d.deck_template_id)
+    const { count: totalCardsCount } = await supabase
+      .from('card_templates')
+      .select('*', { count: 'exact', head: true })
+      .in('deck_template_id', deckTemplateIds)
+
+    hasNewCards = (totalCardsCount || 0) > 0
+  }
+
+  return {
+    success: true,
+    totalDueCount: totalDueCount || 0,
+    completedToday,
+    currentStreak,
+    hasNewCards,
+  }
+}
+
+
+/**
+ * Creates or updates user_card_progress when a card is answered.
+ * This enables lazy progress creation - progress is created on first answer.
+ * 
+ * Requirements: V6.4 Lazy Progress Creation
+ */
+export async function upsertCardProgress(
+  cardTemplateId: string,
+  srsUpdate: {
+    interval: number
+    easeFactor: number
+    nextReview: Date
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const user = await getUser()
+  if (!user) {
+    return { success: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Upsert the progress record
+  const { error } = await supabase
+    .from('user_card_progress')
+    .upsert({
+      user_id: user.id,
+      card_template_id: cardTemplateId,
+      interval: srsUpdate.interval,
+      ease_factor: srsUpdate.easeFactor,
+      next_review: srsUpdate.nextReview.toISOString(),
+      last_answered_at: new Date().toISOString(),
+      repetitions: srsUpdate.interval > 0 ? 1 : 0,
+      suspended: false,
+    }, {
+      onConflict: 'user_id,card_template_id',
+    })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
 }

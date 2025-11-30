@@ -5,6 +5,7 @@ import { openai } from '@/lib/openai-client'
 import { MCQ_MODEL, MCQ_TEMPERATURE } from '@/lib/ai-config'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { getCardDefaults } from '@/lib/card-defaults'
+import type { CardTemplate } from '@/types/database'
 import {
   draftBatchInputSchema,
   mcqBatchItemSchema,
@@ -475,6 +476,237 @@ export async function bulkCreateMCQ(input: BulkCreateInput): Promise<BulkCreateR
     
   } catch (error) {
     console.error('Bulk create error:', error)
+    return { ok: false, error: { message: 'Failed to create cards', code: 'DB_ERROR' } }
+  }
+}
+
+
+// ============================================
+// V6.4: Shared Library V2 Functions
+// ============================================
+
+// Feature flag for V2 schema
+const USE_V2_SCHEMA = true
+
+/**
+ * V6.4 Input type for bulk create with deck_template_id
+ */
+export interface BulkCreateV2Input {
+  deckTemplateId: string
+  sessionTags?: string[]
+  cards: Array<{
+    stem: string
+    options: string[]
+    correctIndex: number
+    explanation?: string
+    tagNames: string[]
+  }>
+}
+
+/**
+ * Server Action: Create multiple MCQ card_templates atomically.
+ * V6.4: Creates card_templates instead of cards, auto-creates user_card_progress.
+ * 
+ * @param input - Deck template ID, sessionTags, and array of cards with merged tags
+ * @returns BulkCreateResult - Either { ok: true, createdCount, deckId } or { ok: false, error }
+ */
+export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCreateResult> {
+  if (!USE_V2_SCHEMA) {
+    // Fall back to V1 with deckId
+    return bulkCreateMCQ({
+      deckId: input.deckTemplateId,
+      sessionTags: input.sessionTags || [],
+      cards: input.cards,
+    })
+  }
+
+  const { deckTemplateId, sessionTags = [], cards } = input
+  
+  // Get authenticated user
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } }
+  }
+  
+  const supabase = await createSupabaseServerClient()
+  
+  // Verify user owns the deck_template or has it subscribed
+  const { data: deckTemplate, error: deckError } = await supabase
+    .from('deck_templates')
+    .select('id, author_id')
+    .eq('id', deckTemplateId)
+    .single()
+  
+  if (deckError || !deckTemplate) {
+    return { ok: false, error: { message: 'Deck template not found', code: 'NOT_FOUND' } }
+  }
+
+  // Only author can add cards to a deck_template
+  if (deckTemplate.author_id !== user.id) {
+    return { ok: false, error: { message: 'Only the author can add cards', code: 'UNAUTHORIZED' } }
+  }
+  
+  try {
+    // Step 1: Collect all unique tag names (session + per-card AI tags)
+    const allTagNames = new Set<string>()
+    
+    for (const tagName of sessionTags) {
+      const trimmed = tagName.trim()
+      if (trimmed) {
+        allTagNames.add(trimmed)
+      }
+    }
+    
+    for (const card of cards) {
+      for (const tagName of card.tagNames) {
+        const trimmed = tagName.trim()
+        if (trimmed) {
+          const lowerTrimmed = trimmed.toLowerCase()
+          const alreadyExists = Array.from(allTagNames).some(
+            existing => existing.toLowerCase() === lowerTrimmed
+          )
+          if (!alreadyExists) {
+            allTagNames.add(trimmed)
+          }
+        }
+      }
+    }
+    
+    // Step 2: Resolve tag names to IDs
+    const tagNameToId = new Map<string, string>()
+    
+    for (const tagName of allTagNames) {
+      const { data: existingTag } = await supabase
+        .from('tags')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .ilike('name', tagName)
+        .single()
+      
+      if (existingTag) {
+        tagNameToId.set(tagName.toLowerCase(), existingTag.id)
+        continue
+      }
+      
+      const { data: newTag, error: createTagError } = await supabase
+        .from('tags')
+        .insert({
+          user_id: user.id,
+          name: tagName,
+          color: 'purple',
+        })
+        .select('id, name')
+        .single()
+      
+      if (createTagError) {
+        if (createTagError.code === '23505') {
+          const { data: raceTag } = await supabase
+            .from('tags')
+            .select('id, name')
+            .eq('user_id', user.id)
+            .ilike('name', tagName)
+            .single()
+          
+          if (raceTag) {
+            tagNameToId.set(tagName.toLowerCase(), raceTag.id)
+          }
+        }
+      } else if (newTag) {
+        tagNameToId.set(newTag.name.toLowerCase(), newTag.id)
+      }
+    }
+    
+    // Step 3: Prepare card_template rows
+    const cardTemplateRows = cards.map((card) => ({
+      deck_template_id: deckTemplateId,
+      stem: card.stem,
+      options: card.options,
+      correct_index: card.correctIndex,
+      explanation: card.explanation || null,
+      source_meta: null,
+    }))
+    
+    // Step 4: Insert all card_templates
+    const { data: insertedTemplates, error: insertError } = await supabase
+      .from('card_templates')
+      .insert(cardTemplateRows)
+      .select('id')
+    
+    if (insertError || !insertedTemplates) {
+      console.error('Failed to insert card_templates:', insertError)
+      return { ok: false, error: { message: 'Failed to create cards', code: 'DB_ERROR' } }
+    }
+    
+    // Step 5: Insert card_template_tags join rows
+    const cardTagRows: { card_template_id: string; tag_id: string }[] = []
+    const seenCardTagPairs = new Set<string>()
+    
+    for (let i = 0; i < insertedTemplates.length; i++) {
+      const cardTemplateId = insertedTemplates[i].id
+      
+      for (const tagName of sessionTags) {
+        const normalized = tagName.trim().toLowerCase()
+        const tagId = tagNameToId.get(normalized)
+        if (tagId) {
+          const pairKey = `${cardTemplateId}:${tagId}`
+          if (!seenCardTagPairs.has(pairKey)) {
+            seenCardTagPairs.add(pairKey)
+            cardTagRows.push({ card_template_id: cardTemplateId, tag_id: tagId })
+          }
+        }
+      }
+      
+      for (const tagName of cards[i].tagNames) {
+        const normalized = tagName.trim().toLowerCase()
+        const tagId = tagNameToId.get(normalized)
+        if (tagId) {
+          const pairKey = `${cardTemplateId}:${tagId}`
+          if (!seenCardTagPairs.has(pairKey)) {
+            seenCardTagPairs.add(pairKey)
+            cardTagRows.push({ card_template_id: cardTemplateId, tag_id: tagId })
+          }
+        }
+      }
+    }
+    
+    if (cardTagRows.length > 0) {
+      const { error: tagInsertError } = await supabase
+        .from('card_template_tags')
+        .insert(cardTagRows)
+      
+      if (tagInsertError) {
+        console.error('Failed to insert card_template_tags:', tagInsertError)
+      }
+    }
+    
+    // Step 6: Auto-create user_card_progress for author
+    const defaults = getCardDefaults()
+    const progressRows = insertedTemplates.map((ct) => ({
+      user_id: user.id,
+      card_template_id: ct.id,
+      interval: defaults.interval,
+      ease_factor: defaults.ease_factor,
+      next_review: defaults.next_review.toISOString(),
+      repetitions: 0,
+      suspended: false,
+    }))
+    
+    const { error: progressError } = await supabase
+      .from('user_card_progress')
+      .insert(progressRows)
+    
+    if (progressError) {
+      console.error('Failed to create user_card_progress:', progressError)
+      // Don't fail - cards were created, progress can be created lazily
+    }
+    
+    // Revalidate deck page
+    revalidatePath(`/decks/${deckTemplateId}`)
+    
+    return { ok: true, createdCount: insertedTemplates.length, deckId: deckTemplateId }
+    
+  } catch (error) {
+    console.error('Bulk create V2 error:', error)
     return { ok: false, error: { message: 'Failed to create cards', code: 'DB_ERROR' } }
   }
 }
