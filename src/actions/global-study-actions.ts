@@ -420,11 +420,41 @@ export async function getGlobalDueCardsV2(batchNumber: number = 0): Promise<Glob
 
   const deckTemplateIds = userDecks.map(d => d.deck_template_id)
 
-  // Get total count of due cards from user_card_progress
+  // Get card_template_ids from active subscriptions
+  const { data: activeCardTemplates, error: activeCardsError } = await supabase
+    .from('card_templates')
+    .select('id')
+    .in('deck_template_id', deckTemplateIds)
+
+  if (activeCardsError) {
+    return {
+      success: false,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+      error: activeCardsError.message,
+    }
+  }
+
+  const activeCardIds = (activeCardTemplates || []).map(c => c.id)
+
+  if (activeCardIds.length === 0) {
+    return {
+      success: true,
+      cards: [],
+      totalDue: 0,
+      hasMoreBatches: false,
+      isNewCardsFallback: false,
+    }
+  }
+
+  // Get total count of due cards from user_card_progress (only from active subscriptions)
   const { count: totalDueCount, error: countError } = await supabase
     .from('user_card_progress')
     .select('card_template_id', { count: 'exact', head: true })
     .eq('user_id', user.id)
+    .in('card_template_id', activeCardIds)
     .lte('next_review', now)
     .eq('suspended', false)
 
@@ -484,6 +514,7 @@ export async function getGlobalDueCardsV2(batchNumber: number = 0): Promise<Glob
   }
 
   // Fetch due cards with pagination - join card_templates with user_card_progress
+  // Only include cards from active subscriptions
   const offset = batchNumber * BATCH_SIZE
   const { data: progressRecords, error: progressError } = await supabase
     .from('user_card_progress')
@@ -492,6 +523,7 @@ export async function getGlobalDueCardsV2(batchNumber: number = 0): Promise<Glob
       card_templates!inner(*)
     `)
     .eq('user_id', user.id)
+    .in('card_template_id', activeCardIds)
     .lte('next_review', now)
     .eq('suspended', false)
     .order('next_review', { ascending: true })
@@ -577,23 +609,92 @@ export async function getGlobalStatsV2(): Promise<GlobalStatsResult> {
   const now = new Date().toISOString()
   const todayDateStr = new Date().toISOString().split('T')[0]
 
-  // Get total due count from user_card_progress
-  const { count: totalDueCount, error: dueCountError } = await supabase
-    .from('user_card_progress')
-    .select('card_template_id', { count: 'exact', head: true })
+  // Get user's active subscriptions first
+  const { data: userDecks, error: userDecksError } = await supabase
+    .from('user_decks')
+    .select('deck_template_id')
     .eq('user_id', user.id)
-    .lte('next_review', now)
-    .eq('suspended', false)
+    .eq('is_active', true)
 
-  if (dueCountError) {
+  if (userDecksError) {
     return {
       success: false,
       totalDueCount: 0,
       completedToday: 0,
       currentStreak: 0,
       hasNewCards: false,
-      error: dueCountError.message,
+      error: userDecksError.message,
     }
+  }
+
+  // If no active subscriptions, return zeros
+  if (!userDecks || userDecks.length === 0) {
+    // Still get streak and completed today
+    const { data: studyLog } = await supabase
+      .from('study_logs')
+      .select('cards_reviewed')
+      .eq('user_id', user.id)
+      .eq('study_date', todayDateStr)
+      .single()
+
+    const { data: userStats } = await supabase
+      .from('user_stats')
+      .select('current_streak')
+      .eq('user_id', user.id)
+      .single()
+
+    return {
+      success: true,
+      totalDueCount: 0,
+      completedToday: studyLog?.cards_reviewed || 0,
+      currentStreak: userStats?.current_streak || 0,
+      hasNewCards: false,
+    }
+  }
+
+  const deckTemplateIds = userDecks.map(d => d.deck_template_id)
+
+  // Get card_template_ids from active subscriptions
+  const { data: activeCardTemplates, error: activeCardsError } = await supabase
+    .from('card_templates')
+    .select('id')
+    .in('deck_template_id', deckTemplateIds)
+
+  if (activeCardsError) {
+    return {
+      success: false,
+      totalDueCount: 0,
+      completedToday: 0,
+      currentStreak: 0,
+      hasNewCards: false,
+      error: activeCardsError.message,
+    }
+  }
+
+  const activeCardIds = (activeCardTemplates || []).map(c => c.id)
+
+  // Get total due count from user_card_progress (only from active subscriptions)
+  let totalDueCount = 0
+  if (activeCardIds.length > 0) {
+    const { count, error: dueCountError } = await supabase
+      .from('user_card_progress')
+      .select('card_template_id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('card_template_id', activeCardIds)
+      .lte('next_review', now)
+      .eq('suspended', false)
+
+    if (dueCountError) {
+      return {
+        success: false,
+        totalDueCount: 0,
+        completedToday: 0,
+        currentStreak: 0,
+        hasNewCards: false,
+        error: dueCountError.message,
+      }
+    }
+    totalDueCount = count || 0
   }
 
   // Get completed today from study_logs (unchanged)
@@ -637,16 +738,10 @@ export async function getGlobalStatsV2(): Promise<GlobalStatsResult> {
 
   const currentStreak = userStats?.current_streak || 0
 
-  // Check if there are any card_templates in user's decks
-  const { data: userDecks } = await supabase
-    .from('user_decks')
-    .select('deck_template_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-
+  // Check if there are any card_templates in user's active subscriptions
+  // (we already have deckTemplateIds from earlier)
   let hasNewCards = false
-  if (userDecks && userDecks.length > 0) {
-    const deckTemplateIds = userDecks.map(d => d.deck_template_id)
+  if (deckTemplateIds.length > 0) {
     const { count: totalCardsCount } = await supabase
       .from('card_templates')
       .select('*', { count: 'exact', head: true })

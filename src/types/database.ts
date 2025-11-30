@@ -223,3 +223,38 @@ export interface CardTemplateWithTags extends CardTemplate {
 export interface DeckTemplateWithDueCount extends DeckTemplate {
   due_count: number;
 }
+
+// ============================================
+// Library UX Types (V6.5)
+// ============================================
+
+/**
+ * Deck item for the library browse view.
+ * Includes visibility info and subscription status.
+ */
+export interface BrowseDeckItem {
+  id: string;
+  title: string;
+  description: string | null;
+  visibility: DeckVisibility;
+  author_id: string;
+  card_count: number;
+  isSubscribed: boolean;
+  isAuthor: boolean;
+  created_at: string;
+}
+
+/**
+ * Deck item for the My Library view.
+ * Includes study statistics (due count, new count).
+ */
+export interface MyDeckItem {
+  id: string;
+  title: string;
+  description: string | null;
+  card_count: number;
+  due_count: number;
+  new_count: number;
+  isAuthor: boolean;
+  created_at: string;
+}
