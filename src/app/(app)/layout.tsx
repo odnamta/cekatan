@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { ToastProvider } from '@/components/ui/Toast'
 import { MobileNavBar } from '@/components/navigation/MobileNavBar'
+import { OnboardingWrapper } from '@/components/onboarding/OnboardingWrapper'
 
 export default async function AppLayout({
   children,
@@ -20,8 +21,14 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      {/* Onboarding Modal - Requirements 3.1 */}
+      <OnboardingWrapper 
+        userMetadata={user.user_metadata as { onboarded?: boolean } | null}
+        userName={user.user_metadata?.full_name || user.email?.split('@')[0]}
+      />
       <div className="min-h-screen flex flex-col">
-        <header className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+        {/* Header with glassmorphism - Requirements 4.2, 4.3, 4.4 */}
+        <header className="sticky top-0 z-40 border-b border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-6">
               <a href="/dashboard" className="text-xl font-semibold text-slate-900 dark:text-slate-100">

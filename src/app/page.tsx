@@ -1,71 +1,130 @@
-import Link from 'next/link';
-import TestConnection from '@/components/TestConnection';
+'use client';
 
-export default function Home() {
+import Link from 'next/link';
+import { Brain, BookOpen, TrendingUp, Sparkles } from 'lucide-react';
+
+/**
+ * Gradient blob background component for glassmorphism effect
+ * Requirements: 1.1 - slate-50 background with gradient blob accents
+ */
+function GradientBlob() {
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-      {/* Connection Test */}
-      <div className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto">
-        <TestConnection />
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/30 to-purple-400/30 rounded-full blur-3xl" />
+      <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-teal-400/30 to-blue-400/30 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-purple-300/20 to-pink-300/20 rounded-full blur-3xl" />
+    </div>
+  );
+}
+
+/**
+ * Hero section with ResidencyOS branding
+ * Requirements: 1.2, 1.4 - ResidencyOS headline and AI-Powered Study Platform copy
+ */
+function HeroSection() {
+  return (
+    <section className="relative z-10 pt-20 pb-16 px-4 text-center">
+      <div className="mb-6">
+        <span className="text-6xl">🩺</span>
       </div>
-      
-      {/* Hero Section */}
-      <main className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto text-center">
-          {/* Logo/Brand */}
-          <div className="mb-8">
-            <span className="text-5xl">🩺</span>
-          </div>
-          
-          {/* Hero Title */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-            Celline&apos;s OBGYN Prep
-          </h1>
-          
-          {/* Hero Description */}
-          <p className="text-lg sm:text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
-            Master your medical entrance exams with intelligent spaced repetition. 
-            Our SM-2 algorithm schedules your reviews at optimal intervals for maximum retention.
-          </p>
-          
-          {/* Features List */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12 text-left">
-            <div className="bg-slate-800 rounded-lg p-6">
-              <div className="text-2xl mb-3">📚</div>
-              <h3 className="font-semibold text-lg mb-2">Organize by Deck</h3>
-              <p className="text-slate-400 text-sm">
-                Create custom flashcard decks for each topic you need to study.
-              </p>
-            </div>
-            <div className="bg-slate-800 rounded-lg p-6">
-              <div className="text-2xl mb-3">🧠</div>
-              <h3 className="font-semibold text-lg mb-2">Smart Scheduling</h3>
-              <p className="text-slate-400 text-sm">
-                SM-2 algorithm optimizes review timing based on your performance.
-              </p>
-            </div>
-            <div className="bg-slate-800 rounded-lg p-6">
-              <div className="text-2xl mb-3">📈</div>
-              <h3 className="font-semibold text-lg mb-2">Track Progress</h3>
-              <p className="text-slate-400 text-sm">
-                See due cards at a glance and prioritize your study sessions.
-              </p>
-            </div>
-          </div>
-          
-          {/* Login Button */}
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500"
-          >
-            Get Started
-          </Link>
-          
-          <p className="mt-4 text-slate-500 text-sm">
-            Already have an account? <Link href="/login" className="text-blue-400 hover:text-blue-300">Login here</Link>
-          </p>
+      <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4 tracking-tight">
+        ResidencyOS
+      </h1>
+      <p className="text-xl md:text-2xl text-slate-600 mb-2">
+        The Operating System for Medical Specialists
+      </p>
+      <p className="text-lg text-slate-500 mb-8 max-w-xl mx-auto">
+        AI-Powered Study Platform for Board Exam Success
+      </p>
+      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25"
+        >
+          Get Started
+        </Link>
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-xl bg-white/70 backdrop-blur-md border border-white/20 text-slate-700 hover:bg-white/90 transition-colors"
+        >
+          Sign In
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Glassmorphic feature card component
+ * Requirements: 1.3 - backdrop-blur-md and semi-transparent white backgrounds
+ */
+export interface GlassCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
+
+export function GlassCard({ icon, title, description }: GlassCardProps) {
+  return (
+    <div className="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg shadow-slate-200/50 p-6 hover:bg-white/80 transition-colors">
+      <div className="text-blue-600 mb-4">{icon}</div>
+      <h3 className="font-semibold text-lg text-slate-900 mb-2">{title}</h3>
+      <p className="text-slate-600 text-sm leading-relaxed">{description}</p>
+    </div>
+  );
+}
+
+/**
+ * Feature cards section with glassmorphism styling
+ * Requirements: 1.3 - Glassmorphic feature cards
+ */
+function FeatureCards() {
+  const features = [
+    {
+      icon: <Brain className="h-8 w-8" />,
+      title: 'Smart Scheduling',
+      description: 'SM-2 algorithm optimizes review timing based on your performance for maximum retention.',
+    },
+    {
+      icon: <BookOpen className="h-8 w-8" />,
+      title: 'Curated Content',
+      description: 'Access shared deck libraries from fellow residents and medical professionals.',
+    },
+    {
+      icon: <TrendingUp className="h-8 w-8" />,
+      title: 'Track Progress',
+      description: 'Visualize your study streaks, due cards, and mastery levels at a glance.',
+    },
+    {
+      icon: <Sparkles className="h-8 w-8" />,
+      title: 'AI-Assisted',
+      description: 'Generate flashcards from PDFs and study materials with intelligent extraction.',
+    },
+  ];
+
+  return (
+    <section className="relative z-10 px-4 pb-20">
+      <div className="max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {features.map((feature) => (
+            <GlassCard key={feature.title} {...feature} />
+          ))}
         </div>
-      </main>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Landing page with Medical Glass theme
+ * Requirements: 1.1, 1.2, 1.3, 1.4 - Glassmorphism landing page with ResidencyOS branding
+ */
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+      <GradientBlob />
+      <HeroSection />
+      <FeatureCards />
     </div>
   );
 }

@@ -49,12 +49,18 @@ export interface MobileNavBarProps {
  * MobileNavBar component - Fixed bottom navigation for mobile devices
  * Requirements: 4.1, 4.3, 4.4, 4.5 - Mobile bottom nav with Home, Library, Profile
  */
+/**
+ * Glassmorphic navigation classes for property testing
+ * Requirements: 4.1, 4.3 - bg-white/80 backdrop-blur-lg border-white/20
+ */
+export const GLASS_NAV_CLASSES = 'bg-white/80 backdrop-blur-lg border-t border-white/20';
+
 export function MobileNavBar({ className = '' }: MobileNavBarProps) {
   const pathname = usePathname();
 
   return (
     <nav 
-      className={`fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 md:hidden z-40 pb-safe ${className}`}
+      className={`fixed bottom-0 left-0 right-0 ${GLASS_NAV_CLASSES} md:hidden z-40 pb-safe ${className}`}
       role="navigation"
       aria-label="Mobile navigation"
     >
