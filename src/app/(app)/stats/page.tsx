@@ -6,7 +6,7 @@ import { TrainWeakestButton } from '@/components/analytics/TrainWeakestButton'
 import { BarChart3 } from 'lucide-react'
 
 export const metadata = {
-  title: 'Stats | ResidencyOS',
+  title: 'Stats | Specialize',
   description: 'Track your study performance and identify areas for improvement',
 }
 

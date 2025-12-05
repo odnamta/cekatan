@@ -21,10 +21,10 @@ function HeroSection() {
         <span className="text-6xl">🩺</span>
       </div>
       <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4 tracking-tight">
-        ResidencyOS
+        Specialize
       </h1>
       <p className="text-xl md:text-2xl text-slate-600 mb-2">
-        The Operating System for Medical Specialists
+        Medical Board Prep
       </p>
       <p className="text-lg text-slate-500 mb-8 max-w-xl mx-auto">
         AI-Powered Study Platform for Board Exam Success

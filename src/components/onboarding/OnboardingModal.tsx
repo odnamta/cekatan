@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
+import { enrollInStarterPack } from '@/actions/onboarding-actions';
 
 /**
  * Specialty options for onboarding
@@ -68,6 +69,8 @@ export function OnboardingModal({ isOpen, userName, onComplete }: OnboardingModa
     try {
       const supabase = createSupabaseBrowserClient();
       
+      // Save user preferences to metadata
+      // Requirements: 3.5 - Persist specialty to user_metadata
       const { error: updateError } = await supabase.auth.updateUser({
         data: {
           onboarded: true,
@@ -82,8 +85,16 @@ export function OnboardingModal({ isOpen, userName, onComplete }: OnboardingModa
         return;
       }
 
+      // Auto-enroll in starter pack based on specialty
+      // Requirements: 4.1, 4.3 - Create subscriptions and redirect to dashboard
+      const enrollResult = await enrollInStarterPack(specialty);
+      if (!enrollResult.success) {
+        // Log error but continue - graceful degradation
+        console.error('Starter pack enrollment failed:', enrollResult.error);
+      }
+
       onComplete?.();
-      router.push('/library');
+      router.push('/dashboard');
     } catch {
       setError('Failed to save preferences. Please try again.');
       setIsLoading(false);
@@ -170,20 +181,20 @@ export function OnboardingModal({ isOpen, userName, onComplete }: OnboardingModa
           </div>
         )}
 
-        {/* Slide 3: Completion - Requirements 3.5 */}
+        {/* Slide 3: Completion - Requirements 3.5, 4.1, 4.3 */}
         {step === 3 && (
           <div className="text-center">
             <div className="text-5xl mb-4">🎉</div>
             <h2 className="text-2xl font-semibold text-slate-900 mb-2">
               You&apos;re all set!
             </h2>
-            <p className="text-slate-600 mb-6">Let&apos;s find your first study deck</p>
+            <p className="text-slate-600 mb-6">We&apos;ve added starter decks to get you going</p>
             <Button 
               onClick={handleComplete}
               loading={isLoading}
               className="w-full"
             >
-              Go to Library
+              Start Studying
             </Button>
           </div>
         )}
