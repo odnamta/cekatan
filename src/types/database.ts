@@ -222,6 +222,9 @@ export interface UserCardProgress {
   next_review: string;
   last_answered_at: string | null;
   suspended: boolean;
+  // V10.2: Accuracy tracking
+  correct_count: number;
+  total_attempts: number;
 }
 
 // Extended CardTemplate type with tags included
@@ -267,4 +270,40 @@ export interface MyDeckItem {
   new_count: number;
   isAuthor: boolean;
   created_at: string;
+}
+
+// ============================================
+// V10.2: Analytics Types
+// ============================================
+
+/**
+ * Accuracy data for a single topic tag
+ */
+export interface TopicAccuracy {
+  tagId: string
+  tagName: string
+  tagColor: string
+  accuracy: number | null  // null if no attempts
+  correctCount: number
+  totalAttempts: number
+  isLowConfidence: boolean  // true if totalAttempts < 5
+}
+
+/**
+ * Progress data for a single deck
+ */
+export interface DeckProgress {
+  deckId: string
+  deckTitle: string
+  cardsLearned: number  // cards with at least 1 review
+  totalCards: number
+}
+
+/**
+ * Daily activity data point
+ */
+export interface DailyActivity {
+  date: string        // ISO date string (YYYY-MM-DD)
+  dayName: string     // "Mon", "Tue", etc.
+  cardsReviewed: number
 }

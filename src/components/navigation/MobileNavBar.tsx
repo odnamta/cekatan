@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Library, User } from 'lucide-react';
+import { Home, Library, User, BarChart3 } from 'lucide-react';
 import { ReactNode } from 'react';
 
 export interface NavItem {
@@ -17,6 +17,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', icon: <Home className="h-5 w-5" />, label: 'Home' },
   { href: '/library', icon: <Library className="h-5 w-5" />, label: 'Library' },
+  { href: '/stats', icon: <BarChart3 className="h-5 w-5" />, label: 'Stats' },
   { href: '/profile', icon: <User className="h-5 w-5" />, label: 'Profile' },
 ];
 

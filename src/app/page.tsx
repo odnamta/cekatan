@@ -1,12 +1,9 @@
-'use client';
+'use client'
 
-import Link from 'next/link';
-import { Brain, BookOpen, TrendingUp, Sparkles } from 'lucide-react';
+import Link from 'next/link'
+import { Brain, BookOpen, TrendingUp, Sparkles } from 'lucide-react'
+import { GlassCard } from '@/components/ui/GlassCard'
 
-/**
- * Gradient blob background component for glassmorphism effect
- * Requirements: 1.1 - slate-50 background with gradient blob accents
- */
 function GradientBlob() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -14,13 +11,9 @@ function GradientBlob() {
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-teal-400/30 to-blue-400/30 rounded-full blur-3xl" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-purple-300/20 to-pink-300/20 rounded-full blur-3xl" />
     </div>
-  );
+  )
 }
 
-/**
- * Hero section with ResidencyOS branding
- * Requirements: 1.2, 1.4 - ResidencyOS headline and AI-Powered Study Platform copy
- */
 function HeroSection() {
   return (
     <section className="relative z-10 pt-20 pb-16 px-4 text-center">
@@ -51,33 +44,9 @@ function HeroSection() {
         </Link>
       </div>
     </section>
-  );
+  )
 }
 
-/**
- * Glassmorphic feature card component
- * Requirements: 1.3 - backdrop-blur-md and semi-transparent white backgrounds
- */
-export interface GlassCardProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}
-
-export function GlassCard({ icon, title, description }: GlassCardProps) {
-  return (
-    <div className="bg-white/70 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg shadow-slate-200/50 p-6 hover:bg-white/80 transition-colors">
-      <div className="text-blue-600 mb-4">{icon}</div>
-      <h3 className="font-semibold text-lg text-slate-900 mb-2">{title}</h3>
-      <p className="text-slate-600 text-sm leading-relaxed">{description}</p>
-    </div>
-  );
-}
-
-/**
- * Feature cards section with glassmorphism styling
- * Requirements: 1.3 - Glassmorphic feature cards
- */
 function FeatureCards() {
   const features = [
     {
@@ -100,7 +69,7 @@ function FeatureCards() {
       title: 'AI-Assisted',
       description: 'Generate flashcards from PDFs and study materials with intelligent extraction.',
     },
-  ];
+  ]
 
   return (
     <section className="relative z-10 px-4 pb-20">
@@ -112,13 +81,9 @@ function FeatureCards() {
         </div>
       </div>
     </section>
-  );
+  )
 }
 
-/**
- * Landing page with Medical Glass theme
- * Requirements: 1.1, 1.2, 1.3, 1.4 - Glassmorphism landing page with ResidencyOS branding
- */
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
@@ -126,5 +91,5 @@ export default function LandingPage() {
       <HeroSection />
       <FeatureCards />
     </div>
-  );
+  )
 }

@@ -4,29 +4,32 @@ import { NAV_ITEMS, isNavItemActive, getNavItemClasses } from '../components/nav
 
 /**
  * **Feature: v10, Property 8: MobileNavBar Items**
- * *For any* rendered MobileNavBar, it should contain exactly three navigation items: 
- * Home, Library, and Profile.
- * **Validates: Requirements 4.3**
+ * *For any* rendered MobileNavBar, it should contain exactly four navigation items: 
+ * Home, Library, Stats, and Profile.
+ * **Validates: Requirements 4.3, V10.2 2.2**
  */
 describe('Property 8: MobileNavBar Items', () => {
-  it('has exactly three navigation items', () => {
-    expect(NAV_ITEMS).toHaveLength(3);
+  it('has exactly four navigation items', () => {
+    expect(NAV_ITEMS).toHaveLength(4);
   });
 
-  it('contains Home, Library, and Profile items', () => {
+  it('contains Home, Library, Stats, and Profile items', () => {
     const labels = NAV_ITEMS.map(item => item.label);
     expect(labels).toContain('Home');
     expect(labels).toContain('Library');
+    expect(labels).toContain('Stats');
     expect(labels).toContain('Profile');
   });
 
   it('has correct hrefs for each item', () => {
     const homeItem = NAV_ITEMS.find(item => item.label === 'Home');
     const libraryItem = NAV_ITEMS.find(item => item.label === 'Library');
+    const statsItem = NAV_ITEMS.find(item => item.label === 'Stats');
     const profileItem = NAV_ITEMS.find(item => item.label === 'Profile');
 
     expect(homeItem?.href).toBe('/dashboard');
     expect(libraryItem?.href).toBe('/library');
+    expect(statsItem?.href).toBe('/stats');
     expect(profileItem?.href).toBe('/profile');
   });
 

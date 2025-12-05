@@ -58,7 +58,12 @@ export async function rateCardAction(
     rating,
   })
 
-  // V8.0: Upsert user_card_progress
+  // V10.2: Determine if answer is correct (rating >= 3 means Good/Easy)
+  const isCorrect = rating >= 3
+  const newCorrectCount = (currentProgress?.correct_count ?? 0) + (isCorrect ? 1 : 0)
+  const newTotalAttempts = (currentProgress?.total_attempts ?? 0) + 1
+
+  // V8.0: Upsert user_card_progress with V10.2 accuracy tracking
   const { error: updateError } = await supabase
     .from('user_card_progress')
     .upsert({
@@ -70,6 +75,9 @@ export async function rateCardAction(
       last_answered_at: new Date().toISOString(),
       repetitions: (currentProgress?.repetitions ?? 0) + 1,
       suspended: false,
+      // V10.2: Accuracy tracking
+      correct_count: newCorrectCount,
+      total_attempts: newTotalAttempts,
     }, {
       onConflict: 'user_id,card_template_id',
     })

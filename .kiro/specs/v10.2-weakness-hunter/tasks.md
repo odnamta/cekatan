@@ -1,0 +1,100 @@
+# Implementation Plan
+
+- [x] 1. Database schema update for accuracy tracking
+  - [x] 1.1 Create migration to add correct_count and total_attempts columns to user_card_progress
+    - Add `correct_count INTEGER DEFAULT 0` column
+    - Add `total_attempts INTEGER DEFAULT 0` column
+    - Create migration file in `scripts/migrate-v10.2-analytics.sql`
+    - _Requirements: 1.1, 1.2_
+  - [x] 1.2 Update recordAnswer action to increment accuracy counters
+    - Modify `src/actions/study-actions.ts` to increment total_attempts on every answer
+    - Increment correct_count when answer is correct (rating >= 3 for Good/Easy)
+    - _Requirements: 1.2_
+  - [x] 1.3 Write property test for accuracy counter updates
+    - **Property 1: Accuracy calculation produces valid percentages**
+    - **Validates: Requirements 1.2, 3.2**
+
+- [x] 2. Implement analytics Server Actions
+  - [x] 2.1 Create analytics-actions.ts with TypeScript interfaces
+    - Define TopicAccuracy, DeckProgress, AnalyticsResult, DailyActivity, ActivityResult interfaces
+    - _Requirements: 1.1, 1.5_
+  - [x] 2.2 Implement getUserAnalytics Server Action
+    - Join user_card_progress with card_templates, card_template_tags, and tags
+    - Filter tags by category = 'topic'
+    - Calculate accuracy per topic: (correct_count / total_attempts) * 100
+    - Return null accuracy for topics with zero attempts
+    - Include cardsLearned vs totalCards per deck
+    - Identify weakest topic with tiebreaker logic
+    - _Requirements: 1.1, 1.2, 1.3, 1.5, 5.1, 5.4_
+  - [x] 2.3 Write property test for learned count invariant
+    - **Property 2: Learned count never exceeds total count**
+    - **Validates: Requirements 1.5**
+  - [x] 2.4 Write property test for weakest topic identification
+    - **Property 8: Weakest topic identification with tiebreaker**
+    - **Validates: Requirements 5.1, 5.4**
+  - [x] 2.5 Implement getActivityData Server Action
+    - Query study_logs for last 7 days
+    - Fill missing days with zero counts
+    - Format dates to day names (Mon, Tue, etc.)
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 2.6 Write property test for activity data coverage
+    - **Property 6: Activity data covers exactly 7 days**
+    - **Validates: Requirements 4.1**
+  - [x] 2.7 Write property test for day name formatting
+    - **Property 7: Day name formatting**
+    - **Validates: Requirements 4.2**
+
+- [x] 3. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 4. Update navigation to include Stats
+  - [x] 4.1 Add Stats item to MobileNavBar NAV_ITEMS array
+    - Add `{ href: '/stats', icon: <BarChart3 />, label: 'Stats' }` to NAV_ITEMS
+    - Import BarChart3 from lucide-react
+    - _Requirements: 2.2, 2.3, 2.4_
+  - [x] 4.2 Write property test for navigation active state
+    - **Property 3: Navigation active state detection**
+    - **Validates: Requirements 2.4**
+
+- [x] 5. Create Analytics Dashboard page and components
+  - [x] 5.1 Install recharts package
+    - Run `npm install recharts`
+    - _Requirements: 3.4_
+  - [x] 5.2 Create /stats page route
+    - Create `src/app/(app)/stats/page.tsx` as Server Component
+    - Fetch data via getUserAnalytics and getActivityData
+    - Display loading skeleton while fetching
+    - Pass data to chart components
+    - _Requirements: 2.1, 2.5_
+  - [x] 5.3 Create RadarChart component
+    - Create `src/components/analytics/RadarChart.tsx`
+    - Use recharts RadarChart with PolarGrid, PolarAngleAxis, Radar
+    - Normalize accuracy values to 0-100 scale
+    - Add tooltip showing accuracy % and attempt count
+    - Visual indicator for low-confidence data (< 5 attempts)
+    - _Requirements: 3.1, 3.2, 3.3, 3.5_
+  - [x] 5.4 Write property test for radar chart data transformation
+    - **Property 4: Radar chart data contains all topics**
+    - **Validates: Requirements 3.1**
+  - [x] 5.5 Write property test for low confidence threshold
+    - **Property 5: Low confidence threshold**
+    - **Validates: Requirements 3.3**
+  - [x] 5.6 Create ActivityChart component
+    - Create `src/components/analytics/ActivityChart.tsx`
+    - Use recharts BarChart with XAxis, YAxis, Bar
+    - Display day names on x-axis
+    - Glassmorphic styling with semi-transparent bars
+    - Tooltip showing exact count on hover
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [x] 5.7 Create FocusRecommendation component
+    - Create `src/components/analytics/FocusRecommendation.tsx`
+    - Display weakest topic name and accuracy percentage
+    - "Improve [Topic]" button linking to custom study session
+    - Show encouragement message when no sufficient data
+    - _Requirements: 5.1, 5.2, 5.3, 5.5_
+  - [x] 5.8 Write property test for improve button URL construction
+    - **Property 9: Improve button URL construction**
+    - **Validates: Requirements 5.3**
+
+- [x] 6. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
