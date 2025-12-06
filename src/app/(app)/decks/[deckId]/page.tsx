@@ -10,6 +10,7 @@ import { EditableDeckTitle } from '@/components/decks/EditableDeckTitle'
 import { EditableDeckSubject } from '@/components/decks/EditableDeckSubject'
 import { ManageTagsButton } from '@/components/decks/ManageTagsButton'
 import { VisibilityToggle } from '@/components/decks/VisibilityToggle'
+import { SyncProgressButton } from '@/components/decks/SyncProgressButton'
 import type { Card, Tag, DeckVisibility } from '@/types/database'
 
 // Type for card template with nested tags from Supabase join
@@ -261,6 +262,8 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
             </Link>
             {/* V8.3: Clean Duplicates button */}
             <CleanDuplicatesButton deckId={deckId} />
+            {/* V10.6.1: Sync Progress button for authors */}
+            <SyncProgressButton deckId={deckId} />
             {/* V9.4: Manage Tags button for authors */}
             <ManageTagsButton isAuthor={isAuthor} />
           </>

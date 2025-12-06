@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Globe, Lock } from 'lucide-react'
 import { updateDeckVisibilityAction } from '@/actions/deck-actions'
+import { useToast } from '@/components/ui/Toast'
 import type { DeckVisibility } from '@/types/database'
 
 interface VisibilityToggleProps {
@@ -17,6 +18,7 @@ interface VisibilityToggleProps {
  * Allows deck authors to toggle between private and public visibility.
  * 
  * V10.4: Deck Visibility Controls
+ * V10.6.1: Added toast notifications and optimistic UI with revert
  * Requirements: 5.1, 5.4
  */
 export function VisibilityToggle({
@@ -28,6 +30,7 @@ export function VisibilityToggle({
   const [visibility, setVisibility] = useState<DeckVisibility>(currentVisibility)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   // Don't render if user is not the author
   if (!isAuthor) {
@@ -38,17 +41,24 @@ export function VisibilityToggle({
 
   const handleToggle = () => {
     const newVisibility: DeckVisibility = isPublic ? 'private' : 'public'
+    const previousVisibility = visibility
+    
+    // V10.6.1: Optimistic update
+    setVisibility(newVisibility)
     setError(null)
 
     startTransition(async () => {
       const result = await updateDeckVisibilityAction(deckId, newVisibility)
       
       if (result.success) {
-        setVisibility(newVisibility)
         onVisibilityChange?.(newVisibility)
+        showToast(`Deck is now ${newVisibility}`, 'success')
       } else {
-        setError(result.error || 'Failed to update visibility')
-        // Revert optimistic update would happen here if we did one
+        // V10.6.1: Revert on failure
+        setVisibility(previousVisibility)
+        const errorMsg = result.error || 'Failed to update visibility'
+        setError(errorMsg)
+        showToast(errorMsg, 'error')
       }
     })
   }

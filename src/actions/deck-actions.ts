@@ -483,6 +483,90 @@ export async function getDeckSubject(deckId: string): Promise<string> {
 
 
 // ============================================
+// V10.6.1: Author Progress Sync
+// ============================================
+
+/**
+ * V10.6.1: Sync author progress for a deck.
+ * Creates user_card_progress rows for all cards the author doesn't have progress for.
+ * Uses ON CONFLICT DO NOTHING for idempotency.
+ * 
+ * This fixes the "0 Cards Due" issue for authors who create decks but haven't studied yet.
+ * 
+ * @param deckId - The deck_template ID to sync
+ * @returns ActionResult with success/error
+ */
+export async function syncAuthorProgress(deckId: string): Promise<ActionResult> {
+  const user = await getUser()
+  if (!user) {
+    return { success: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Verify user is author
+  const { data: deck, error: deckError } = await supabase
+    .from('deck_templates')
+    .select('author_id')
+    .eq('id', deckId)
+    .single()
+
+  if (deckError || !deck) {
+    return { success: false, error: 'Deck not found' }
+  }
+
+  if (deck.author_id !== user.id) {
+    return { success: false, error: 'Only the author can sync progress' }
+  }
+
+  // Get all card IDs in this deck
+  const { data: cards, error: cardsError } = await supabase
+    .from('card_templates')
+    .select('id')
+    .eq('deck_template_id', deckId)
+
+  if (cardsError) {
+    return { success: false, error: cardsError.message }
+  }
+
+  if (!cards || cards.length === 0) {
+    return { success: true, data: { synced: 0 } }
+  }
+
+  // Bulk insert progress rows (ON CONFLICT DO NOTHING)
+  const progressRows = cards.map(card => ({
+    user_id: user.id,
+    card_template_id: card.id,
+    interval: 0,
+    ease_factor: 2.5,
+    repetitions: 0,
+    next_review: new Date().toISOString(),
+    suspended: false,
+    correct_count: 0,
+    total_attempts: 0,
+    is_flagged: false,
+  }))
+
+  const { error: upsertError } = await supabase
+    .from('user_card_progress')
+    .upsert(progressRows, {
+      onConflict: 'user_id,card_template_id',
+      ignoreDuplicates: true,
+    })
+
+  if (upsertError) {
+    return { success: false, error: upsertError.message }
+  }
+
+  revalidatePath(`/decks/${deckId}`)
+  revalidatePath('/study')
+  revalidatePath('/dashboard')
+
+  return { success: true, data: { synced: cards.length } }
+}
+
+
+// ============================================
 // V10.4: Deck Visibility Management
 // ============================================
 

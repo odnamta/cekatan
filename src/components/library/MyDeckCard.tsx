@@ -1,29 +1,77 @@
 'use client'
 
 import Link from 'next/link'
-import { useTransition, useState } from 'react'
+import { useTransition, useState, useRef, useEffect } from 'react'
+import { MoreVertical, Loader2 } from 'lucide-react'
 import { unsubscribeFromDeck } from '@/actions/library-actions'
+import { deleteDeckAction } from '@/actions/deck-actions'
 import { Button } from '@/components/ui/Button'
 import type { MyDeckItem } from '@/types/database'
 
 interface MyDeckCardProps {
   deck: MyDeckItem
   onUnsubscribeSuccess?: () => void
+  onDeleteSuccess?: () => void
 }
 
-export function MyDeckCard({ deck, onUnsubscribeSuccess }: MyDeckCardProps) {
+/**
+ * V10.6.2: MyDeckCard with separate Unsubscribe/Delete actions
+ * - Authors see dropdown with both "Unsubscribe" and "Delete Deck"
+ * - Non-authors only see "Unsubscribe"
+ * - Optimistic UI: card hides immediately on action
+ * - useTransition for non-blocking UI
+ */
+export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDeckCardProps) {
   const [isPending, startTransition] = useTransition()
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
+  const [showMenu, setShowMenu] = useState(false)
+  const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close menu on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
 
   const handleUnsubscribe = () => {
+    setIsVisible(false) // Optimistic hide
+    setShowUnsubscribeConfirm(false)
+    setShowMenu(false)
     startTransition(async () => {
       const result = await unsubscribeFromDeck(deck.id)
-      if (result.success && onUnsubscribeSuccess) {
-        onUnsubscribeSuccess()
+      if (result.success) {
+        onUnsubscribeSuccess?.()
+      } else {
+        setIsVisible(true) // Restore on error
       }
-      setShowConfirm(false)
     })
   }
+
+  const handleDelete = () => {
+    setIsVisible(false) // Optimistic hide
+    setShowDeleteConfirm(false)
+    setShowMenu(false)
+    startTransition(async () => {
+      const result = await deleteDeckAction(deck.id)
+      if (result.success) {
+        onDeleteSuccess?.()
+      } else {
+        setIsVisible(true) // Restore on error
+      }
+    })
+  }
+
+  // Optimistic hide
+  if (!isVisible) return null
 
   const totalDue = deck.due_count + deck.new_count
 
@@ -58,13 +106,14 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess }: MyDeckCardProps) {
         </div>
 
         <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-700">
-          {showConfirm ? (
+          {/* Unsubscribe Confirmation */}
+          {showUnsubscribeConfirm && (
             <div className="flex items-center gap-2 w-full">
               <span className="text-sm text-slate-600 dark:text-slate-400">Unsubscribe?</span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowConfirm(false)}
+                onClick={() => setShowUnsubscribeConfirm(false)}
                 disabled={isPending}
               >
                 Cancel
@@ -76,18 +125,90 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess }: MyDeckCardProps) {
                 disabled={isPending}
                 className="text-red-600 dark:text-red-400"
               >
-                {isPending ? '...' : 'Yes'}
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes'}
               </Button>
             </div>
-          ) : (
+          )}
+
+          {/* Delete Confirmation */}
+          {showDeleteConfirm && (
+            <div className="flex flex-col gap-2 w-full">
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                Delete this deck for ALL users?
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                This action cannot be undone.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10"
+                >
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete Forever'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Normal State */}
+          {!showUnsubscribeConfirm && !showDeleteConfirm && (
             <>
-              <button
-                onClick={() => setShowConfirm(true)}
-                className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              >
-                Unsubscribe
-              </button>
-              <Link href={`/study/global`}>
+              {/* Actions Menu */}
+              <div className="relative" ref={menuRef}>
+                {deck.isAuthor ? (
+                  <>
+                    <button
+                      onClick={() => setShowMenu(!showMenu)}
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded"
+                      aria-label="Deck actions"
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
+                    {showMenu && (
+                      <div className="absolute left-0 bottom-full mb-1 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10">
+                        <button
+                          onClick={() => {
+                            setShowMenu(false)
+                            setShowUnsubscribeConfirm(true)
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-t-lg"
+                        >
+                          Unsubscribe
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowMenu(false)
+                            setShowDeleteConfirm(true)
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-b-lg"
+                        >
+                          Delete Deck
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setShowUnsubscribeConfirm(true)}
+                    className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  >
+                    Unsubscribe
+                  </button>
+                )}
+              </div>
+
+              <Link href="/study/global">
                 <Button variant="primary" size="sm">
                   {totalDue > 0 ? 'Continue Study' : 'Start Today'}
                 </Button>

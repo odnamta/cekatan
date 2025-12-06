@@ -53,7 +53,7 @@
         "-y",
         "@jpisnice/shadcn-ui-mcp-server@latest"
       ],
-      "disabled": false,
+      "disabled": true,
       "autoApprove": []
     }
   }

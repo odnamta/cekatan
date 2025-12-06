@@ -183,7 +183,8 @@ function createSnippet(text: string, query: string): string {
 }
 
 /**
- * Searches cards across user's subscribed decks.
+ * Searches cards across user's subscribed decks AND authored decks.
+ * V10.6.1: Added author access - authors can search their own decks even without subscription.
  * 
  * Requirements: 3.1, 3.2, 3.3
  * 
@@ -214,13 +215,28 @@ export async function searchCards(query: string): Promise<SearchCardsResult> {
     return { success: false, results: [], error: decksError.message }
   }
 
-  if (!userDecks || userDecks.length === 0) {
+  const subscribedDeckIds = (userDecks || []).map(ud => ud.deck_template_id)
+
+  // V10.6.1: Get authored deck IDs (authors can search their own decks)
+  const { data: authoredDecks, error: authoredError } = await supabase
+    .from('deck_templates')
+    .select('id')
+    .eq('author_id', user.id)
+
+  if (authoredError) {
+    return { success: false, results: [], error: authoredError.message }
+  }
+
+  const authoredDeckIds = (authoredDecks || []).map(d => d.id)
+
+  // Combine subscribed + authored, deduplicate
+  const accessibleDeckIds = [...new Set([...subscribedDeckIds, ...authoredDeckIds])]
+
+  if (accessibleDeckIds.length === 0) {
     return { success: true, results: [] }
   }
 
-  const subscribedDeckIds = userDecks.map(ud => ud.deck_template_id)
-
-  // Search card_templates in subscribed decks
+  // Search card_templates in accessible decks
   const { data: cards, error: searchError } = await supabase
     .from('card_templates')
     .select(`
@@ -230,7 +246,7 @@ export async function searchCards(query: string): Promise<SearchCardsResult> {
       deck_template_id,
       deck_templates!inner(id, title)
     `)
-    .in('deck_template_id', subscribedDeckIds)
+    .in('deck_template_id', accessibleDeckIds)
     .or(`stem.ilike.${searchTerm},explanation.ilike.${searchTerm}`)
     .limit(MAX_SEARCH_RESULTS)
 

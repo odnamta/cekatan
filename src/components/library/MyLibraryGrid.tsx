@@ -12,10 +12,13 @@ interface MyLibraryGridProps {
   decks: MyDeckItem[]
 }
 
+/**
+ * V10.6.2: Updated to support both unsubscribe and delete callbacks
+ */
 export function MyLibraryGrid({ decks }: MyLibraryGridProps) {
   const router = useRouter()
 
-  const handleUnsubscribeSuccess = () => {
+  const handleSuccess = () => {
     router.refresh()
   }
 
@@ -40,7 +43,8 @@ export function MyLibraryGrid({ decks }: MyLibraryGridProps) {
         <MyDeckCard
           key={deck.id}
           deck={deck}
-          onUnsubscribeSuccess={handleUnsubscribeSuccess}
+          onUnsubscribeSuccess={handleSuccess}
+          onDeleteSuccess={handleSuccess}
         />
       ))}
     </div>
