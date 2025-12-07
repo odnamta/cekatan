@@ -8,11 +8,13 @@ import { sortTagsByCategory } from '@/lib/tag-sort'
 import type { Card, Tag } from '@/types/database'
 
 // V11.1: Extended card type with book_source for virtual source badge
+// V11.3: Added status for draft/publish workflow
 interface CardWithSource extends Card {
   book_source?: {
     id: string
     title: string
   } | null
+  status?: 'draft' | 'published' | 'archived'
 }
 
 interface CardListItemProps {
@@ -42,10 +44,21 @@ export function CardListItem({ card, deckId, tags = [], onDelete, onDuplicate, i
     onDelete?.(card.id, preview || '', typeLabel)
   }
 
+  // V11.3: Check if card is draft or archived
+  const isDraft = card.status === 'draft'
+  const isArchived = card.status === 'archived'
+
   // V8.6: Determine border/background classes based on state
+  // V11.3: Added draft/archived styling
   const getBorderClasses = () => {
     if (isSelected) {
       return 'border-blue-400 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/10'
+    }
+    if (isDraft) {
+      return 'border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-900/10'
+    }
+    if (isArchived) {
+      return 'border-slate-300 dark:border-slate-600 bg-slate-100/50 dark:bg-slate-800/50 opacity-60'
     }
     if (needsReview) {
       return 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
@@ -73,6 +86,17 @@ export function CardListItem({ card, deckId, tags = [], onDelete, onDuplicate, i
             {preview}
           </p>
           <div className="flex flex-wrap gap-2 mt-2">
+            {/* V11.3: Draft/Archived status badge */}
+            {isDraft && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
+                Draft
+              </span>
+            )}
+            {isArchived && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600">
+                Archived
+              </span>
+            )}
             {/* Card type badge - V9.4: Distinct from pill-shaped tags with border + lighter bg */}
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
               isMCQ 

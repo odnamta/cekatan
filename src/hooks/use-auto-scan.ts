@@ -34,6 +34,8 @@ export interface UseAutoScanOptions {
   onComplete?: (stats: AutoScanStats) => void
   onSafetyStop?: () => void
   onOffline?: () => void  // V7.1: Called when connection lost during scan
+  /** V11.3: Import session ID for draft/publish workflow */
+  importSessionId?: string
 }
 
 // V8.3: Page range interface for precision scanning
@@ -119,6 +121,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     onComplete,
     onSafetyStop,
     onOffline,  // V7.1: Offline callback
+    importSessionId,  // V11.3: Import session ID for draft/publish workflow
   } = options
 
   const totalPages = pdfDocument?.numPages ?? 0
@@ -259,16 +262,20 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
       }))
 
       // V7.2.1: Deep logging - AutoScan caller
+      // V11.3: Include importSessionId for draft/publish workflow
       console.log('[AutoScan] Calling bulkCreateMCQV2', {
         deckTemplateId: deckId,
         page: pageNumber,
         cardsCount: cards.length,
+        importSessionId,
       })
       
+      // V11.3: Pass importSessionId for draft/publish workflow
       const saveResult = await bulkCreateMCQV2({
         deckTemplateId: deckId,
         sessionTags: sessionTagNames,
         cards,
+        importSessionId,
       })
 
       if (!saveResult.ok) {
@@ -300,7 +307,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
       onError?.(pageNumber, errorMessage)
       return false
     }
-  }, [pdfDocument, deckId, sessionTagNames, aiMode, includeNextPage, totalPages, onPageComplete, onError])
+  }, [pdfDocument, deckId, sessionTagNames, aiMode, includeNextPage, totalPages, onPageComplete, onError, importSessionId])
 
   // Main scan loop iteration
   // V8.3: Updated to use scanEndPage instead of totalPages for range scanning

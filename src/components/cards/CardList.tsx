@@ -17,12 +17,14 @@ import type { Card, Tag } from '@/types/database'
 
 // Extended card type with tags and book_source
 // V11.1: Added book_source for source filtering
+// V11.3: Added status for draft/publish workflow
 interface CardWithTags extends Card {
   tags?: Tag[]
   book_source?: {
     id: string
     title: string
   } | null
+  status?: 'draft' | 'published' | 'archived'
 }
 
 interface CardListProps {
@@ -58,6 +60,8 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   const [showAutoTagModal, setShowAutoTagModal] = useState(false)
   // V11.1: Source filter state
   const [filterSourceIds, setFilterSourceIds] = useState<string[]>([])
+  // V11.3: Show drafts toggle for authors
+  const [showDrafts, setShowDrafts] = useState(false)
 
   // V9.3: useAutoTag hook for chunked processing with progress
   const autoTag = useAutoTag({
@@ -91,6 +95,16 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     return cards.filter(card => !card.tags || card.tags.length === 0).length
   }, [cards])
 
+  // V11.3: Count draft cards
+  const draftCount = useMemo(() => {
+    return cards.filter(card => card.status === 'draft').length
+  }, [cards])
+
+  // V11.3: Count archived cards
+  const archivedCount = useMemo(() => {
+    return cards.filter(card => card.status === 'archived').length
+  }, [cards])
+
   // V11.1: Extract distinct book_sources from cards for source filter
   const availableSources = useMemo(() => {
     const sourceMap = new Map<string, { id: string; title: string }>()
@@ -106,8 +120,19 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   // V8.6: Also filter by NeedsReview if toggle is on
   // V9.2: Also filter by untagged if toggle is on
   // V11.1: Also filter by source (AND logic with tags)
+  // V11.3: Filter by status (default to published only, show drafts if toggled)
   const filteredCards = useMemo(() => {
     let result = cards
+    
+    // V11.3: Apply status filter first (authors can toggle to see drafts)
+    // Default: show only published cards
+    // When showDrafts is true: show published AND draft cards (not archived)
+    if (!showDrafts) {
+      result = result.filter(card => !card.status || card.status === 'published')
+    } else {
+      // Show published and draft, but not archived
+      result = result.filter(card => !card.status || card.status === 'published' || card.status === 'draft')
+    }
     
     // V9.2: Apply untagged filter first (mutually exclusive with tag filter)
     if (showUntaggedOnly) {
@@ -136,7 +161,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     }
     
     return result
-  }, [cards, filterTagIds, filterSourceIds, showNeedsReviewOnly, showUntaggedOnly])
+  }, [cards, filterTagIds, filterSourceIds, showNeedsReviewOnly, showUntaggedOnly, showDrafts])
 
   // Selection handlers
   const toggleSelection = (id: string) => {
@@ -275,6 +300,23 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
 
   return (
     <>
+      {/* V11.3: Show Drafts toggle for authors */}
+      {isAuthor && draftCount > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowDrafts(!showDrafts)}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              showDrafts
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-blue-400" />
+            {showDrafts ? 'Showing' : 'Show'} draft cards ({draftCount})
+          </button>
+        </div>
+      )}
+
       {/* V8.6: NeedsReview filter toggle */}
       {needsReviewCount > 0 && (
         <div className="mb-4">

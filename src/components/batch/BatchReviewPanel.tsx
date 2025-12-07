@@ -19,6 +19,8 @@ interface BatchReviewPanelProps {
   onSaveSuccess: (count: number) => void
   /** V6.2: Current session total for toast message */
   sessionTotal?: number
+  /** V11.3: Import session ID for draft/publish workflow */
+  importSessionId?: string
 }
 
 /**
@@ -37,6 +39,7 @@ export function BatchReviewPanel({
   deckId,
   onSaveSuccess,
   sessionTotal = 0,
+  importSessionId,
 }: BatchReviewPanelProps) {
   const { showToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
@@ -98,17 +101,21 @@ export function BatchReviewPanel({
       }))
 
       // V7.2.1: Deep logging - BatchReviewPanel caller
+      // V11.3: Include importSessionId for draft/publish workflow
       console.log('[BatchReviewPanel] Saving via bulkCreateMCQV2', {
         deckTemplateId: deckId,
         sessionTags: sessionTagNames,
         cardsCount: cards.length,
+        importSessionId,
       })
       
       // V7.2: Use bulkCreateMCQV2 for V2 schema consistency with Auto-Scan
+      // V11.3: Pass importSessionId for draft/publish workflow
       const result = await bulkCreateMCQV2({ 
         deckTemplateId: deckId, 
         sessionTags: sessionTagNames,
         cards,
+        importSessionId,
       })
 
       if (result.ok) {

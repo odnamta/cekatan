@@ -68,8 +68,9 @@ export async function getGlobalDueCards(batchNumber: number = 0): Promise<Global
 
   const deckTemplateIds = userDecks.map(d => d.deck_template_id)
 
+  // V11.3: Only fetch published cards for study (draft/archived cards are excluded)
   const { data: activeCardTemplates } = await supabase
-    .from('card_templates').select('id').in('deck_template_id', deckTemplateIds)
+    .from('card_templates').select('id').in('deck_template_id', deckTemplateIds).eq('status', 'published')
 
   const activeCardIds = (activeCardTemplates || []).map(c => c.id)
   if (activeCardIds.length === 0) {
@@ -116,10 +117,12 @@ export async function getGlobalDueCards(batchNumber: number = 0): Promise<Global
   })
 
   // V8.2: Fetch new cards (no progress row) and interleave
+  // V11.3: Only fetch published cards
   let cards = dueCards
   if (batchNumber === 0 && newCardIds.length > 0) {
     const { data: newCardTemplates } = await supabase
       .from('card_templates').select('*').in('id', newCardIds.slice(0, NEW_CARDS_FALLBACK_LIMIT))
+      .eq('status', 'published')
       .order('created_at', { ascending: true })
 
     const newCards = (newCardTemplates || []).map(ct => templateToCard(ct))
@@ -186,8 +189,9 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
   }
 
   const deckTemplateIds = userDecks.map(d => d.deck_template_id)
+  // V11.3: Only count published cards for stats
   const { data: activeCardTemplates } = await supabase
-    .from('card_templates').select('id').in('deck_template_id', deckTemplateIds)
+    .from('card_templates').select('id').in('deck_template_id', deckTemplateIds).eq('status', 'published')
 
   const activeCardIds = (activeCardTemplates || []).map(c => c.id)
   let totalDueCount = 0
@@ -199,8 +203,9 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
     totalDueCount = count || 0
   }
 
+  // V11.3: Only count published cards
   const { count: totalCardsCount } = await supabase
-    .from('card_templates').select('*', { count: 'exact', head: true }).in('deck_template_id', deckTemplateIds)
+    .from('card_templates').select('*', { count: 'exact', head: true }).in('deck_template_id', deckTemplateIds).eq('status', 'published')
 
   return {
     success: true,

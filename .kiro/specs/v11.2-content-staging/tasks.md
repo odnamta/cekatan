@@ -1,0 +1,185 @@
+# Implementation Plan
+
+- [x] 1. Schema update and migration
+  - [x] 1.1 Create migration script for `status` and `import_session_id` columns
+    - Add `status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived'))` to `card_templates`
+    - Add `import_session_id UUID` to `card_templates`
+    - Create indexes for efficient querying
+    - Backfill existing rows with `status = 'published'`
+    - _Requirements: 1.3_
+  - [x] 1.2 Write property test for status default behavior
+    - **Property 4: Study queries filter by published status only**
+    - **Validates: Requirements 1.4, 3.1, 3.2, 3.3, 3.4**
+
+- [x] 2. Update `bulkCreateMCQV2` for draft status and session ID
+  - [x] 2.1 Modify `BulkCreateV2Input` interface to accept `importSessionId`
+    - Add optional `importSessionId?: string` parameter
+    - Update JSDoc comments
+    - _Requirements: 2.2_
+  - [x] 2.2 Update card insertion logic to set `status` and `import_session_id`
+    - When `importSessionId` is provided, set `status = 'draft'` and `import_session_id = importSessionId`
+    - When `importSessionId` is not provided, keep existing behavior (`status = 'published'`)
+    - _Requirements: 1.1, 1.2_
+  - [x] 2.3 Write property test for bulk import draft status
+    - **Property 1: Bulk import creates cards with draft status**
+    - **Validates: Requirements 1.1**
+  - [x] 2.4 Write property test for session ID storage
+    - **Property 2: Bulk import stores session ID on all cards**
+    - **Validates: Requirements 1.2, 2.2**
+
+- [x] 3. Update study queries to filter by published status
+  - [x] 3.1 Update `getGlobalDueCards` to filter `status = 'published'`
+    - Add `.eq('status', 'published')` to card_templates query
+    - _Requirements: 3.1_
+  - [x] 3.2 Update `getDueCardsForDeck` to filter `status = 'published'`
+    - Add status filter to per-deck study query
+    - _Requirements: 3.2_
+  - [x] 3.3 Update `getGlobalStats` to count only published cards
+    - Add status filter to due count query
+    - _Requirements: 3.3_
+  - [x] 3.4 Write property test for study query filtering
+    - **Property 4: Study queries filter by published status only**
+    - **Validates: Requirements 1.4, 3.1, 3.2, 3.3, 3.4**
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Create session management server actions
+  - [x] 5.1 Implement `generateImportSessionId` utility function
+    - Use `crypto.randomUUID()` for UUID generation
+    - Export from `src/lib/import-session.ts`
+    - _Requirements: 2.1_
+  - [x] 5.2 Write property test for session ID uniqueness
+    - **Property 3: Session ID generation is unique**
+    - **Validates: Requirements 2.1**
+  - [x] 5.3 Implement `getSessionCards` server action
+    - Fetch all card_templates with matching `import_session_id`
+    - Include session metadata (book_source, chapter)
+    - Verify author authorization
+    - _Requirements: 2.3, 4.1, 4.5_
+  - [x] 5.4 Write property test for session fetch
+    - **Property 5: Session fetch returns all cards with matching session ID**
+    - **Validates: Requirements 2.3, 4.1**
+  - [x] 5.5 Write property test for authorization
+    - **Property 7: Authorization denies non-authors**
+    - **Validates: Requirements 4.5**
+
+- [x] 6. Create publish and archive server actions
+  - [x] 6.1 Implement `publishCards` server action
+    - Accept array of card IDs
+    - Update `status = 'published'` for all selected cards
+    - Verify author authorization
+    - Return count of published cards
+    - _Requirements: 7.2, 7.5_
+  - [x] 6.2 Implement `archiveCards` server action
+    - Accept array of card IDs
+    - Update `status = 'archived'` for all selected cards
+    - Verify author authorization
+    - Return count of archived cards
+    - _Requirements: 8.1_
+  - [x] 6.3 Write property test for bulk status update
+    - **Property 12: Bulk status update changes all selected cards**
+    - **Validates: Requirements 7.2, 8.1**
+  - [x] 6.4 Write property test for session ID preservation
+    - **Property 13: Publish preserves session ID**
+    - **Validates: Requirements 7.5**
+
+- [x] 7. Create duplicate card server action
+  - [x] 7.1 Implement `duplicateCard` server action
+    - Copy card data including tags
+    - Preserve `import_session_id` from original
+    - Set `status = 'draft'` on new card
+    - Verify author authorization
+    - _Requirements: 5.3_
+  - [x] 7.2 Write property test for duplicate behavior
+    - **Property 8: Duplicate preserves session ID and sets draft status**
+    - **Validates: Requirements 5.3**
+
+- [x] 8. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 9. Create QA metrics utilities
+  - [x] 9.1 Implement `formatQAMetrics` utility function
+    - Format: "Detected N questions · M cards created · Missing: X, Y, Z"
+    - Handle empty missing array gracefully
+    - Export from `src/lib/qa-metrics.ts`
+    - _Requirements: 6.4_
+  - [x] 9.2 Write property test for QA metrics format
+    - **Property 11: QA metrics format string is correct**
+    - **Validates: Requirements 6.4**
+  - [x] 9.3 Write property test for question number detection
+    - **Property 9: Question number detection extracts numbers correctly**
+    - **Validates: Requirements 6.1**
+  - [x] 9.4 Write property test for missing number calculation
+    - **Property 10: Missing number calculation is correct**
+    - **Validates: Requirements 6.2**
+
+- [x] 10. Create Session Review page
+  - [x] 10.1 Create route at `/admin/sessions/[sessionId]/page.tsx`
+    - Server component that fetches session data via `getSessionCards`
+    - Verify author authorization, redirect non-authors
+    - Pass data to client components
+    - _Requirements: 4.1, 4.5_
+  - [x] 10.2 Create `SessionReviewHeader` component
+    - Display book title, chapter title, card counts
+    - Show QA metrics using `formatQAMetrics`
+    - _Requirements: 4.2, 6.2, 6.4_
+  - [x] 10.3 Create `SessionReviewTable` component
+    - Client component with selection state
+    - Columns: checkbox, question_number, stem (truncated), tags count, status, actions
+    - Sortable by question_number
+    - Row actions: Edit, Delete, Duplicate
+    - _Requirements: 4.3, 4.4, 5.1, 5.2, 5.3_
+  - [x] 10.4 Write property test for sorting
+    - **Property 6: Sorting by question_number is correct**
+    - **Validates: Requirements 4.4**
+
+- [x] 11. Add bulk actions to Session Review
+  - [x] 11.1 Implement "Select All" checkbox functionality
+    - Track selection state in React state
+    - _Requirements: 7.1_
+  - [x] 11.2 Implement "Publish Selected" button
+    - Call `publishCards` with selected card IDs
+    - Show confirmation banner with count
+    - Refresh card list after publish
+    - _Requirements: 7.2, 7.3, 7.4_
+  - [x] 11.3 Implement "Archive Selected" button
+    - Call `archiveCards` with selected card IDs
+    - Show confirmation banner
+    - Refresh card list after archive
+    - _Requirements: 8.1_
+  - [x] 11.4 Implement "Add Missing Card" button
+    - Open MCQ form pre-filled with session context
+    - New cards created with `status = 'draft'` and same `import_session_id`
+    - _Requirements: 5.4, 5.5_
+
+- [x] 12. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 13. Integrate session panel into BulkImport page
+  - [x] 13.1 Create `SessionPanel` component
+    - Display current session stats (draft count, detected, missing)
+    - "Review & Publish" button linking to Session Review page
+    - _Requirements: 9.1, 9.2_
+  - [x] 13.2 Update BulkImport page to generate and track session ID
+    - Generate `import_session_id` on page load or first import
+    - Pass session ID to `bulkCreateMCQV2` calls
+    - Store in React state or context
+    - _Requirements: 2.1, 2.4_
+  - [x] 13.3 Wire SessionPanel to BulkImport page
+    - Fetch session stats after each import
+    - Update panel display
+    - Enable navigation to Session Review
+    - _Requirements: 9.3_
+
+- [x] 14. Update deck detail page for draft visibility
+  - [x] 14.1 Add "Show Drafts" toggle for authors
+    - Default to showing only published cards
+    - When toggled, include draft cards with visual indicator
+    - _Requirements: 4.3_
+  - [x] 14.2 Add visual indicator for draft/archived cards
+    - Badge or styling to distinguish status
+    - _Requirements: 8.3_
+
+- [x] 15. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

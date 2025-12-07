@@ -348,6 +348,7 @@ export interface MatchingBlockInput {
 /**
  * V8.0 Input type for bulk create with deck_template_id
  * V11: Extended with optional book/chapter/matching group context
+ * V11.3: Extended with importSessionId for draft/publish workflow
  */
 export interface BulkCreateV2Input {
   deckTemplateId: string
@@ -366,6 +367,9 @@ export interface BulkCreateV2Input {
   matchingGroupId?: string
   // V11: Matching block data - when provided, creates a matching_group and links all cards
   matchingBlockData?: MatchingBlockInput
+  // V11.3: Import session ID for draft/publish workflow
+  // When provided, cards are created with status='draft' and grouped by this session ID
+  importSessionId?: string
 }
 
 /**
@@ -385,15 +389,23 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     chapterId,
     matchingGroupId,
     matchingBlockData,
+    // V11.3: Import session for draft/publish workflow
+    importSessionId,
   } = input
   
-  // V11: Log structured content context if provided
-  if (bookSourceId || chapterId || matchingGroupId || matchingBlockData) {
-    console.log('[bulkCreateMCQV2] V11: Structured content context:', {
+  // V11.3: Determine card status based on importSessionId
+  // When importSessionId is provided, cards are drafts; otherwise published (backwards compatible)
+  const cardStatus = importSessionId ? 'draft' : 'published'
+  
+  // V11/V11.3: Log structured content context if provided
+  if (bookSourceId || chapterId || matchingGroupId || matchingBlockData || importSessionId) {
+    console.log('[bulkCreateMCQV2] V11.3: Content context:', {
       bookSourceId,
       chapterId,
       matchingGroupId,
       hasMatchingBlockData: !!matchingBlockData,
+      importSessionId,
+      cardStatus,
     })
   }
   
@@ -525,6 +537,7 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     
     // Step 3: Insert card_templates
     // V11: Include structured content foreign keys if provided
+    // V11.3: Include status and import_session_id for draft/publish workflow
     // V11.5: Use effectiveMatchingGroupId which may be auto-created from matchingBlockData
     const cardTemplateRows = cards.map((card) => ({
       deck_template_id: deckTemplateId,
@@ -539,6 +552,9 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
       chapter_id: chapterId || null,
       question_number: card.questionNumber || null,
       matching_group_id: effectiveMatchingGroupId,
+      // V11.3: Draft/publish workflow fields
+      status: cardStatus,
+      import_session_id: importSessionId || null,
     }))
     
     const { data: insertedTemplates, error: insertError } = await supabase

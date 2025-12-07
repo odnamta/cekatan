@@ -16,6 +16,7 @@ import type { Card, Tag, DeckVisibility } from '@/types/database'
 // Type for card template with nested tags from Supabase join
 // V9: Added category field to tags
 // V11.1: Added book_source for virtual source badge
+// V11.3: Added status for draft/publish workflow
 // Note: Supabase returns tags as single object for foreign key join
 interface CardTemplateWithNestedTags {
   id: string
@@ -25,6 +26,7 @@ interface CardTemplateWithNestedTags {
   explanation: string | null
   created_at: string
   book_source_id: string | null
+  status: string | null
   book_sources: {
     id: string
     title: string
@@ -70,12 +72,14 @@ interface CardTemplateRaw {
 
 // Extended Card type with tags for CardList
 // V11.1: Added book_source for virtual source badge
+// V11.3: Added status for draft/publish workflow
 interface CardWithTags extends Card {
   tags: Tag[]
   book_source?: {
     id: string
     title: string
   } | null
+  status?: 'draft' | 'published' | 'archived'
 }
 
 interface DeckDetailsPageProps {
@@ -138,6 +142,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
   // V8.0: Fetch card_templates for this deck_template
   // V8.5: Join with card_template_tags and tags to fetch associated tags
   // V11.1: Join with book_sources for virtual source badge
+  // V11.3: Include status for draft/publish workflow
   const { data: cardTemplates, error: cardsError } = await supabase
     .from('card_templates')
     .select(`
@@ -148,6 +153,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       explanation,
       created_at,
       book_source_id,
+      status,
       book_sources (
         id,
         title
@@ -206,6 +212,8 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       tags,
       // V11.1: Include book_source for virtual source badge
       book_source: ct.book_sources || null,
+      // V11.3: Include status for draft/publish workflow
+      status: (ct.status || 'published') as 'draft' | 'published' | 'archived',
     }
   })
 

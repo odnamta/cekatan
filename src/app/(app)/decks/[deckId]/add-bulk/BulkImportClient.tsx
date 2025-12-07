@@ -39,6 +39,9 @@ import { SkippedPagesPanel } from '@/components/pdf/SkippedPagesPanel'
 // V8.3: Error Boundary for crash protection
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+// V11.3: Import session for draft/publish workflow
+import { useImportSession } from '@/hooks/use-import-session'
+import { SessionPanel } from '@/components/session/SessionPanel'
 
 // Dynamic import PDFViewer to avoid SSR issues with react-pdf
 const PDFViewer = dynamic(
@@ -139,6 +142,9 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
   // V6: Session Tags
   const { sessionTagIds, setSessionTagIds, sessionTagNames, isLoading: isLoadingTags } = useSessionTags(deckId)
 
+  // V11.3: Import session for draft/publish workflow
+  const importSession = useImportSession(deckId)
+
   // V6: Batch AI Draft state
   const [batchDrafts, setBatchDrafts] = useState<MCQBatchDraftUI[]>([])
   const [isBatchPanelOpen, setIsBatchPanelOpen] = useState(false)
@@ -194,6 +200,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
   }, [linkedSource?.id])
 
   // V7.0: Auto-Scan Hook
+  // V11.3: Pass importSessionId for draft/publish workflow
   const autoScan = useAutoScan({
     pdfDocument,
     deckId,
@@ -201,18 +208,23 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
     sessionTagNames,
     aiMode,
     includeNextPage,
+    importSessionId: importSession.sessionId || undefined,
     onPageComplete: (page, cardsCreated) => {
       // Update session card count
       if (linkedSource?.id) {
         const newTotal = addToSessionCardCount(linkedSource.id, cardsCreated)
         setSessionCardCount(newTotal)
       }
+      // V11.3: Update import session stats
+      importSession.incrementDraftCount(cardsCreated)
     },
     onError: (page, error) => {
       console.warn(`[AutoScan] Page ${page} failed:`, error)
     },
     onComplete: (stats) => {
       showToast(`Auto-scan complete! Created ${stats.cardsCreated} cards.`, 'success')
+      // V11.3: Refresh session stats after scan completes
+      importSession.refreshStats()
     },
     onSafetyStop: () => {
       showToast('Auto-scan stopped: 3 consecutive pages failed. Check skipped pages.', 'error')
@@ -460,6 +472,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
   }, [pdfSelection, lastBatchTime, deckId, sessionTagNames, aiMode, subject, processedImage, showToast])
 
   // V6.2: Handle batch save success - update session count and restore scroll
+  // V11.3: Also update import session stats
   const handleBatchSaveSuccess = useCallback((count: number) => {
     setBatchDrafts([])
     setIsBatchPanelOpen(false)
@@ -470,6 +483,10 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
       setSessionCardCount(newTotal)
     }
     
+    // V11.3: Update import session stats
+    importSession.incrementDraftCount(count)
+    importSession.refreshStats()
+    
     // V6.2: Restore scroll position after modal closes
     setTimeout(() => {
       if (pdfContainerRef.current) {
@@ -477,7 +494,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
       }
       pdfContainerRef.current?.focus()
     }, 100)
-  }, [linkedSource?.id, savedScrollPosition])
+  }, [linkedSource?.id, savedScrollPosition, importSession])
 
   // V6.2: Handle session HUD reset
   const handleResetSessionCount = useCallback(() => {
@@ -861,6 +878,18 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
         )}
       </div>
 
+      {/* V11.3: Session Panel for draft/publish workflow */}
+      {!importSession.isLoading && importSession.sessionId && (
+        <div className="mb-6">
+          <SessionPanel
+            sessionId={importSession.sessionId}
+            draftCount={importSession.draftCount}
+            detectedNumbers={[]}
+            savedNumbers={importSession.questionNumbers}
+          />
+        </div>
+      )}
+
       {/* V6: Session Tags Selector */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -1121,6 +1150,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
       )}
 
       {/* V6: Batch Review Panel */}
+      {/* V11.3: Pass importSessionId for draft/publish workflow */}
       <BatchReviewPanel
         isOpen={isBatchPanelOpen}
         onClose={() => setIsBatchPanelOpen(false)}
@@ -1131,6 +1161,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
         deckId={deckId}
         onSaveSuccess={handleBatchSaveSuccess}
         sessionTotal={sessionCardCount}
+        importSessionId={importSession.sessionId || undefined}
       />
       </ErrorBoundary>
     </div>

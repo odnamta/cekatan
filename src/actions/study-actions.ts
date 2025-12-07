@@ -261,6 +261,7 @@ export async function getDueCardsForDeck(deckId: string): Promise<{
   }
 
   // V8.0: Fetch due cards from user_card_progress joined with card_templates
+  // V11.3: Only fetch published cards for study
   const now = new Date().toISOString()
   const { data: dueProgress, error: progressError } = await supabase
     .from('user_card_progress')
@@ -269,6 +270,7 @@ export async function getDueCardsForDeck(deckId: string): Promise<{
       card_templates!inner(*)
     `)
     .eq('user_id', user.id)
+    .eq('card_templates.status', 'published')
     .lte('next_review', now)
     .eq('suspended', false)
     .order('next_review', { ascending: true })
@@ -278,6 +280,7 @@ export async function getDueCardsForDeck(deckId: string): Promise<{
   }
 
   // Filter to cards in this deck and convert to Card format
+  // V11.3: Status filter already applied in query
   const cards: Card[] = (dueProgress || [])
     .filter(p => {
       const ct = p.card_templates as unknown as { deck_template_id: string }
