@@ -11,10 +11,18 @@ import { EmptyState } from '@/components/ui/EmptyState'
 // import type { CourseWithProgress } from '@/components/course/CourseCard'
 import type { DeckWithDueCount } from '@/types/database'
 
+/**
+ * V11.5.1: Extended deck type with draft count for authors
+ */
+interface DeckWithDraftCount extends DeckWithDueCount {
+  draft_count?: number
+  isAuthor?: boolean
+}
+
 export interface LibrarySectionProps {
   // courses prop kept for API compatibility but not rendered
   courses?: unknown[]
-  decks: DeckWithDueCount[]
+  decks: DeckWithDraftCount[]
   defaultExpanded?: boolean
 }
 

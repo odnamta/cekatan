@@ -200,6 +200,8 @@ export interface CardTemplate {
   source_meta: Record<string, unknown> | null;
   legacy_id: string | null;
   created_at: string;
+  // V11.3: Card status for draft/publish workflow
+  status?: 'draft' | 'published' | 'archived';
 }
 
 export interface CardTemplateTag {

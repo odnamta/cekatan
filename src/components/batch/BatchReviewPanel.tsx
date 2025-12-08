@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, AlertTriangle } from 'lucide-react'
 import { BatchDraftCard } from './BatchDraftCard'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { bulkCreateMCQV2 } from '@/actions/batch-mcq-actions'
+import { formatQAMetrics, type QAMetrics } from '@/lib/content-staging-metrics'
 import type { MCQBatchDraftUI } from '@/lib/batch-mcq-schema'
 
 interface BatchReviewPanelProps {
@@ -21,6 +22,8 @@ interface BatchReviewPanelProps {
   sessionTotal?: number
   /** V11.3: Import session ID for draft/publish workflow */
   importSessionId?: string
+  /** V11.5.1: QA metrics from autoscan for summary display */
+  qaMetrics?: QAMetrics
 }
 
 /**
@@ -40,6 +43,7 @@ export function BatchReviewPanel({
   onSaveSuccess,
   sessionTotal = 0,
   importSessionId,
+  qaMetrics,
 }: BatchReviewPanelProps) {
   const { showToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
@@ -162,14 +166,25 @@ export function BatchReviewPanel({
       <div className="relative w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:mx-4 bg-white dark:bg-slate-900 sm:rounded-lg shadow-xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Review AI Drafts
-          </h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Review AI Drafts
+            </h2>
+            {/* V11.5.1: QA Metrics Summary */}
+            {qaMetrics && (
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-1">
+                <span>{formatQAMetrics(qaMetrics)}</span>
+                {qaMetrics.missingNumbers.length > 0 && (
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 inline-block ml-1 flex-shrink-0" />
+                )}
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={handleDiscard}
             disabled={isSaving}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-50"
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-50 flex-shrink-0"
             aria-label="Close panel"
           >
             <X className="w-5 h-5" />

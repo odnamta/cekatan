@@ -31,7 +31,8 @@ export function getVariantClasses(variant: ButtonVariant): string {
  */
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', loading = false, children, disabled, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]';
+    // V11.5: Added active:scale-95 transition-transform for micro-interaction
+    const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors transition-transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] active:scale-95';
 
     const sizeStyles: Record<ButtonSize, string> = {
       sm: 'px-3 py-1.5 text-sm min-h-[36px]',

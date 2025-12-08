@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { openai } from '@/lib/openai-client'
 import { MCQ_MODEL, MCQ_TEMPERATURE, MCQ_MAX_TOKENS } from '@/lib/ai-config'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { withUser, type AuthContext } from './_helpers'
 import { getCardDefaults } from '@/lib/card-defaults'
 import {
   draftBatchInputSchema,
@@ -475,28 +476,37 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     })
   }
   
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } }
-  }
-  
-  const supabase = await createSupabaseServerClient()
-  
-  // V8.0: Direct deck_template lookup - NO FALLBACK
-  const { data: deckTemplate, error: deckError } = await supabase
-    .from('deck_templates')
-    .select('id, author_id')
-    .eq('id', deckTemplateId)
-    .single()
-  
-  if (deckError || !deckTemplate) {
-    // V8.0: No legacy fallback - return error immediately
-    return { ok: false, error: { message: `Deck not found in V2 schema: ${deckTemplateId}`, code: 'NOT_FOUND' } }
+  // V11.5.1: Use withUser for auth
+  const authResult = await withUser(async ({ user, supabase }: AuthContext) => {
+    // V8.0: Direct deck_template lookup - NO FALLBACK
+    const { data: deckTemplate, error: deckError } = await supabase
+      .from('deck_templates')
+      .select('id, author_id')
+      .eq('id', deckTemplateId)
+      .single()
+    
+    if (deckError || !deckTemplate) {
+      // V8.0: No legacy fallback - return error immediately
+      return { ok: false as const, error: { message: `Deck not found in V2 schema: ${deckTemplateId}`, code: 'NOT_FOUND' } }
+    }
+
+    if (deckTemplate.author_id !== user.id) {
+      return { ok: false as const, error: { message: 'Only the author can add cards', code: 'UNAUTHORIZED' } }
+    }
+
+    return { ok: true as const, data: { user, supabase } }
+  })
+
+  // Handle auth failure
+  if (!authResult.ok) {
+    if (authResult.error === 'AUTH_REQUIRED') {
+      return { ok: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } }
+    }
+    // Pass through other errors (deck not found, not author)
+    return authResult as BulkCreateResult
   }
 
-  if (deckTemplate.author_id !== user.id) {
-    return { ok: false, error: { message: 'Only the author can add cards', code: 'UNAUTHORIZED' } }
-  }
+  const { user, supabase } = authResult.data!
   
   try {
     // V11: Step 0 - Create matching_group if matchingBlockData is provided
@@ -553,16 +563,11 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     
     console.log(`[bulkCreateMCQV2] Total unique tags to resolve: ${allTagNames.size}`, Array.from(allTagNames))
     
-    // V9: Fetch Golden List topics to determine category for new tags
-    const { data: goldenTopics } = await supabase
-      .from('tags')
-      .select('name')
-      .eq('user_id', user.id)
-      .eq('category', 'topic')
-    const goldenTopicNames = new Set((goldenTopics || []).map(t => t.name.toLowerCase()))
+    // V11.5.1: Import tag resolver for canonical topic tag matching
+    const { resolveTopicTag } = await import('@/lib/tag-resolver')
     
     // Step 2: Resolve tag names to IDs
-    // V9: Assign correct category based on Golden List
+    // V11.5.1: Use resolveTopicTag for canonical Golden List matching
     const tagNameToId = new Map<string, string>()
     for (const tagName of allTagNames) {
       const { data: existingTag } = await supabase
@@ -577,14 +582,17 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
         continue
       }
       
-      // V9: Determine category - if matches Golden List topic, use 'topic', else 'concept'
-      const isGoldenTopic = goldenTopicNames.has(tagName.toLowerCase())
+      // V11.5.1: Use resolveTopicTag for canonical Golden List matching
+      const canonicalTopic = resolveTopicTag(tagName)
+      const isGoldenTopic = canonicalTopic !== null
       const category = isGoldenTopic ? 'topic' : 'concept'
       const color = isGoldenTopic ? 'purple' : 'green'
+      // V11.5.1: Use canonical form if available, otherwise original name
+      const finalTagName = canonicalTopic || tagName
       
       const { data: newTag, error: createTagError } = await supabase
         .from('tags')
-        .insert({ user_id: user.id, name: tagName, color, category })
+        .insert({ user_id: user.id, name: finalTagName, color, category })
         .select('id, name')
         .single()
       

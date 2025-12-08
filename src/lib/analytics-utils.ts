@@ -170,3 +170,112 @@ export function selectWeakestTopic(topics: TopicAccuracy[]): TopicAccuracy | nul
     current.totalAttempts > best.totalAttempts ? current : best
   )
 }
+
+
+// ============================================
+// V11.5: Weakest Concepts Analytics
+// ============================================
+
+import { LOW_CONFIDENCE_THRESHOLD } from './constants'
+
+/**
+ * Result type for weakest concept analysis.
+ */
+export interface WeakestConceptResult {
+  tagId: string
+  tagName: string
+  accuracy: number
+  totalAttempts: number
+  isLowConfidence: boolean
+}
+
+/**
+ * Finds the weakest concepts based on user progress and card tags.
+ * Orders by accuracy ascending, deprioritizes low-confidence tags.
+ * 
+ * @param progressData - Array of { cardTemplateId, correctCount, totalAttempts }
+ * @param cardTags - Array of { cardTemplateId, tagId }
+ * @param tags - Array of { id, name, category }
+ * @param limit - Maximum number of results (default 5)
+ * @returns Array of WeakestConceptResult ordered by weakness
+ * 
+ * **Feature: v11.5-global-study-stabilization**
+ * **Property 12: Weakest Concepts - Accuracy Ordering**
+ * **Property 13: Weakest Concepts - Low Confidence Deprioritization**
+ * **Property 14: Weakest Concepts - Tie Breaker**
+ * **Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5**
+ */
+export function findWeakestConcepts(
+  progressData: Array<{ cardTemplateId: string; correctCount: number; totalAttempts: number }>,
+  cardTags: Array<{ cardTemplateId: string; tagId: string }>,
+  tags: Array<{ id: string; name: string; category: string }>,
+  limit: number = 5
+): WeakestConceptResult[] {
+  // Build map of cardTemplateId -> progress
+  const progressMap = new Map<string, { correctCount: number; totalAttempts: number }>()
+  for (const p of progressData) {
+    progressMap.set(p.cardTemplateId, { correctCount: p.correctCount, totalAttempts: p.totalAttempts })
+  }
+  
+  // Build map of tagId -> tag info
+  const tagMap = new Map<string, { name: string; category: string }>()
+  for (const t of tags) {
+    tagMap.set(t.id, { name: t.name, category: t.category })
+  }
+  
+  // Aggregate stats per tag
+  const tagStats = new Map<string, { correctCount: number; totalAttempts: number }>()
+  
+  for (const ct of cardTags) {
+    const progress = progressMap.get(ct.cardTemplateId)
+    if (!progress || progress.totalAttempts === 0) continue
+    
+    const existing = tagStats.get(ct.tagId) || { correctCount: 0, totalAttempts: 0 }
+    tagStats.set(ct.tagId, {
+      correctCount: existing.correctCount + progress.correctCount,
+      totalAttempts: existing.totalAttempts + progress.totalAttempts,
+    })
+  }
+  
+  // Convert to results with accuracy
+  const results: WeakestConceptResult[] = []
+  
+  for (const [tagId, stats] of tagStats) {
+    const tagInfo = tagMap.get(tagId)
+    if (!tagInfo) continue
+    
+    // Only include concept tags (not source or topic)
+    if (tagInfo.category !== 'concept') continue
+    
+    const accuracy = stats.totalAttempts > 0
+      ? (stats.correctCount / stats.totalAttempts) * 100
+      : 0
+    
+    results.push({
+      tagId,
+      tagName: tagInfo.name,
+      accuracy,
+      totalAttempts: stats.totalAttempts,
+      isLowConfidence: stats.totalAttempts < LOW_CONFIDENCE_THRESHOLD,
+    })
+  }
+  
+  // Sort by:
+  // 1. Low confidence tags go last (deprioritized)
+  // 2. Accuracy ascending (weakest first)
+  // 3. Total attempts descending (tie-breaker: more data = more reliable)
+  results.sort((a, b) => {
+    // Low confidence goes last
+    if (a.isLowConfidence !== b.isLowConfidence) {
+      return a.isLowConfidence ? 1 : -1
+    }
+    // Lower accuracy = weaker = comes first
+    if (a.accuracy !== b.accuracy) {
+      return a.accuracy - b.accuracy
+    }
+    // More attempts = more reliable = comes first (tie-breaker)
+    return b.totalAttempts - a.totalAttempts
+  })
+  
+  return results.slice(0, limit)
+}

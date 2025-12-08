@@ -3,17 +3,21 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { withUser, type AuthContext } from './_helpers'
 import { getCategoryColor } from '@/lib/tag-colors'
+import { TAG_CATEGORIES, isValidTagCategory } from '@/lib/constants'
 import type { Tag, TagCategory } from '@/types/database'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * Tag Server Actions
  * Requirements: V5 Feature Set 1 - Tagging System
  * V9: Added category support with enforced colors
+ * V11.5: Uses TAG_CATEGORIES from constants
  */
 
-// V9: Tag category schema
-const tagCategorySchema = z.enum(['source', 'topic', 'concept']).default('concept')
+// V9/V11.5: Tag category schema using constants
+const tagCategorySchema = z.enum(TAG_CATEGORIES).default('concept')
 
 // Validation schemas
 const createTagSchema = z.object({
@@ -27,14 +31,13 @@ const updateTagSchema = z.object({
   category: tagCategorySchema.optional(),
 })
 
-// Result types
-export type TagActionResult =
-  | { ok: true; tag?: Tag }
-  | { ok: false; error: string }
+// V11.5.1: Result types using ActionResultV2
+export type TagActionResult = ActionResultV2<Tag>
 
 /**
  * Create a new tag for the current user.
  * V9: Category defaults to 'concept', color is enforced by category.
+ * V11.5.1: Refactored to use withUser helper.
  * Validates uniqueness of tag name per user.
  * Req: 1.1, 1.2, V9-1.1, V9-1.2, V9-1.3, V9-1.4, V9-1.5
  */
@@ -47,71 +50,67 @@ export async function createTag(
     return { ok: false, error: validation.error.issues[0].message }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Check for duplicate name (case-insensitive)
+    const { data: existing } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('user_id', user.id)
+      .ilike('name', name.trim())
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (existing) {
+      return { ok: false, error: `Tag "${name}" already exists` }
+    }
 
-  // Check for duplicate name (case-insensitive)
-  const { data: existing } = await supabase
-    .from('tags')
-    .select('id')
-    .eq('user_id', user.id)
-    .ilike('name', name.trim())
-    .single()
+    // V9: Enforce color based on category
+    const color = getCategoryColor(category)
 
-  if (existing) {
-    return { ok: false, error: `Tag "${name}" already exists` }
-  }
+    // Create the tag with category and enforced color
+    const { data: tag, error } = await supabase
+      .from('tags')
+      .insert({
+        user_id: user.id,
+        name: name.trim(),
+        color,
+        category,
+      })
+      .select()
+      .single()
 
-  // V9: Enforce color based on category
-  const color = getCategoryColor(category)
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  // Create the tag with category and enforced color
-  const { data: tag, error } = await supabase
-    .from('tags')
-    .insert({
-      user_id: user.id,
-      name: name.trim(),
-      color,
-      category,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  return { ok: true, tag }
+    return { ok: true, data: tag }
+  })
 }
 
 /**
  * Get all tags for the current user.
+ * V11.5.1: Refactored to use withUser helper.
  * Req: 1.1
  */
 export async function getUserTags(): Promise<Tag[]> {
-  const user = await getUser()
-  if (!user) {
-    return []
-  }
+  const result = await withUser(async ({ user, supabase }: AuthContext) => {
+    const { data: tags } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name')
 
-  const supabase = await createSupabaseServerClient()
+    return { ok: true as const, data: tags || [] }
+  })
 
-  const { data: tags } = await supabase
-    .from('tags')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('name')
-
-  return tags || []
+  // Return empty array if auth failed
+  if (!result.ok) return []
+  return result.data ?? []
 }
 
 /**
  * Update an existing tag.
  * V9: If category is changed, color is automatically updated to match.
+ * V11.5.1: Refactored to use withUser helper.
  * Req: 1.1, 1.2, V9-3.2, V9-3.5
  */
 export async function updateTag(
@@ -124,96 +123,87 @@ export async function updateTag(
     return { ok: false, error: validation.error.issues[0].message }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Verify ownership and get current tag
+    const { data: existingTag } = await supabase
+      .from('tags')
+      .select('id, category')
+      .eq('id', tagId)
+      .eq('user_id', user.id)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (!existingTag) {
+      return { ok: false, error: 'Tag not found' }
+    }
 
-  // Verify ownership and get current tag
-  const { data: existingTag } = await supabase
-    .from('tags')
-    .select('id, category')
-    .eq('id', tagId)
-    .eq('user_id', user.id)
-    .single()
+    // Check for duplicate name (excluding current tag, case-insensitive)
+    const { data: duplicate } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('user_id', user.id)
+      .ilike('name', name.trim())
+      .neq('id', tagId)
+      .single()
 
-  if (!existingTag) {
-    return { ok: false, error: 'Tag not found' }
-  }
+    if (duplicate) {
+      return { ok: false, error: `Tag "${name}" already exists` }
+    }
 
-  // Check for duplicate name (excluding current tag, case-insensitive)
-  const { data: duplicate } = await supabase
-    .from('tags')
-    .select('id')
-    .eq('user_id', user.id)
-    .ilike('name', name.trim())
-    .neq('id', tagId)
-    .single()
+    // V9: Determine final category and enforce color
+    const finalCategory = category ?? existingTag.category
+    const color = getCategoryColor(finalCategory)
 
-  if (duplicate) {
-    return { ok: false, error: `Tag "${name}" already exists` }
-  }
+    // Update the tag with category and enforced color
+    const { data: tag, error } = await supabase
+      .from('tags')
+      .update({ name: name.trim(), category: finalCategory, color })
+      .eq('id', tagId)
+      .select()
+      .single()
 
-  // V9: Determine final category and enforce color
-  const finalCategory = category ?? existingTag.category
-  const color = getCategoryColor(finalCategory)
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  // Update the tag with category and enforced color
-  const { data: tag, error } = await supabase
-    .from('tags')
-    .update({ name: name.trim(), category: finalCategory, color })
-    .eq('id', tagId)
-    .select()
-    .single()
-
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  return { ok: true, tag }
+    return { ok: true, data: tag }
+  })
 }
 
 /**
  * Delete a tag. Cascades to card_tags automatically.
+ * V11.5.1: Refactored to use withUser helper.
  * Req: 1.6
  */
-export async function deleteTag(tagId: string): Promise<TagActionResult> {
+export async function deleteTag(tagId: string): Promise<ActionResultV2> {
   if (!tagId) {
     return { ok: false, error: 'Tag ID is required' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Verify ownership
+    const { data: existingTag } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('id', tagId)
+      .eq('user_id', user.id)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (!existingTag) {
+      return { ok: false, error: 'Tag not found' }
+    }
 
-  // Verify ownership
-  const { data: existingTag } = await supabase
-    .from('tags')
-    .select('id')
-    .eq('id', tagId)
-    .eq('user_id', user.id)
-    .single()
+    // Delete the tag (cascades to card_tags)
+    const { error } = await supabase
+      .from('tags')
+      .delete()
+      .eq('id', tagId)
 
-  if (!existingTag) {
-    return { ok: false, error: 'Tag not found' }
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  // Delete the tag (cascades to card_tags)
-  const { error } = await supabase
-    .from('tags')
-    .delete()
-    .eq('id', tagId)
-
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  return { ok: true }
+    return { ok: true }
+  })
 }
 
 
@@ -223,121 +213,114 @@ export async function deleteTag(tagId: string): Promise<TagActionResult> {
 
 /**
  * Assign tags to a card. Replaces existing tags.
+ * V11.5.1: Refactored to use withUser helper.
  * Req: 1.3
  */
 export async function assignTagsToCard(
   cardId: string,
   tagIds: string[]
-): Promise<TagActionResult> {
+): Promise<ActionResultV2> {
   if (!cardId) {
     return { ok: false, error: 'Card ID is required' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Verify card ownership via deck
+    const { data: card } = await supabase
+      .from('cards')
+      .select('id, deck_id, decks!inner(user_id)')
+      .eq('id', cardId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
-
-  // Verify card ownership via deck
-  const { data: card } = await supabase
-    .from('cards')
-    .select('id, deck_id, decks!inner(user_id)')
-    .eq('id', cardId)
-    .single()
-
-  if (!card) {
-    return { ok: false, error: 'Card not found' }
-  }
-
-  const deckData = card.decks as unknown as { user_id: string }
-  if (deckData.user_id !== user.id) {
-    return { ok: false, error: 'Access denied' }
-  }
-
-  // Remove existing tags
-  await supabase
-    .from('card_tags')
-    .delete()
-    .eq('card_id', cardId)
-
-  // Add new tags (if any)
-  if (tagIds.length > 0) {
-    const cardTags = tagIds.map((tagId) => ({
-      card_id: cardId,
-      tag_id: tagId,
-    }))
-
-    const { error } = await supabase
-      .from('card_tags')
-      .insert(cardTags)
-
-    if (error) {
-      return { ok: false, error: error.message }
+    if (!card) {
+      return { ok: false, error: 'Card not found' }
     }
-  }
 
-  // Revalidate deck page
-  revalidatePath(`/decks/${card.deck_id}`)
+    const deckData = card.decks as unknown as { user_id: string }
+    if (deckData.user_id !== user.id) {
+      return { ok: false, error: 'Access denied' }
+    }
 
-  return { ok: true }
+    // Remove existing tags
+    await supabase
+      .from('card_tags')
+      .delete()
+      .eq('card_id', cardId)
+
+    // Add new tags (if any)
+    if (tagIds.length > 0) {
+      const cardTags = tagIds.map((tagId) => ({
+        card_id: cardId,
+        tag_id: tagId,
+      }))
+
+      const { error } = await supabase
+        .from('card_tags')
+        .insert(cardTags)
+
+      if (error) {
+        return { ok: false, error: error.message }
+      }
+    }
+
+    // Revalidate deck page
+    revalidatePath(`/decks/${card.deck_id}`)
+
+    return { ok: true }
+  })
 }
 
 /**
  * Remove a single tag from a card.
+ * V11.5.1: Refactored to use withUser helper.
  * Req: 1.4
  */
 export async function removeTagFromCard(
   cardId: string,
   tagId: string
-): Promise<TagActionResult> {
+): Promise<ActionResultV2> {
   if (!cardId || !tagId) {
     return { ok: false, error: 'Card ID and Tag ID are required' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Verify card ownership via deck
+    const { data: card } = await supabase
+      .from('cards')
+      .select('id, deck_id, decks!inner(user_id)')
+      .eq('id', cardId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (!card) {
+      return { ok: false, error: 'Card not found' }
+    }
 
-  // Verify card ownership via deck
-  const { data: card } = await supabase
-    .from('cards')
-    .select('id, deck_id, decks!inner(user_id)')
-    .eq('id', cardId)
-    .single()
+    const deckData = card.decks as unknown as { user_id: string }
+    if (deckData.user_id !== user.id) {
+      return { ok: false, error: 'Access denied' }
+    }
 
-  if (!card) {
-    return { ok: false, error: 'Card not found' }
-  }
+    // Remove the tag association
+    const { error } = await supabase
+      .from('card_tags')
+      .delete()
+      .eq('card_id', cardId)
+      .eq('tag_id', tagId)
 
-  const deckData = card.decks as unknown as { user_id: string }
-  if (deckData.user_id !== user.id) {
-    return { ok: false, error: 'Access denied' }
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  // Remove the tag association
-  const { error } = await supabase
-    .from('card_tags')
-    .delete()
-    .eq('card_id', cardId)
-    .eq('tag_id', tagId)
+    // Revalidate deck page
+    revalidatePath(`/decks/${card.deck_id}`)
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  // Revalidate deck page
-  revalidatePath(`/decks/${card.deck_id}`)
-
-  return { ok: true }
+    return { ok: true }
+  })
 }
 
 /**
  * Get all tags for a specific card.
+ * V11.5.1: Refactored to use withUser helper.
  * Req: 1.3
  */
 export async function getCardTags(cardId: string): Promise<Tag[]> {
@@ -345,26 +328,27 @@ export async function getCardTags(cardId: string): Promise<Tag[]> {
     return []
   }
 
-  const user = await getUser()
-  if (!user) {
-    return []
-  }
+  const result = await withUser(async ({ supabase }: AuthContext) => {
+    const { data } = await supabase
+      .from('card_tags')
+      .select('tags(*)')
+      .eq('card_id', cardId)
 
-  const supabase = await createSupabaseServerClient()
+    if (!data) {
+      return { ok: true as const, data: [] as Tag[] }
+    }
 
-  const { data } = await supabase
-    .from('card_tags')
-    .select('tags(*)')
-    .eq('card_id', cardId)
+    // Extract tags from the join result
+    const tags = data
+      .map((row) => row.tags as unknown as Tag)
+      .filter((tag): tag is Tag => tag !== null)
 
-  if (!data) {
-    return []
-  }
+    return { ok: true as const, data: tags }
+  })
 
-  // Extract tags from the join result
-  return data
-    .map((row) => row.tags as unknown as Tag)
-    .filter((tag): tag is Tag => tag !== null)
+  // Return empty array if auth failed
+  if (!result.ok) return []
+  return result.data ?? []
 }
 
 
@@ -374,13 +358,13 @@ export async function getCardTags(cardId: string): Promise<Tag[]> {
 
 /**
  * V9.1: Result type for bulk tag operations
+ * V11.5.1: Using ActionResultV2 pattern
  */
-export type BulkTagResult =
-  | { ok: true; taggedCount: number }
-  | { ok: false; error: string }
+export type BulkTagResult = ActionResultV2<{ taggedCount: number }>
 
 /**
  * V9.1: Add a tag to multiple cards in bulk.
+ * V11.5.1: Refactored to use withUser helper.
  * Batches inserts in chunks of 100 to prevent timeout.
  * Uses ON CONFLICT DO NOTHING for idempotent behavior.
  * 
@@ -402,86 +386,81 @@ export async function bulkAddTagToCards(
     return { ok: false, error: 'Tag ID is required' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Verify tag exists and belongs to user
+    const { data: tag, error: tagError } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('id', tagId)
+      .eq('user_id', user.id)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
-
-  // Verify tag exists and belongs to user
-  const { data: tag, error: tagError } = await supabase
-    .from('tags')
-    .select('id')
-    .eq('id', tagId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (tagError || !tag) {
-    return { ok: false, error: 'Tag not found' }
-  }
-
-  // Verify user is author of all cards via deck_template.author_id
-  // Fetch all card_templates with their deck_template author info
-  const { data: cardTemplates, error: fetchError } = await supabase
-    .from('card_templates')
-    .select('id, deck_template_id, deck_templates!inner(author_id)')
-    .in('id', cardIds)
-
-  if (fetchError || !cardTemplates) {
-    return { ok: false, error: 'Could not verify card ownership' }
-  }
-
-  // Check that we found all requested cards
-  if (cardTemplates.length !== cardIds.length) {
-    return { ok: false, error: 'Some cards were not found' }
-  }
-
-  // Check all cards belong to user (author check)
-  const unauthorized = cardTemplates.some((ct) => {
-    const deckData = ct.deck_templates as unknown as { author_id: string }
-    return deckData.author_id !== user.id
-  })
-
-  if (unauthorized) {
-    return { ok: false, error: 'Only the author can tag these cards' }
-  }
-
-  // Batch inserts in chunks of 100 to prevent timeout
-  const BATCH_SIZE = 100
-  let totalTagged = 0
-
-  for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
-    const batch = cardIds.slice(i, i + BATCH_SIZE)
-    const cardTagRows = batch.map((cardId) => ({
-      card_template_id: cardId,
-      tag_id: tagId,
-    }))
-
-    // Use upsert with ON CONFLICT DO NOTHING for idempotence
-    const { error: insertError, count } = await supabase
-      .from('card_template_tags')
-      .upsert(cardTagRows, { 
-        onConflict: 'card_template_id,tag_id',
-        ignoreDuplicates: true,
-        count: 'exact'
-      })
-
-    if (insertError) {
-      console.error('Bulk tag insert error:', insertError)
-      return { ok: false, error: 'Failed to tag cards. Please try again.' }
+    if (tagError || !tag) {
+      return { ok: false, error: 'Tag not found' }
     }
 
-    totalTagged += count || 0
-  }
+    // Verify user is author of all cards via deck_template.author_id
+    // Fetch all card_templates with their deck_template author info
+    const { data: cardTemplates, error: fetchError } = await supabase
+      .from('card_templates')
+      .select('id, deck_template_id, deck_templates!inner(author_id)')
+      .in('id', cardIds)
 
-  // Revalidate affected deck pages
-  const deckIds = [...new Set(cardTemplates.map((ct) => ct.deck_template_id))]
-  for (const deckId of deckIds) {
-    revalidatePath(`/decks/${deckId}`)
-  }
+    if (fetchError || !cardTemplates) {
+      return { ok: false, error: 'Could not verify card ownership' }
+    }
 
-  return { ok: true, taggedCount: totalTagged }
+    // Check that we found all requested cards
+    if (cardTemplates.length !== cardIds.length) {
+      return { ok: false, error: 'Some cards were not found' }
+    }
+
+    // Check all cards belong to user (author check)
+    const unauthorized = cardTemplates.some((ct) => {
+      const deckData = ct.deck_templates as unknown as { author_id: string }
+      return deckData.author_id !== user.id
+    })
+
+    if (unauthorized) {
+      return { ok: false, error: 'Only the author can tag these cards' }
+    }
+
+    // Batch inserts in chunks of 100 to prevent timeout
+    const BATCH_SIZE = 100
+    let totalTagged = 0
+
+    for (let i = 0; i < cardIds.length; i += BATCH_SIZE) {
+      const batch = cardIds.slice(i, i + BATCH_SIZE)
+      const cardTagRows = batch.map((cardId) => ({
+        card_template_id: cardId,
+        tag_id: tagId,
+      }))
+
+      // Use upsert with ON CONFLICT DO NOTHING for idempotence
+      const { error: insertError, count } = await supabase
+        .from('card_template_tags')
+        .upsert(cardTagRows, { 
+          onConflict: 'card_template_id,tag_id',
+          ignoreDuplicates: true,
+          count: 'exact'
+        })
+
+      if (insertError) {
+        console.error('Bulk tag insert error:', insertError)
+        return { ok: false, error: 'Failed to tag cards. Please try again.' }
+      }
+
+      totalTagged += count || 0
+    }
+
+    // Revalidate affected deck pages
+    const deckIds = [...new Set(cardTemplates.map((ct) => ct.deck_template_id))]
+    for (const deckId of deckIds) {
+      revalidatePath(`/decks/${deckId}`)
+    }
+
+    return { ok: true, data: { taggedCount: totalTagged } }
+  })
 }
 
 
@@ -494,14 +473,14 @@ import { GOLDEN_TOPIC_TAGS, getCanonicalTopicTag } from '@/lib/golden-list'
 
 /**
  * V9.2: Result type for auto-tag operations
+ * V11.5.1: Using ActionResultV2 pattern
  */
-export type AutoTagResult =
-  | { ok: true; taggedCount: number; skippedCount: number }
-  | { ok: false; error: string }
+export type AutoTagResult = ActionResultV2<{ taggedCount: number; skippedCount: number }>
 
 /**
  * V9.2: Auto-tag cards using AI classification.
  * V9.3: Added chunk limit (max 5), parallel processing, and subject parameter.
+ * V11.5.1: Refactored to use withUser helper.
  * Sends card content to OpenAI for topic and concept classification.
  * 
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 4.1
@@ -529,9 +508,10 @@ export async function autoTagCards(
     return { ok: false, error: 'No cards selected' }
   }
 
+  // V11.5.1: Use withUser for auth, but we need user/supabase in scope for the rest
   const user = await getUser()
   if (!user) {
-    return { ok: false, error: 'Authentication required' }
+    return { ok: false, error: 'AUTH_REQUIRED' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -708,5 +688,5 @@ Respond with JSON only, no markdown:
     revalidatePath(`/decks/${deckId}`)
   }
 
-  return { ok: true, taggedCount: totalTagged, skippedCount: totalSkipped }
+  return { ok: true, data: { taggedCount: totalTagged, skippedCount: totalSkipped } }
 }

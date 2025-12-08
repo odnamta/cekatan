@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { withUser, type AuthContext } from './_helpers'
 import { createDeckSchema } from '@/lib/validations'
-import type { ActionResult } from '@/types/actions'
+import type { ActionResult, ActionResultV2 } from '@/types/actions'
 
 /**
  * V8.0/V9.1: Server Action for creating a new deck.
@@ -63,64 +64,64 @@ export async function createDeckAction(
 
 /**
  * V8.0: Server Action for deleting a deck.
+ * V11.5.1: Refactored to use withUser helper.
  * Deletes deck_template (cascade handles card_templates).
  * Requirements: 2.3, 9.3, V8 2.4
  */
-export async function deleteDeckAction(deckId: string): Promise<ActionResult> {
+export async function deleteDeckAction(deckId: string): Promise<ActionResultV2> {
   if (!deckId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deckId)) {
-    return { success: false, error: 'Invalid deck ID' }
+    return { ok: false, error: 'Invalid deck ID' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { success: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // V8.0: Delete deck_template (cascade handles card_templates, user_decks)
+    const { error } = await supabase
+      .from('deck_templates')
+      .delete()
+      .eq('id', deckId)
+      .eq('author_id', user.id)
 
-  const supabase = await createSupabaseServerClient()
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  // V8.0: Delete deck_template (cascade handles card_templates, user_decks)
-  const { error } = await supabase
-    .from('deck_templates')
-    .delete()
-    .eq('id', deckId)
-    .eq('author_id', user.id)
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  revalidatePath('/dashboard')
-  return { success: true }
+    revalidatePath('/dashboard')
+    return { ok: true }
+  })
 }
 
 
 /**
  * V8.0: Server Action for fetching all user's deck_templates.
+ * V11.5.1: Refactored to use withUser helper.
  * Queries user_decks joined with deck_templates.
  * Requirements: V8 2.1
  */
 export async function getUserDecks(): Promise<{ id: string; title: string }[]> {
-  const user = await getUser()
-  if (!user) return []
+  const result = await withUser(async ({ user, supabase }: AuthContext) => {
+    // V8.0: Query user_decks joined with deck_templates
+    const { data: userDecks, error } = await supabase
+      .from('user_decks')
+      .select(`deck_template_id, deck_templates!inner(id, title)`)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
 
-  const supabase = await createSupabaseServerClient()
+    if (error) {
+      console.error('Failed to fetch user decks:', error)
+      return { ok: true as const, data: [] as { id: string; title: string }[] }
+    }
 
-  // V8.0: Query user_decks joined with deck_templates
-  const { data: userDecks, error } = await supabase
-    .from('user_decks')
-    .select(`deck_template_id, deck_templates!inner(id, title)`)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
+    const decks = (userDecks || []).map(ud => {
+      const dt = ud.deck_templates as unknown as { id: string; title: string }
+      return { id: dt.id, title: dt.title }
+    }).sort((a, b) => a.title.localeCompare(b.title))
 
-  if (error) {
-    console.error('Failed to fetch user decks:', error)
-    return []
-  }
+    return { ok: true as const, data: decks }
+  })
 
-  return (userDecks || []).map(ud => {
-    const dt = ud.deck_templates as unknown as { id: string; title: string }
-    return { id: dt.id, title: dt.title }
-  }).sort((a, b) => a.title.localeCompare(b.title))
+  // Return empty array if auth failed
+  if (!result.ok) return []
+  return result.data ?? []
 }
 
 
@@ -129,125 +130,151 @@ export async function getUserDecks(): Promise<{ id: string; title: string }[]> {
 // ============================================
 
 import type { DeckTemplate, DeckTemplateWithDueCount } from '@/types/database'
+import { CARD_STATUS } from '@/lib/constants'
+
+/**
+ * V11.5.1: Extended deck type with draft count for authors
+ */
+export interface DeckTemplateWithCounts extends DeckTemplateWithDueCount {
+  draft_count: number
+  isAuthor: boolean
+}
 
 /**
  * Fetches user's deck_templates (authored + subscribed via user_decks).
  * Includes due count from user_card_progress.
+ * V11.5.1: Also includes draft_count for author's decks. Refactored to use withUser.
  * 
  * V6.4: Shared Library Read Path
  */
-export async function getDeckTemplates(): Promise<DeckTemplateWithDueCount[]> {
-  const user = await getUser()
-  if (!user) {
-    return []
-  }
+export async function getDeckTemplates(): Promise<DeckTemplateWithCounts[]> {
+  const result = await withUser(async ({ user, supabase }: AuthContext) => {
+    const now = new Date().toISOString()
 
-  const supabase = await createSupabaseServerClient()
-  const now = new Date().toISOString()
+    // Get user's subscribed deck_templates via user_decks
+    const { data: userDecks, error: userDecksError } = await supabase
+      .from('user_decks')
+      .select(`
+        deck_template_id,
+        deck_templates!inner(*)
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
 
-  // Get user's subscribed deck_templates via user_decks
-  const { data: userDecks, error: userDecksError } = await supabase
-    .from('user_decks')
-    .select(`
-      deck_template_id,
-      deck_templates!inner(*)
-    `)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-
-  if (userDecksError) {
-    console.error('Failed to fetch deck templates:', userDecksError)
-    return []
-  }
-
-  if (!userDecks || userDecks.length === 0) {
-    return []
-  }
-
-  // Get due counts for each deck_template
-  const deckTemplateIds = userDecks.map(ud => ud.deck_template_id)
-  
-  // Get all card_templates in user's decks
-  const { data: cardTemplates, error: ctError } = await supabase
-    .from('card_templates')
-    .select('id, deck_template_id')
-    .in('deck_template_id', deckTemplateIds)
-
-  if (ctError) {
-    console.error('Failed to fetch card templates:', ctError)
-  }
-
-  // Create map of card_template_id -> deck_template_id
-  const cardToDeckMap = new Map<string, string>()
-  for (const ct of cardTemplates || []) {
-    cardToDeckMap.set(ct.id, ct.deck_template_id)
-  }
-
-  // Get due progress records
-  const cardTemplateIdList = Array.from(cardToDeckMap.keys())
-  const { data: dueProgress, error: dueError } = await supabase
-    .from('user_card_progress')
-    .select('card_template_id')
-    .eq('user_id', user.id)
-    .lte('next_review', now)
-    .eq('suspended', false)
-    .in('card_template_id', cardTemplateIdList)
-
-  if (dueError) {
-    console.error('Failed to fetch due counts:', dueError)
-  }
-
-  // Build due count map
-  const dueCountMap = new Map<string, number>()
-  for (const record of dueProgress || []) {
-    const deckTemplateId = cardToDeckMap.get(record.card_template_id)
-    if (deckTemplateId) {
-      dueCountMap.set(deckTemplateId, (dueCountMap.get(deckTemplateId) || 0) + 1)
+    if (userDecksError) {
+      console.error('Failed to fetch deck templates:', userDecksError)
+      return { ok: true as const, data: [] as DeckTemplateWithCounts[] }
     }
-  }
 
-  // Map to DeckTemplateWithDueCount
-  return userDecks.map(ud => {
-    const dt = ud.deck_templates as unknown as DeckTemplate
-    return {
-      ...dt,
-      due_count: dueCountMap.get(dt.id) || 0,
+    if (!userDecks || userDecks.length === 0) {
+      return { ok: true as const, data: [] as DeckTemplateWithCounts[] }
     }
+
+    // Get due counts for each deck_template
+    const deckTemplateIds = userDecks.map(ud => ud.deck_template_id)
+    
+    // V11.5.1: Get all card_templates with status for draft counting
+    const { data: cardTemplates, error: ctError } = await supabase
+      .from('card_templates')
+      .select('id, deck_template_id, status')
+      .in('deck_template_id', deckTemplateIds)
+
+    if (ctError) {
+      console.error('Failed to fetch card templates:', ctError)
+    }
+
+    // Create map of card_template_id -> deck_template_id
+    const cardToDeckMap = new Map<string, string>()
+    for (const ct of cardTemplates || []) {
+      cardToDeckMap.set(ct.id, ct.deck_template_id)
+    }
+
+    // V11.5.1: Build draft count map (only for author's decks)
+    const draftCountMap = new Map<string, number>()
+    for (const ct of cardTemplates || []) {
+      if (ct.status === CARD_STATUS.Draft) {
+        draftCountMap.set(ct.deck_template_id, (draftCountMap.get(ct.deck_template_id) || 0) + 1)
+      }
+    }
+
+    // Get due progress records
+    const cardTemplateIdList = Array.from(cardToDeckMap.keys())
+    const { data: dueProgress, error: dueError } = await supabase
+      .from('user_card_progress')
+      .select('card_template_id')
+      .eq('user_id', user.id)
+      .lte('next_review', now)
+      .eq('suspended', false)
+      .in('card_template_id', cardTemplateIdList)
+
+    if (dueError) {
+      console.error('Failed to fetch due counts:', dueError)
+    }
+
+    // Build due count map
+    const dueCountMap = new Map<string, number>()
+    for (const record of dueProgress || []) {
+      const deckTemplateId = cardToDeckMap.get(record.card_template_id)
+      if (deckTemplateId) {
+        dueCountMap.set(deckTemplateId, (dueCountMap.get(deckTemplateId) || 0) + 1)
+      }
+    }
+
+    // Map to DeckTemplateWithCounts
+    const decks = userDecks.map(ud => {
+      const dt = ud.deck_templates as unknown as DeckTemplate
+      const isAuthor = dt.author_id === user.id
+      return {
+        ...dt,
+        due_count: dueCountMap.get(dt.id) || 0,
+        // V11.5.1: Only include draft_count for author's decks
+        draft_count: isAuthor ? (draftCountMap.get(dt.id) || 0) : 0,
+        isAuthor,
+      }
+    })
+
+    return { ok: true as const, data: decks }
   })
+
+  // Return empty array if auth failed
+  if (!result.ok) return []
+  return result.data ?? []
 }
 
 /**
  * Fetches user's deck_templates for dropdown selection.
+ * V11.5.1: Refactored to use withUser helper.
  * Simpler version without due counts.
  * 
  * V6.4: Used by ConfigureSessionModal for deck selection.
  */
 export async function getUserDeckTemplates(): Promise<{ id: string; title: string }[]> {
-  const user = await getUser()
-  if (!user) {
-    return []
-  }
+  const result = await withUser(async ({ user, supabase }: AuthContext) => {
+    const { data: userDecks, error } = await supabase
+      .from('user_decks')
+      .select(`
+        deck_template_id,
+        deck_templates!inner(id, title)
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
 
-  const supabase = await createSupabaseServerClient()
+    if (error) {
+      console.error('Failed to fetch user deck templates:', error)
+      return { ok: true as const, data: [] as { id: string; title: string }[] }
+    }
 
-  const { data: userDecks, error } = await supabase
-    .from('user_decks')
-    .select(`
-      deck_template_id,
-      deck_templates!inner(id, title)
-    `)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
+    const decks = (userDecks || []).map(ud => {
+      const dt = ud.deck_templates as unknown as { id: string; title: string }
+      return { id: dt.id, title: dt.title }
+    }).sort((a, b) => a.title.localeCompare(b.title))
 
-  if (error) {
-    console.error('Failed to fetch user deck templates:', error)
-    return []
-  }
+    return { ok: true as const, data: decks }
+  })
 
-  return (userDecks || []).map(ud => {
-    const dt = ud.deck_templates as unknown as { id: string; title: string }
-    return { id: dt.id, title: dt.title }
-  }).sort((a, b) => a.title.localeCompare(b.title))
+  // Return empty array if auth failed
+  if (!result.ok) return []
+  return result.data ?? []
 }
 
 /**

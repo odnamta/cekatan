@@ -476,3 +476,287 @@ describe('Analytics Property Tests', () => {
     })
   })
 })
+
+
+// ============================================
+// V11.5: Weakest Concepts Property Tests
+// ============================================
+
+import { findWeakestConcepts, type WeakestConceptResult } from '@/lib/analytics-utils'
+
+describe('V11.5 Weakest Concepts Property Tests', () => {
+  // Helper to create test data
+  function createTestData(
+    progressItems: Array<{ cardId: string; correct: number; total: number }>,
+    cardTagLinks: Array<{ cardId: string; tagId: string }>,
+    tagDefs: Array<{ id: string; name: string; category: string }>
+  ) {
+    return {
+      progressData: progressItems.map((p) => ({
+        cardTemplateId: p.cardId,
+        correctCount: p.correct,
+        totalAttempts: p.total,
+      })),
+      cardTags: cardTagLinks.map((ct) => ({
+        cardTemplateId: ct.cardId,
+        tagId: ct.tagId,
+      })),
+      tags: tagDefs,
+    }
+  }
+
+  /**
+   * **Property 12: Weakest Concepts - Accuracy Ordering**
+   * For any set of tags with accuracy data, findWeakestConcepts SHALL return tags ordered by accuracy ascending.
+   * **Validates: Requirements 9.2**
+   */
+  describe('Property 12: Weakest Concepts - Accuracy Ordering', () => {
+    it('should order concepts by accuracy ascending (weakest first)', () => {
+      const { progressData, cardTags, tags } = createTestData(
+        [
+          { cardId: 'c1', correct: 8, total: 10 }, // 80%
+          { cardId: 'c2', correct: 3, total: 10 }, // 30%
+          { cardId: 'c3', correct: 5, total: 10 }, // 50%
+        ],
+        [
+          { cardId: 'c1', tagId: 't1' },
+          { cardId: 'c2', tagId: 't2' },
+          { cardId: 'c3', tagId: 't3' },
+        ],
+        [
+          { id: 't1', name: 'Concept1', category: 'concept' },
+          { id: 't2', name: 'Concept2', category: 'concept' },
+          { id: 't3', name: 'Concept3', category: 'concept' },
+        ]
+      )
+
+      const result = findWeakestConcepts(progressData, cardTags, tags, 10)
+
+      // Should be ordered: 30%, 50%, 80%
+      expect(result.length).toBe(3)
+      expect(result[0].tagName).toBe('Concept2') // 30%
+      expect(result[1].tagName).toBe('Concept3') // 50%
+      expect(result[2].tagName).toBe('Concept1') // 80%
+    })
+
+    it('should maintain accuracy ordering with property-based test', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              id: fc.uuid(),
+              name: fc.string({ minLength: 1, maxLength: 20 }),
+              accuracy: fc.integer({ min: 0, max: 100 }),
+              attempts: fc.integer({ min: 5, max: 100 }), // >= 5 to avoid low confidence
+            }),
+            { minLength: 2, maxLength: 10 }
+          ),
+          (conceptData) => {
+            // Create test data from generated concepts
+            const progressData = conceptData.map((c, i) => ({
+              cardTemplateId: `card-${i}`,
+              correctCount: Math.round((c.accuracy / 100) * c.attempts),
+              totalAttempts: c.attempts,
+            }))
+            const cardTags = conceptData.map((c, i) => ({
+              cardTemplateId: `card-${i}`,
+              tagId: c.id,
+            }))
+            const tags = conceptData.map((c) => ({
+              id: c.id,
+              name: c.name,
+              category: 'concept',
+            }))
+
+            const result = findWeakestConcepts(progressData, cardTags, tags, 100)
+
+            // Verify ordering: each item should have accuracy <= next item
+            for (let i = 1; i < result.length; i++) {
+              expect(result[i].accuracy).toBeGreaterThanOrEqual(result[i - 1].accuracy)
+            }
+          }
+        ),
+        { numRuns: 50 }
+      )
+    })
+  })
+
+  /**
+   * **Property 13: Weakest Concepts - Low Confidence Deprioritization**
+   * For any two tags with equal accuracy where one has <5 attempts and one has >=5 attempts,
+   * the >=5 attempts tag SHALL rank as "weaker" (more reliable data).
+   * **Validates: Requirements 9.3**
+   */
+  describe('Property 13: Weakest Concepts - Low Confidence Deprioritization', () => {
+    it('should deprioritize low confidence tags (< 5 attempts)', () => {
+      const { progressData, cardTags, tags } = createTestData(
+        [
+          { cardId: 'c1', correct: 2, total: 4 }, // 50%, low confidence
+          { cardId: 'c2', correct: 5, total: 10 }, // 50%, high confidence
+        ],
+        [
+          { cardId: 'c1', tagId: 't1' },
+          { cardId: 'c2', tagId: 't2' },
+        ],
+        [
+          { id: 't1', name: 'LowConfidence', category: 'concept' },
+          { id: 't2', name: 'HighConfidence', category: 'concept' },
+        ]
+      )
+
+      const result = findWeakestConcepts(progressData, cardTags, tags, 10)
+
+      // High confidence should come first despite same accuracy
+      expect(result.length).toBe(2)
+      expect(result[0].tagName).toBe('HighConfidence')
+      expect(result[0].isLowConfidence).toBe(false)
+      expect(result[1].tagName).toBe('LowConfidence')
+      expect(result[1].isLowConfidence).toBe(true)
+    })
+
+    it('should mark tags with < 5 attempts as low confidence', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 1, max: 4 }), // Low confidence range
+          (attempts) => {
+            const { progressData, cardTags, tags } = createTestData(
+              [{ cardId: 'c1', correct: 1, total: attempts }],
+              [{ cardId: 'c1', tagId: 't1' }],
+              [{ id: 't1', name: 'Test', category: 'concept' }]
+            )
+
+            const result = findWeakestConcepts(progressData, cardTags, tags, 10)
+
+            if (result.length > 0) {
+              expect(result[0].isLowConfidence).toBe(true)
+            }
+          }
+        ),
+        { numRuns: 50 }
+      )
+    })
+  })
+
+  /**
+   * **Property 14: Weakest Concepts - Tie Breaker**
+   * For any two tags with equal accuracy and both >=5 attempts, 
+   * the tag with more attempts SHALL rank first.
+   * **Validates: Requirements 9.4**
+   */
+  describe('Property 14: Weakest Concepts - Tie Breaker', () => {
+    it('should use total attempts as tie-breaker (more attempts = more reliable)', () => {
+      const { progressData, cardTags, tags } = createTestData(
+        [
+          { cardId: 'c1', correct: 5, total: 10 }, // 50%, 10 attempts
+          { cardId: 'c2', correct: 10, total: 20 }, // 50%, 20 attempts
+          { cardId: 'c3', correct: 3, total: 6 }, // 50%, 6 attempts
+        ],
+        [
+          { cardId: 'c1', tagId: 't1' },
+          { cardId: 'c2', tagId: 't2' },
+          { cardId: 'c3', tagId: 't3' },
+        ],
+        [
+          { id: 't1', name: 'Medium', category: 'concept' },
+          { id: 't2', name: 'Most', category: 'concept' },
+          { id: 't3', name: 'Least', category: 'concept' },
+        ]
+      )
+
+      const result = findWeakestConcepts(progressData, cardTags, tags, 10)
+
+      // All have 50% accuracy, should be ordered by attempts descending
+      expect(result.length).toBe(3)
+      expect(result[0].tagName).toBe('Most') // 20 attempts
+      expect(result[1].tagName).toBe('Medium') // 10 attempts
+      expect(result[2].tagName).toBe('Least') // 6 attempts
+    })
+  })
+
+  /**
+   * Additional tests
+   */
+  describe('Additional behavior', () => {
+    it('should only include concept category tags', () => {
+      const { progressData, cardTags, tags } = createTestData(
+        [
+          { cardId: 'c1', correct: 5, total: 10 },
+          { cardId: 'c2', correct: 5, total: 10 },
+          { cardId: 'c3', correct: 5, total: 10 },
+        ],
+        [
+          { cardId: 'c1', tagId: 't1' },
+          { cardId: 'c2', tagId: 't2' },
+          { cardId: 'c3', tagId: 't3' },
+        ],
+        [
+          { id: 't1', name: 'Source1', category: 'source' },
+          { id: 't2', name: 'Topic1', category: 'topic' },
+          { id: 't3', name: 'Concept1', category: 'concept' },
+        ]
+      )
+
+      const result = findWeakestConcepts(progressData, cardTags, tags, 10)
+
+      // Should only include concept tags
+      expect(result.length).toBe(1)
+      expect(result[0].tagName).toBe('Concept1')
+    })
+
+    it('should respect limit parameter', () => {
+      const { progressData, cardTags, tags } = createTestData(
+        [
+          { cardId: 'c1', correct: 1, total: 10 },
+          { cardId: 'c2', correct: 2, total: 10 },
+          { cardId: 'c3', correct: 3, total: 10 },
+          { cardId: 'c4', correct: 4, total: 10 },
+          { cardId: 'c5', correct: 5, total: 10 },
+        ],
+        [
+          { cardId: 'c1', tagId: 't1' },
+          { cardId: 'c2', tagId: 't2' },
+          { cardId: 'c3', tagId: 't3' },
+          { cardId: 'c4', tagId: 't4' },
+          { cardId: 'c5', tagId: 't5' },
+        ],
+        [
+          { id: 't1', name: 'C1', category: 'concept' },
+          { id: 't2', name: 'C2', category: 'concept' },
+          { id: 't3', name: 'C3', category: 'concept' },
+          { id: 't4', name: 'C4', category: 'concept' },
+          { id: 't5', name: 'C5', category: 'concept' },
+        ]
+      )
+
+      const result = findWeakestConcepts(progressData, cardTags, tags, 3)
+
+      expect(result.length).toBe(3)
+    })
+
+    it('should return empty array for no data', () => {
+      const result = findWeakestConcepts([], [], [], 10)
+      expect(result).toEqual([])
+    })
+
+    it('should aggregate stats across multiple cards with same tag', () => {
+      const { progressData, cardTags, tags } = createTestData(
+        [
+          { cardId: 'c1', correct: 3, total: 5 }, // 60%
+          { cardId: 'c2', correct: 2, total: 5 }, // 40%
+        ],
+        [
+          { cardId: 'c1', tagId: 't1' },
+          { cardId: 'c2', tagId: 't1' }, // Same tag
+        ],
+        [{ id: 't1', name: 'SharedConcept', category: 'concept' }]
+      )
+
+      const result = findWeakestConcepts(progressData, cardTags, tags, 10)
+
+      // Should aggregate: (3+2)/(5+5) = 50%
+      expect(result.length).toBe(1)
+      expect(result[0].accuracy).toBe(50)
+      expect(result[0].totalAttempts).toBe(10)
+    })
+  })
+})

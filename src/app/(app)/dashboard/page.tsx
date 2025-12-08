@@ -8,6 +8,7 @@ import { getStudyLogs, getUserStats } from '@/actions/stats-actions'
 import { getGlobalStats } from '@/actions/global-study-actions'
 import { isUserAdmin, ADMIN_USER_IDS } from '@/lib/onboarding-utils'
 import type { DeckWithDueCount, Course, Lesson, LessonProgress } from '@/types/database'
+import { CARD_STATUS } from '@/lib/constants'
 
 /**
  * Dashboard Page - React Server Component
@@ -136,12 +137,12 @@ export default async function DashboardPage() {
   // Get deck template IDs for due count calculation
   const deckTemplateIds = (userDecks || []).map(ud => ud.deck_template_id)
   
-  // Fetch card_templates for due count calculation
-  let cardTemplates: { id: string; deck_template_id: string }[] = []
+  // V11.5.1: Fetch card_templates with status for due count and draft count calculation
+  let cardTemplates: { id: string; deck_template_id: string; status: string | null }[] = []
   if (deckTemplateIds.length > 0) {
     const { data: ctData } = await supabase
       .from('card_templates')
-      .select('id, deck_template_id')
+      .select('id, deck_template_id, status')
       .in('deck_template_id', deckTemplateIds)
     cardTemplates = ctData || []
   }
@@ -175,15 +176,27 @@ export default async function DashboardPage() {
     }
   }
 
-  // Build decks with due counts using V2 IDs
-  const decksWithDueCounts: DeckWithDueCount[] = (userDecks || []).map(ud => {
+  // V11.5.1: Build draft count map by deck_template_id
+  const draftCountMap = new Map<string, number>()
+  for (const ct of cardTemplates) {
+    if (ct.status === CARD_STATUS.Draft) {
+      draftCountMap.set(ct.deck_template_id, (draftCountMap.get(ct.deck_template_id) || 0) + 1)
+    }
+  }
+
+  // V11.5.1: Build decks with due counts and draft counts using V2 IDs
+  const decksWithDueCounts = (userDecks || []).map(ud => {
     const dt = ud.deck_templates as unknown as { id: string; title: string; author_id: string; created_at: string }
+    const isAuthor = dt.author_id === user.id
     return {
       id: dt.id, // V2 deck_template ID
       user_id: dt.author_id,
       title: dt.title,
       created_at: dt.created_at,
       due_count: dueCountMap.get(dt.id) || 0,
+      // V11.5.1: Only include draft_count for author's decks
+      draft_count: isAuthor ? (draftCountMap.get(dt.id) || 0) : 0,
+      isAuthor,
     }
   }).sort((a, b) => a.title.localeCompare(b.title))
 
