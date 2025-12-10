@@ -46,7 +46,20 @@ function templateToCard(template: CardTemplate, progress?: UserCardProgress): Ca
   }
 }
 
-export async function getGlobalDueCards(batchNumber: number = 0): Promise<GlobalDueCardsResult> {
+/**
+ * V11.7: Get global due cards with optional tag filtering.
+ * When tagIds is provided and non-empty, only returns cards linked to at least one of the tags.
+ * 
+ * @param batchNumber - Pagination batch number (default 0)
+ * @param tagIds - Optional array of tag IDs to filter by (V11.7)
+ * 
+ * **Feature: v11.7-companion-dashboard-tag-filtered-study**
+ * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5**
+ */
+export async function getGlobalDueCards(
+  batchNumber: number = 0,
+  tagIds?: string[]
+): Promise<GlobalDueCardsResult> {
   const user = await getUser()
   if (!user) {
     return { success: false, cards: [], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false, error: 'Authentication required' }
@@ -72,9 +85,26 @@ export async function getGlobalDueCards(batchNumber: number = 0): Promise<Global
   const { data: activeCardTemplates } = await supabase
     .from('card_templates').select('id').in('deck_template_id', deckTemplateIds).eq('status', 'published')
 
-  const activeCardIds = (activeCardTemplates || []).map(c => c.id)
+  let activeCardIds = (activeCardTemplates || []).map(c => c.id)
   if (activeCardIds.length === 0) {
     return { success: true, cards: [], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+  }
+
+  // V11.7: Filter by tags if tagIds provided
+  const hasTagFilter = tagIds && tagIds.length > 0
+  if (hasTagFilter) {
+    const { data: taggedCards } = await supabase
+      .from('card_template_tags')
+      .select('card_template_id')
+      .in('tag_id', tagIds)
+      .in('card_template_id', activeCardIds)
+    
+    const taggedCardIds = new Set((taggedCards || []).map(tc => tc.card_template_id))
+    activeCardIds = activeCardIds.filter(id => taggedCardIds.has(id))
+    
+    if (activeCardIds.length === 0) {
+      return { success: true, cards: [], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+    }
   }
 
   // V8.2: Get existing progress records to identify new cards

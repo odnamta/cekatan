@@ -327,3 +327,129 @@ export async function getUserSubject(): Promise<SubjectResult> {
     }
   }
 }
+
+
+// ============================================
+// V11.7: Dashboard Insights
+// ============================================
+
+import { withUser, type AuthContext } from './_helpers'
+import { findWeakestConcepts } from '@/lib/analytics-utils'
+import { getGlobalStats } from './global-study-actions'
+import type { DashboardInsightsResult, WeakestConceptSummary } from '@/types/actions'
+import { LOW_CONFIDENCE_THRESHOLD } from '@/lib/constants'
+
+/**
+ * V11.7: Get dashboard insights including due count and weakest concepts.
+ * Uses withUser helper and returns ActionResultV2.
+ * 
+ * **Feature: v11.7-companion-dashboard-tag-filtered-study**
+ * **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5**
+ */
+export async function getDashboardInsights(): Promise<DashboardInsightsResult> {
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    // Get global stats for due count
+    const statsResult = await getGlobalStats()
+    const dueCount = statsResult.success ? statsResult.totalDueCount : 0
+
+    // Get today's reviewed count from study_logs
+    const todayDateStr = new Date().toISOString().split('T')[0]
+    const { data: studyLog } = await supabase
+      .from('study_logs')
+      .select('cards_reviewed')
+      .eq('user_id', user.id)
+      .eq('study_date', todayDateStr)
+      .single()
+
+    // Fetch user progress data for weakest concepts
+    const { data: progressData } = await supabase
+      .from('user_card_progress')
+      .select('card_template_id, correct_count, total_attempts')
+      .eq('user_id', user.id)
+
+    // Fetch card-tag associations
+    const { data: cardTags } = await supabase
+      .from('card_template_tags')
+      .select('card_template_id, tag_id')
+
+    // Fetch user's tags (concept category only for weakest concepts)
+    const { data: tags } = await supabase
+      .from('tags')
+      .select('id, name, category')
+      .eq('user_id', user.id)
+
+    // Calculate total attempts across all concept tags
+    const conceptTags = (tags || []).filter(t => t.category === 'concept')
+    const conceptTagIds = new Set(conceptTags.map(t => t.id))
+    
+    // Map card progress to concept tags
+    const cardTagMap = new Map<string, string[]>()
+    for (const ct of cardTags || []) {
+      if (conceptTagIds.has(ct.tag_id)) {
+        const existing = cardTagMap.get(ct.card_template_id) || []
+        existing.push(ct.tag_id)
+        cardTagMap.set(ct.card_template_id, existing)
+      }
+    }
+
+    // Calculate total attempts for concept tags
+    let totalConceptAttempts = 0
+    for (const progress of progressData || []) {
+      const tagIds = cardTagMap.get(progress.card_template_id)
+      if (tagIds && tagIds.length > 0) {
+        totalConceptAttempts += progress.total_attempts ?? 0
+      }
+    }
+
+    // If total attempts < LOW_CONFIDENCE_THRESHOLD, return empty weakest concepts
+    let weakestConcepts: WeakestConceptSummary[] = []
+    
+    if (totalConceptAttempts >= LOW_CONFIDENCE_THRESHOLD) {
+      // Use findWeakestConcepts utility
+      const progressForConcepts = (progressData || []).map(p => ({
+        cardTemplateId: p.card_template_id,
+        correctCount: p.correct_count ?? 0,
+        totalAttempts: p.total_attempts ?? 0,
+      }))
+
+      const cardTagsForConcepts = (cardTags || []).map(ct => ({
+        cardTemplateId: ct.card_template_id,
+        tagId: ct.tag_id,
+      }))
+
+      const tagsForConcepts = (tags || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        category: t.category,
+      }))
+
+      const weakest = findWeakestConcepts(
+        progressForConcepts,
+        cardTagsForConcepts,
+        tagsForConcepts,
+        3 // Limit to 3 weakest concepts
+      )
+
+      weakestConcepts = weakest.map(w => ({
+        tagId: w.tagId,
+        tagName: w.tagName,
+        accuracy: w.accuracy,
+        totalAttempts: w.totalAttempts,
+        isLowConfidence: w.isLowConfidence,
+      }))
+    }
+
+    // Build result
+    const result: { dueCount: number; weakestConcepts: WeakestConceptSummary[]; reviewedToday?: number } = {
+      dueCount,
+      weakestConcepts,
+    }
+
+    // Only include reviewedToday if we have a study log for today
+    if (studyLog?.cards_reviewed !== undefined) {
+      result.reviewedToday = studyLog.cards_reviewed
+    }
+
+    return { ok: true, data: result }
+  })
+}

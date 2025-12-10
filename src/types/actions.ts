@@ -36,3 +36,30 @@ export interface DraftCardSummary {
   importSessionId: string | null
   createdAt: string
 }
+
+
+/**
+ * V11.7: Dashboard insights for companion-style dashboard.
+ * Contains due count, weakest concepts, and optional reviewed today count.
+ * 
+ * **Feature: v11.7-companion-dashboard-tag-filtered-study**
+ * **Validates: Requirements 4.2**
+ */
+export interface DashboardInsights {
+  dueCount: number
+  weakestConcepts: WeakestConceptSummary[]
+  reviewedToday?: number
+}
+
+/**
+ * V11.7: Weakest concept summary for dashboard display.
+ */
+export interface WeakestConceptSummary {
+  tagId: string
+  tagName: string
+  accuracy: number
+  totalAttempts: number
+  isLowConfidence: boolean
+}
+
+export type DashboardInsightsResult = ActionResultV2<DashboardInsights>

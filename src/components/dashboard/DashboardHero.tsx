@@ -1,14 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Flame, Play, RotateCcw, Settings, Library, Plus } from 'lucide-react'
 import { ConfigureSessionModal } from '@/components/study/ConfigureSessionModal'
 import { SearchBar } from '@/components/search/SearchBar'
 import { SingleCardPreviewModal } from '@/components/search/SingleCardPreviewModal'
+import { StudyTagFilter } from '@/components/tags/StudyTagFilter'
 import { shouldShowWelcomeMode } from '@/lib/onboarding-utils'
+import { buildStudyUrl } from '@/lib/url-utils'
+import type { Tag } from '@/types/database'
 
 /**
  * Session state stored in localStorage for resume capability.
@@ -65,6 +69,7 @@ export interface DashboardHeroProps {
   userName?: string
   subscribedDecks?: number  // V10.4: for zero state detection
   isAdmin?: boolean         // V10.4: for create deck button
+  tags?: Tag[]              // V11.7: for tag filter
 }
 
 /**
@@ -124,18 +129,33 @@ export function DashboardHero({
   userName,
   subscribedDecks = 0,
   isAdmin = false,
+  tags = [],
 }: DashboardHeroProps) {
+  const router = useRouter()
   const [hasUnfinishedSession, setHasUnfinishedSession] = useState(false)
   // V6.3: Custom session modal state
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false)
   // V10.6: Search preview modal state
   const [previewCardId, setPreviewCardId] = useState<string | null>(null)
+  // V11.7: Selected tag IDs for filtered study
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   // Check for unfinished session on mount (client-side only)
   useEffect(() => {
     const cachedSession = getValidCachedSession()
     setHasUnfinishedSession(cachedSession !== null)
   }, [])
+
+  // V11.7: Handle tag selection change
+  const handleTagSelectionChange = useCallback((tagIds: string[]) => {
+    setSelectedTagIds(tagIds)
+  }, [])
+
+  // V11.7: Handle start studying with tag filter
+  const handleStartStudying = useCallback(() => {
+    const url = buildStudyUrl(selectedTagIds.length > 0 ? selectedTagIds : undefined)
+    router.push(url)
+  }, [router, selectedTagIds])
 
   // Calculate daily goal progress
   const goalProgress = dailyGoal ? Math.min(completedToday / dailyGoal, 1) : null
@@ -248,24 +268,38 @@ export function DashboardHero({
       ) : (
         /* Primary CTA - Requirements 1.6, 1.8, 7.2 */
         <div className="space-y-3">
-          <Link href="/study/global" className="block">
-            <Button
-              size="lg"
-              className="w-full min-h-[44px] text-lg"
-            >
-              {hasUnfinishedSession ? (
-                <>
-                  <RotateCcw className="w-5 h-5 mr-2" />
-                  Resume Session
-                </>
-              ) : (
-                <>
-                  <Play className="w-5 h-5 mr-2" />
-                  Start Today&apos;s Session
-                </>
-              )}
-            </Button>
-          </Link>
+          {/* V11.7: Tag Filter */}
+          {tags.length > 0 && (
+            <div className="mb-2">
+              <StudyTagFilter
+                tags={tags}
+                onSelectionChange={handleTagSelectionChange}
+              />
+            </div>
+          )}
+
+          <Button
+            size="lg"
+            className="w-full min-h-[44px] text-lg"
+            onClick={handleStartStudying}
+          >
+            {hasUnfinishedSession ? (
+              <>
+                <RotateCcw className="w-5 h-5 mr-2" />
+                Resume Session
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 mr-2" />
+                Start Today&apos;s Session
+                {selectedTagIds.length > 0 && (
+                  <span className="ml-1 text-sm opacity-80">
+                    ({selectedTagIds.length} filter{selectedTagIds.length > 1 ? 's' : ''})
+                  </span>
+                )}
+              </>
+            )}
+          </Button>
           
           {/* V6.3: Custom Session button */}
           <Button

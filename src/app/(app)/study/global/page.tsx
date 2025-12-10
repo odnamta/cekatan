@@ -5,18 +5,22 @@ import { getUserStats } from '@/actions/stats-actions'
 import { GlobalStudySession } from '@/components/study/GlobalStudySession'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { parseTagIdsFromUrl } from '@/lib/url-utils'
 
 interface GlobalStudyPageProps {
-  searchParams: Promise<{ batch?: string }>
+  searchParams: Promise<{ batch?: string; tags?: string }>
 }
 
 /**
  * Global Study Page - React Server Component
  * Fetches due cards across all decks and renders GlobalStudySession.
  * Accepts optional `batch` query parameter for pagination.
+ * V11.7: Accepts optional `tags` query parameter for tag filtering.
+ * 
  * Requirements: 2.1, 2.2, 2.3, 2.4
  * 
- * Feature: v3-ux-overhaul
+ * **Feature: v11.7-companion-dashboard-tag-filtered-study**
+ * **Validates: Requirements 2.2, 2.3**
  */
 export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageProps) {
   const user = await getUser()
@@ -30,8 +34,14 @@ export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageP
   const batchNumber = params.batch ? parseInt(params.batch, 10) : 0
   const validBatchNumber = isNaN(batchNumber) || batchNumber < 0 ? 0 : batchNumber
 
-  // Fetch global due cards with batch pagination
-  const { cards, totalDue, hasMoreBatches, isNewCardsFallback, error } = await getGlobalDueCards(validBatchNumber)
+  // V11.7: Parse tag IDs from query params
+  const tagIds = parseTagIdsFromUrl(params)
+
+  // Fetch global due cards with batch pagination and optional tag filter
+  const { cards, totalDue, hasMoreBatches, isNewCardsFallback, error } = await getGlobalDueCards(
+    validBatchNumber,
+    tagIds.length > 0 ? tagIds : undefined
+  )
   
   // Fetch user stats for streak
   const { stats } = await getUserStats()
@@ -67,7 +77,10 @@ export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageP
   const totalDueRemaining = Math.max(0, totalDue - cardsInPreviousBatches)
 
   // Handler for continue studying - navigate to next batch
-  const nextBatchUrl = hasMoreBatches ? `/study/global?batch=${validBatchNumber + 1}` : undefined
+  // V11.7: Preserve tag filter in next batch URL
+  const nextBatchUrl = hasMoreBatches 
+    ? `/study/global?batch=${validBatchNumber + 1}${tagIds.length > 0 ? `&tags=${tagIds.join(',')}` : ''}`
+    : undefined
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">

@@ -279,3 +279,16 @@ export function findWeakestConcepts(
   
   return results.slice(0, limit)
 }
+
+
+/**
+ * V11.7: Format accuracy as a percentage string.
+ * Rounds to nearest integer and appends "%".
+ * 
+ * **Property 11: Accuracy formatting rounds to integer**
+ * **Validates: Requirements 5.5**
+ */
+export function formatAccuracyPercent(accuracy: number | null): string {
+  if (accuracy === null) return 'N/A'
+  return `${Math.round(accuracy)}%`
+}

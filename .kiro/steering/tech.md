@@ -74,3 +74,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ## MCP Integration
 
 Use the `supabase` MCP server for schema inspection before writing database queries.
+
+**Supabase Project Details:**
+- **Project ID:** `hbqoooatgripeeoobfet`
+- **Project Name:** celline-prep-mvp
+- **Region:** ap-northeast-2
+- **Database Host:** db.hbqoooatgripeeoobfet.supabase.co
+
+Always use project ID `hbqoooatgripeeoobfet` for all Supabase MCP tool calls.

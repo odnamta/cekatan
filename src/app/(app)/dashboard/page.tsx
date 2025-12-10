@@ -3,11 +3,13 @@ import { DashboardHero } from '@/components/dashboard/DashboardHero'
 import { LibrarySection } from '@/components/dashboard/LibrarySection'
 import { StudyHeatmap } from '@/components/dashboard/StudyHeatmap'
 import { RepairButton } from '@/components/dashboard/RepairButton'
+import { WeakestConceptsCard } from '@/components/dashboard/WeakestConceptsCard'
 import type { CourseWithProgress } from '@/components/course'
 import { getStudyLogs, getUserStats } from '@/actions/stats-actions'
 import { getGlobalStats } from '@/actions/global-study-actions'
+import { getDashboardInsights } from '@/actions/analytics-actions'
 import { isUserAdmin, ADMIN_USER_IDS } from '@/lib/onboarding-utils'
-import type { DeckWithDueCount, Course, Lesson, LessonProgress } from '@/types/database'
+import type { DeckWithDueCount, Course, Lesson, LessonProgress, Tag } from '@/types/database'
 import { CARD_STATUS } from '@/lib/constants'
 
 /**
@@ -34,6 +36,19 @@ export default async function DashboardPage() {
 
   // Fetch global stats for DashboardHero (Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8)
   const globalStats = await getGlobalStats()
+
+  // V11.7: Fetch dashboard insights for weakest concepts
+  const insightsResult = await getDashboardInsights()
+  const weakestConcepts = insightsResult.ok ? (insightsResult.data?.weakestConcepts || []) : []
+
+  // V11.7: Fetch user's tags for tag filter (topic and source only)
+  const { data: userTags } = await supabase
+    .from('tags')
+    .select('*')
+    .eq('user_id', user.id)
+    .in('category', ['topic', 'source'])
+    .order('name')
+  const tags: Tag[] = (userTags || []) as Tag[]
 
   // Fetch user's courses with units and lessons for progress calculation (Requirement 6.1)
   const { data: courses, error: coursesError } = await supabase
@@ -212,7 +227,11 @@ export default async function DashboardPage() {
         userName={user.user_metadata?.name || user.email?.split('@')[0]}
         subscribedDecks={subscribedDecksCount}
         isAdmin={userIsAdmin}
+        tags={tags}
       />
+
+      {/* V11.7: Weakest Concepts Card */}
+      <WeakestConceptsCard concepts={weakestConcepts} />
 
       {/* V8.1: Repair Button - Shows if user has cards without progress */}
       <div className="mb-4">
