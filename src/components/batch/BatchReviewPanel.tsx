@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { X, Loader2, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { X, Loader2, AlertTriangle, Filter } from 'lucide-react'
 import { BatchDraftCard } from './BatchDraftCard'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
@@ -47,6 +47,19 @@ export function BatchReviewPanel({
 }: BatchReviewPanelProps) {
   const { showToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
+  // V12: Show flagged only toggle
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false)
+
+  // V12: Count drafts with high-severity issues
+  const flaggedCount = useMemo(() => {
+    return drafts.filter(d => d.qualityIssues?.some(i => i.severity === 'high')).length
+  }, [drafts])
+
+  // V12: Filter drafts based on toggle
+  const visibleDrafts = useMemo(() => {
+    if (!showFlaggedOnly) return drafts
+    return drafts.filter(d => d.qualityIssues?.some(i => i.severity === 'high'))
+  }, [drafts, showFlaggedOnly])
 
   // Handle Escape key to close
   useEffect(() => {
@@ -195,22 +208,50 @@ export function BatchReviewPanel({
           </button>
         </div>
 
+        {/* V12: Flagged filter toggle */}
+        {flaggedCount > 0 && (
+          <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <button
+              type="button"
+              onClick={() => setShowFlaggedOnly(!showFlaggedOnly)}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors active:scale-95 ${
+                showFlaggedOnly
+                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'
+                  : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span>
+                {showFlaggedOnly ? `Showing ${flaggedCount} flagged` : `Show flagged only (${flaggedCount})`}
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {drafts.length === 0 ? (
             <p className="text-center text-slate-500 dark:text-slate-400 py-8">
               No drafts to review
             </p>
+          ) : visibleDrafts.length === 0 ? (
+            <p className="text-center text-slate-500 dark:text-slate-400 py-8">
+              No flagged drafts found
+            </p>
           ) : (
-            drafts.map((draft, index) => (
-              <BatchDraftCard
-                key={draft.id}
-                draft={draft}
-                index={index}
-                sessionTagNames={sessionTagNames}
-                onChange={(updated) => handleDraftChange(index, updated)}
-              />
-            ))
+            visibleDrafts.map((draft) => {
+              // Find original index for proper state updates
+              const originalIndex = drafts.findIndex(d => d.id === draft.id)
+              return (
+                <BatchDraftCard
+                  key={draft.id}
+                  draft={draft}
+                  index={originalIndex}
+                  sessionTagNames={sessionTagNames}
+                  onChange={(updated) => handleDraftChange(originalIndex, updated)}
+                />
+              )
+            })
           )}
         </div>
 

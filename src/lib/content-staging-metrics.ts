@@ -11,11 +11,17 @@
 
 /**
  * QA metrics data structure for import sessions.
+ * V12: Extended with quality scanner fields.
  */
 export interface QAMetrics {
   detectedCount: number
   createdCount: number
   missingNumbers: number[]
+  // V12: Quality scanner fields (optional for backward compat)
+  rawQuestionCount?: number
+  aiDraftCount?: number
+  numQuestionsWithMissingOptions?: number
+  numQuestionsWithExtraOptions?: number
 }
 
 /**
@@ -23,6 +29,7 @@ export interface QAMetrics {
  * 
  * Format: "Detected X · Created Y · Missing: Z"
  * When complete: "Detected X · Created X · Complete ✓"
+ * V12: Shows quality issues when present.
  * 
  * @param metrics - The QA metrics to format
  * @returns Formatted string for display
@@ -35,17 +42,27 @@ export function formatQAMetrics(metrics: QAMetrics): string {
   const detectedPart = `Detected ${detectedCount}`
   const createdPart = `Created ${createdCount}`
   
+  // V12: Build quality issues suffix if present
+  const qualityParts: string[] = []
+  if (metrics.numQuestionsWithMissingOptions && metrics.numQuestionsWithMissingOptions > 0) {
+    qualityParts.push(`${metrics.numQuestionsWithMissingOptions} missing opts`)
+  }
+  if (metrics.numQuestionsWithExtraOptions && metrics.numQuestionsWithExtraOptions > 0) {
+    qualityParts.push(`${metrics.numQuestionsWithExtraOptions} extra opts`)
+  }
+  const qualitySuffix = qualityParts.length > 0 ? ` · ${qualityParts.join(', ')}` : ''
+  
   if (missingNumbers.length === 0 && detectedCount === createdCount) {
-    return `${detectedPart} · ${createdPart} · Complete ✓`
+    return `${detectedPart} · ${createdPart} · Complete ✓${qualitySuffix}`
   }
   
   if (missingNumbers.length > 0) {
     const missingList = missingNumbers.slice(0, 10).join(', ')
     const suffix = missingNumbers.length > 10 ? '...' : ''
-    return `${detectedPart} · ${createdPart} · Missing: ${missingList}${suffix}`
+    return `${detectedPart} · ${createdPart} · Missing: ${missingList}${suffix}${qualitySuffix}`
   }
   
-  return `${detectedPart} · ${createdPart}`
+  return `${detectedPart} · ${createdPart}${qualitySuffix}`
 }
 
 /**

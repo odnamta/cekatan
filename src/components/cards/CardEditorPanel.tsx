@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { TagSelector } from '@/components/tags/TagSelector'
+import { MCQOptionsEditor } from '@/components/mcq/MCQOptionsEditor'
 import { updateCard } from '@/actions/card-actions'
 import { getCardTags, assignTagsToCard } from '@/actions/tag-actions'
 import { useToast } from '@/components/ui/Toast'
@@ -156,12 +157,10 @@ export function CardEditorPanel({
     }
   }
 
-  const handleOptionChange = (index: number, value: string) => {
-    setOptions(prev => {
-      const newOptions = [...prev]
-      newOptions[index] = value
-      return newOptions
-    })
+  // V12: Unified options change handler for MCQOptionsEditor
+  const handleOptionsChange = (newOptions: string[], newCorrectIndex: number) => {
+    setOptions(newOptions)
+    setCorrectIndex(newCorrectIndex)
   }
 
   if (!isOpen) return null
@@ -226,31 +225,16 @@ export function CardEditorPanel({
                 />
               </div>
 
-              {/* Options */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              {/* V12: Options using MCQOptionsEditor */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Answer Options
                 </label>
-                {options.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={correctIndex === index}
-                      onChange={() => setCorrectIndex(index)}
-                      className="w-4 h-4 text-blue-600 flex-shrink-0"
-                    />
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400 w-5 flex-shrink-0">
-                      {String.fromCharCode(65 + index)}.
-                    </span>
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => handleOptionChange(index, e.target.value)}
-                      placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                      className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
+                <MCQOptionsEditor
+                  options={options}
+                  correctIndex={correctIndex}
+                  onChange={handleOptionsChange}
+                />
               </div>
 
               {/* Explanation */}

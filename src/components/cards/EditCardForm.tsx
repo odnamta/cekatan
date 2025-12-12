@@ -7,6 +7,7 @@ import { getCardTags, assignTagsToCard } from '@/actions/tag-actions'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { TagSelector } from '@/components/tags/TagSelector'
+import { MCQOptionsEditor } from '@/components/mcq/MCQOptionsEditor'
 import type { Card } from '@/types/database'
 
 interface EditCardFormProps {
@@ -88,38 +89,10 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
     }
   }
 
-  const handleOptionChange = (index: number, value: string) => {
-    setOptions(prev => {
-      const newOptions = [...prev]
-      newOptions[index] = value
-      return newOptions
-    })
-  }
-
-  const addOption = () => {
-    if (options.length < 5) {
-      setOptions(prev => [...prev, ''])
-    }
-  }
-
-  const removeOption = (index: number) => {
-    if (options.length > 2) {
-      setOptions(prev => prev.filter((_, i) => i !== index))
-      // Adjust correctIndex if needed
-      if (correctIndex >= index && correctIndex > 0) {
-        setCorrectIndex(prev => prev - 1)
-      }
-    }
-  }
-
-  const handleOptionKeyDown = (e: React.KeyboardEvent, index: number) => {
-    // Enter → add new option (if < 5)
-    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
-      e.preventDefault()
-      if (options.length < 5) {
-        addOption()
-      }
-    }
+  // V12: Unified options change handler for MCQOptionsEditor
+  const handleOptionsChange = (newOptions: string[], newCorrectIndex: number) => {
+    setOptions(newOptions)
+    setCorrectIndex(newCorrectIndex)
   }
 
   const handleFormKeyDown = (e: React.KeyboardEvent) => {
@@ -149,55 +122,18 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
           />
         </div>
 
-        {/* Options with dynamic add/remove */}
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        {/* V12: Options using MCQOptionsEditor */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Answer Options
           </label>
-          {options.map((option, index) => (
-            <div key={index} className="flex items-center gap-3">
-              <input
-                type="radio"
-                checked={correctIndex === index}
-                onChange={() => setCorrectIndex(index)}
-                className="w-4 h-4 text-blue-600 flex-shrink-0"
-              />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400 w-6 flex-shrink-0">
-                {String.fromCharCode(65 + index)}.
-              </span>
-              <input
-                type="text"
-                value={option}
-                onChange={(e) => handleOptionChange(index, e.target.value)}
-                onKeyDown={(e) => handleOptionKeyDown(e, index)}
-                placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {/* Remove button - only show if > 2 options */}
-              {options.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => removeOption(index)}
-                  className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0"
-                  title="Remove option"
-                >
-                  <span className="text-lg leading-none">×</span>
-                </button>
-              )}
-            </div>
-          ))}
-          {/* Add option button - only show if < 5 options */}
-          {options.length < 5 && (
-            <button
-              type="button"
-              onClick={addOption}
-              className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-            >
-              + Add Option
-            </button>
-          )}
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Min 2, max 5 options. Press Enter to add, Cmd/Ctrl+Enter to save.
+          <MCQOptionsEditor
+            options={options}
+            correctIndex={correctIndex}
+            onChange={handleOptionsChange}
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+            Cmd/Ctrl+Enter to save.
           </p>
         </div>
 

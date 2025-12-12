@@ -13,8 +13,14 @@ import {
   type DraftBatchResult,
   type BulkCreateResult,
   type MCQBatchItem,
+  type MCQBatchItemWithQuality,
   type AIMode,
 } from '@/lib/batch-mcq-schema'
+import {
+  scanChunkForQuestionsAndOptions,
+  compareWithAIDrafts,
+  getIssuesForDraft,
+} from '@/lib/mcq-quality-scanner'
 
 /**
  * V6.1 Data Integrity Rules - shared across all modes
@@ -392,7 +398,58 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
       console.log(`[draftBatchMCQFromText] Filtered ${filteredCount} questions with invalid tags or data`)
     }
     
-    return { ok: true, drafts: validDrafts }
+    // V12: Quality Scanner Integration (advisory only, never blocks)
+    let scanResult = null
+    let numQuestionsWithMissingOptions = 0
+    let numQuestionsWithExtraOptions = 0
+    
+    try {
+      // Step 1: Scan the raw text chunk
+      scanResult = scanChunkForQuestionsAndOptions(text)
+      console.log(`[draftBatchMCQFromText] V12: Scanned ${scanResult.rawQuestionCount} questions from source text`)
+      
+      // Step 2: Compare with AI drafts
+      const aiDraftOptionCounts = validDrafts.map(d => d.options.length)
+      scanResult = compareWithAIDrafts(scanResult, validDrafts.length, aiDraftOptionCounts)
+      
+      // Step 3: Count issues by type
+      for (const question of scanResult.questions) {
+        for (const issue of question.issues) {
+          if (issue.code === 'MISSING_OPTIONS') numQuestionsWithMissingOptions++
+          if (issue.code === 'EXTRA_OPTIONS') numQuestionsWithExtraOptions++
+        }
+      }
+      
+      // Log quality summary
+      if (scanResult.globalIssues.length > 0 || numQuestionsWithMissingOptions > 0 || numQuestionsWithExtraOptions > 0) {
+        console.log(`[draftBatchMCQFromText] V12: Quality issues detected:`, {
+          globalIssues: scanResult.globalIssues.length,
+          missingOptions: numQuestionsWithMissingOptions,
+          extraOptions: numQuestionsWithExtraOptions,
+        })
+      }
+    } catch (scanError) {
+      // V12: Fail soft - log and continue without quality data
+      console.warn('[draftBatchMCQFromText] V12: Quality scan failed, continuing without quality data:', scanError)
+    }
+    
+    // V12: Attach quality issues to each draft (in-memory only)
+    const draftsWithQuality: MCQBatchItemWithQuality[] = validDrafts.map((draft, index) => ({
+      ...draft,
+      qualityIssues: scanResult ? getIssuesForDraft(scanResult, index) : undefined,
+      rawTextChunk: text, // Store source text for viewer
+    }))
+    
+    return { 
+      ok: true, 
+      drafts: draftsWithQuality,
+      // V12: Quality metadata for metrics
+      rawTextChunk: text,
+      rawQuestionCount: scanResult?.rawQuestionCount,
+      aiDraftCount: validDrafts.length,
+      numQuestionsWithMissingOptions,
+      numQuestionsWithExtraOptions,
+    }
   } catch (error) {
     console.error('OpenAI API error:', error)
     return { ok: false, error: { message: 'AI service unavailable', code: 'OPENAI_ERROR' } }

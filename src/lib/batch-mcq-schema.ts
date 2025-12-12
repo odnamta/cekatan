@@ -102,9 +102,19 @@ export type BulkCreateInput = z.infer<typeof bulkCreateInputSchema>
 
 /**
  * Result types for server actions
+ * V12: Extended with quality scanner data
  */
 export type DraftBatchResult =
-  | { ok: true; drafts: MCQBatchItem[] }
+  | { 
+      ok: true
+      drafts: MCQBatchItemWithQuality[]
+      // V12: Quality scanner metadata
+      rawTextChunk?: string
+      rawQuestionCount?: number
+      aiDraftCount?: number
+      numQuestionsWithMissingOptions?: number
+      numQuestionsWithExtraOptions?: number
+    }
   | { ok: false; error: { message: string; code?: string } }
 
 /**
@@ -115,8 +125,15 @@ export type BulkCreateResult =
   | { ok: false; error: { message: string; code?: string } }
 
 /**
+ * V12: Quality issue type for scanner integration
+ * Re-exported from mcq-quality-scanner for convenience
+ */
+export type { MCQIssue, MCQIssueSeverity, MCQIssueCode } from './mcq-quality-scanner'
+
+/**
  * Client-side UI type for batch drafts with additional state.
  * Extends server draft with id (for React keys) and include checkbox state.
+ * V12: Added qualityIssues and rawTextChunk for quality scanner integration.
  */
 export interface MCQBatchDraftUI {
   id: string              // Unique key for React
@@ -126,13 +143,30 @@ export interface MCQBatchDraftUI {
   explanation: string
   aiTags: string[]        // AI-suggested tags (editable)
   include: boolean        // Checkbox state (default: true)
+  // V12: Quality scanner fields (in-memory only, not DB)
+  qualityIssues?: import('./mcq-quality-scanner').MCQIssue[]
+  rawTextChunk?: string   // Source text for this draft
+}
+
+/**
+ * V12: Extended MCQBatchItem with quality fields for internal use
+ */
+export interface MCQBatchItemWithQuality extends MCQBatchItem {
+  qualityIssues?: import('./mcq-quality-scanner').MCQIssue[]
+  rawTextChunk?: string
 }
 
 /**
  * Transform server draft to UI draft format.
  * Sets include to true by default (Property 7).
+ * V12: Supports qualityIssues and rawTextChunk passthrough.
  */
-export function toUIFormat(draft: MCQBatchItem, index: number): MCQBatchDraftUI {
+export function toUIFormat(
+  draft: MCQBatchItem | MCQBatchItemWithQuality,
+  index: number,
+  rawTextChunk?: string
+): MCQBatchDraftUI {
+  const draftWithQuality = draft as MCQBatchItemWithQuality
   return {
     id: `draft-${Date.now()}-${index}`,
     stem: draft.stem,
@@ -141,12 +175,19 @@ export function toUIFormat(draft: MCQBatchItem, index: number): MCQBatchDraftUI 
     explanation: draft.explanation || '',
     aiTags: draft.tags || [],
     include: true, // Default to included (Property 7)
+    // V12: Quality scanner fields
+    qualityIssues: draftWithQuality.qualityIssues,
+    rawTextChunk: rawTextChunk || draftWithQuality.rawTextChunk,
   }
 }
 
 /**
  * Transform array of server drafts to UI format.
+ * V12: Supports rawTextChunk passthrough for all drafts.
  */
-export function toUIFormatArray(drafts: MCQBatchItem[]): MCQBatchDraftUI[] {
-  return drafts.map((draft, index) => toUIFormat(draft, index))
+export function toUIFormatArray(
+  drafts: (MCQBatchItem | MCQBatchItemWithQuality)[],
+  rawTextChunk?: string
+): MCQBatchDraftUI[] {
+  return drafts.map((draft, index) => toUIFormat(draft, index, rawTextChunk))
 }
