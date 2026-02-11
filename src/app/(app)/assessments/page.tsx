@@ -5,13 +5,22 @@
  *
  * Shows available assessments (candidates) or all assessments (creators).
  * Role-based views with session history.
+ * Creators get publish/archive/edit controls.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle } from 'lucide-react'
+import {
+  Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle,
+  Pencil, Send, Archive,
+} from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
-import { getOrgAssessments, getMyAssessmentSessions } from '@/actions/assessment-actions'
+import {
+  getOrgAssessments,
+  getMyAssessmentSessions,
+  publishAssessment,
+  archiveAssessment,
+} from '@/actions/assessment-actions'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +33,7 @@ export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<AssessmentWithDeck[]>([])
   const [sessions, setSessions] = useState<SessionWithAssessment[]>([])
   const [loading, setLoading] = useState(true)
+  const [isPending, startTransition] = useTransition()
 
   const isCreator = hasMinimumRole(role, 'creator')
 
@@ -40,6 +50,20 @@ export default function AssessmentsPage() {
     if (aResult.ok) setAssessments(aResult.data ?? [])
     if (sResult.ok) setSessions(sResult.data ?? [])
     setLoading(false)
+  }
+
+  function handlePublish(assessmentId: string) {
+    startTransition(async () => {
+      const result = await publishAssessment(assessmentId)
+      if (result.ok) await loadData()
+    })
+  }
+
+  function handleArchive(assessmentId: string) {
+    startTransition(async () => {
+      const result = await archiveAssessment(assessmentId)
+      if (result.ok) await loadData()
+    })
   }
 
   if (loading) {
@@ -115,6 +139,7 @@ export default function AssessmentsPage() {
                   </div>
 
                   <div className="flex items-center gap-2 ml-4">
+                    {/* Candidate: last score */}
                     {lastSession?.status === 'completed' && (
                       <div className="text-right mr-2">
                         <div className={`text-lg font-bold ${lastSession.passed ? 'text-green-600' : 'text-red-500'}`}>
@@ -130,6 +155,7 @@ export default function AssessmentsPage() {
                       </div>
                     )}
 
+                    {/* Candidate: Start/Retake */}
                     {assessment.status === 'published' && (
                       <Button
                         size="sm"
@@ -140,6 +166,44 @@ export default function AssessmentsPage() {
                       </Button>
                     )}
 
+                    {/* Creator: Publish draft */}
+                    {isCreator && assessment.status === 'draft' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handlePublish(assessment.id)}
+                        disabled={isPending}
+                      >
+                        <Send className="h-4 w-4 mr-1" />
+                        Publish
+                      </Button>
+                    )}
+
+                    {/* Creator: Archive published */}
+                    {isCreator && assessment.status === 'published' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleArchive(assessment.id)}
+                        disabled={isPending}
+                        title="Archive assessment"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Creator: Edit (draft only) */}
+                    {isCreator && assessment.status === 'draft' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/assessments/${assessment.id}/edit`)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Creator: View results */}
                     {isCreator && (
                       <Button
                         size="sm"
@@ -183,6 +247,15 @@ export default function AssessmentsPage() {
                     <span className={`text-sm font-bold ${session.passed ? 'text-green-600' : 'text-red-500'}`}>
                       {session.score}%
                     </span>
+                  )}
+                  {session.status === 'in_progress' && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => router.push(`/assessments/${session.assessment_id}/take`)}
+                    >
+                      Resume
+                    </Button>
                   )}
                   <Badge variant="secondary" className="text-xs">
                     {session.status.replace('_', ' ')}

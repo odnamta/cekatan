@@ -203,6 +203,87 @@ export async function publishAssessment(
   })
 }
 
+/**
+ * Archive an assessment (published → archived).
+ * Creator+ only.
+ */
+export async function archiveAssessment(
+  assessmentId: string
+): Promise<ActionResultV2<void>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    const { error } = await supabase
+      .from('assessments')
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .eq('id', assessmentId)
+      .eq('org_id', org.id)
+      .eq('status', 'published')
+
+    if (error) {
+      return { ok: false, error: error.message }
+    }
+
+    revalidatePath('/assessments')
+    return { ok: true }
+  })
+}
+
+/**
+ * Update assessment settings (draft only).
+ * Creator+ only.
+ */
+export async function updateAssessment(
+  assessmentId: string,
+  input: {
+    title?: string
+    description?: string
+    timeLimitMinutes?: number
+    passScore?: number
+    questionCount?: number
+    shuffleQuestions?: boolean
+    shuffleOptions?: boolean
+    showResults?: boolean
+    maxAttempts?: number | null
+  }
+): Promise<ActionResultV2<Assessment>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Build update object, mapping camelCase to snake_case
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    if (input.title !== undefined) updates.title = input.title
+    if (input.description !== undefined) updates.description = input.description || null
+    if (input.timeLimitMinutes !== undefined) updates.time_limit_minutes = input.timeLimitMinutes
+    if (input.passScore !== undefined) updates.pass_score = input.passScore
+    if (input.questionCount !== undefined) updates.question_count = input.questionCount
+    if (input.shuffleQuestions !== undefined) updates.shuffle_questions = input.shuffleQuestions
+    if (input.shuffleOptions !== undefined) updates.shuffle_options = input.shuffleOptions
+    if (input.showResults !== undefined) updates.show_results = input.showResults
+    if (input.maxAttempts !== undefined) updates.max_attempts = input.maxAttempts
+
+    const { data, error } = await supabase
+      .from('assessments')
+      .update(updates)
+      .eq('id', assessmentId)
+      .eq('org_id', org.id)
+      .eq('status', 'draft')
+      .select()
+      .single()
+
+    if (error) {
+      return { ok: false, error: error.message }
+    }
+
+    revalidatePath('/assessments')
+    return { ok: true, data: data as Assessment }
+  })
+}
+
 // ============================================
 // Session Management
 // ============================================
@@ -578,5 +659,107 @@ export async function getSessionQuestions(
       .filter((q): q is NonNullable<typeof q> => q !== null)
 
     return { ok: true, data: questions }
+  })
+}
+
+/**
+ * Get existing answers for an in-progress session.
+ * Used to restore selection state when resuming a session.
+ */
+export async function getExistingAnswers(
+  sessionId: string
+): Promise<ActionResultV2<{ cardTemplateId: string; selectedIndex: number }[]>> {
+  return withOrgUser(async ({ user, supabase }) => {
+    const { data: answers, error } = await supabase
+      .from('assessment_answers')
+      .select('card_template_id, selected_index')
+      .eq('session_id', sessionId)
+      .not('selected_index', 'is', null)
+
+    if (error) {
+      return { ok: false, error: error.message }
+    }
+
+    const result = (answers ?? []).map((a) => ({
+      cardTemplateId: a.card_template_id,
+      selectedIndex: a.selected_index as number,
+    }))
+
+    return { ok: true, data: result }
+  })
+}
+
+/**
+ * Get detailed assessment results for creators.
+ * Includes all sessions with user email for candidate identification.
+ */
+export async function getAssessmentResultsDetailed(
+  assessmentId: string
+): Promise<ActionResultV2<{
+  sessions: (AssessmentSession & { user_email: string })[]
+  stats: { avgScore: number; passRate: number; totalAttempts: number }
+}>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Get all sessions with user profile info
+    const { data, error } = await supabase
+      .from('assessment_sessions')
+      .select(`
+        *,
+        assessments!inner(org_id)
+      `)
+      .eq('assessment_id', assessmentId)
+      .order('completed_at', { ascending: false, nullsFirst: false })
+
+    if (error) {
+      return { ok: false, error: error.message }
+    }
+
+    // Filter by org
+    const orgSessions = (data ?? []).filter((s) => {
+      const a = s.assessments as unknown as { org_id: string }
+      return a.org_id === org.id
+    })
+
+    // Get user emails for all unique user IDs
+    const userIds = [...new Set(orgSessions.map((s) => s.user_id))]
+    const userEmailMap = new Map<string, string>()
+
+    if (userIds.length > 0) {
+      // Use auth admin to get user emails - fallback to user_id display
+      for (const uid of userIds) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', uid)
+          .maybeSingle()
+        userEmailMap.set(uid, profile?.email ?? `user-${uid.slice(0, 8)}`)
+      }
+    }
+
+    const sessions = orgSessions.map((s) => ({
+      ...s,
+      user_email: userEmailMap.get(s.user_id) ?? `user-${s.user_id.slice(0, 8)}`,
+    })) as (AssessmentSession & { user_email: string })[]
+
+    // Calculate stats from completed sessions
+    const completed = sessions.filter((s) => s.status === 'completed')
+    const avgScore = completed.length > 0
+      ? Math.round(completed.reduce((sum, s) => sum + (s.score ?? 0), 0) / completed.length)
+      : 0
+    const passRate = completed.length > 0
+      ? Math.round((completed.filter((s) => s.passed).length / completed.length) * 100)
+      : 0
+
+    return {
+      ok: true,
+      data: {
+        sessions,
+        stats: { avgScore, passRate, totalAttempts: sessions.length },
+      },
+    }
   })
 }

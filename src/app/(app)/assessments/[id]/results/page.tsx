@@ -3,8 +3,9 @@
 /**
  * V13: Assessment Results Page
  *
- * Shows score, pass/fail status, and per-question review.
- * Accessible to the candidate who took the session.
+ * Two modes:
+ * 1. With ?sessionId — Candidate view: score card + per-question review
+ * 2. Without sessionId — Creator view: aggregate stats + all candidate sessions
  */
 
 import { useState, useEffect } from 'react'
@@ -16,10 +17,20 @@ import {
   Trophy,
   BarChart3,
   Clock,
+  Users,
+  TrendingUp,
+  Target,
 } from 'lucide-react'
-import { getSessionResults, getAssessment } from '@/actions/assessment-actions'
+import { useOrg } from '@/components/providers/OrgProvider'
+import { hasMinimumRole } from '@/lib/org-authorization'
+import {
+  getSessionResults,
+  getAssessment,
+  getAssessmentResultsDetailed,
+} from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import type { Assessment, AssessmentSession } from '@/types/database'
 
 type EnrichedAnswer = {
@@ -35,13 +46,39 @@ type EnrichedAnswer = {
   explanation: string | null
 }
 
+type SessionWithEmail = AssessmentSession & { user_email: string }
+
 export default function AssessmentResultsPage() {
+  const { role } = useOrg()
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
   const assessmentId = params.id as string
   const sessionId = searchParams.get('sessionId')
+  const isCreator = hasMinimumRole(role, 'creator')
 
+  // If sessionId is provided, show candidate view. Otherwise show creator view.
+  if (sessionId) {
+    return <CandidateResultsView assessmentId={assessmentId} sessionId={sessionId} />
+  }
+
+  if (isCreator) {
+    return <CreatorResultsView assessmentId={assessmentId} />
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-12 text-center text-slate-500">
+      No results to display.
+    </div>
+  )
+}
+
+// ============================================
+// Candidate Results View
+// ============================================
+
+function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: string; sessionId: string }) {
+  const router = useRouter()
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [session, setSession] = useState<AssessmentSession | null>(null)
   const [answers, setAnswers] = useState<EnrichedAnswer[]>([])
@@ -50,12 +87,6 @@ export default function AssessmentResultsPage() {
 
   useEffect(() => {
     async function load() {
-      if (!sessionId) {
-        setError('No session specified')
-        setLoading(false)
-        return
-      }
-
       const [aResult, sResult] = await Promise.all([
         getAssessment(assessmentId),
         getSessionResults(sessionId),
@@ -224,6 +255,171 @@ export default function AssessmentResultsPage() {
           Back to Assessments
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ============================================
+// Creator Results View
+// ============================================
+
+function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
+  const router = useRouter()
+  const [assessment, setAssessment] = useState<Assessment | null>(null)
+  const [sessions, setSessions] = useState<SessionWithEmail[]>([])
+  const [stats, setStats] = useState<{ avgScore: number; passRate: number; totalAttempts: number } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const [aResult, rResult] = await Promise.all([
+        getAssessment(assessmentId),
+        getAssessmentResultsDetailed(assessmentId),
+      ])
+
+      if (aResult.ok && aResult.data) setAssessment(aResult.data)
+      if (!rResult.ok) {
+        setError(rResult.error)
+      } else if (rResult.data) {
+        setSessions(rResult.data.sessions as SessionWithEmail[])
+        setStats(rResult.data.stats)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [assessmentId])
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-500">
+        Loading results...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
+        <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+        <Button variant="secondary" onClick={() => router.push('/assessments')}>
+          Back to Assessments
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <button
+        onClick={() => router.push('/assessments')}
+        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-6"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Assessments
+      </button>
+
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+        {assessment?.title ?? 'Assessment'} — Results
+      </h1>
+      {assessment && (
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+          {assessment.question_count} questions · {assessment.time_limit_minutes} min · {assessment.pass_score}% to pass
+        </p>
+      )}
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center">
+            <Users className="h-5 w-5 mx-auto text-slate-400 mb-1" />
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {stats.totalAttempts}
+            </div>
+            <div className="text-xs text-slate-500">Total Attempts</div>
+          </div>
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center">
+            <TrendingUp className="h-5 w-5 mx-auto text-blue-500 mb-1" />
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {stats.avgScore}%
+            </div>
+            <div className="text-xs text-slate-500">Average Score</div>
+          </div>
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center">
+            <Target className="h-5 w-5 mx-auto text-green-500 mb-1" />
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {stats.passRate}%
+            </div>
+            <div className="text-xs text-slate-500">Pass Rate</div>
+          </div>
+        </div>
+      )}
+
+      {/* Candidate Sessions Table */}
+      {sessions.length === 0 ? (
+        <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+          <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
+          <p>No attempts yet.</p>
+        </div>
+      ) : (
+        <>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            All Attempts
+          </h2>
+          <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/50 text-left">
+                  <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Candidate</th>
+                  <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Score</th>
+                  <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Status</th>
+                  <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                {sessions.map((s) => (
+                  <tr key={s.id} className="bg-white dark:bg-slate-800">
+                    <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+                      {s.user_email}
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.status === 'completed' && s.score !== null ? (
+                        <span className={`font-bold ${s.passed ? 'text-green-600' : 'text-red-500'}`}>
+                          {s.score}%
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.status === 'completed' ? (
+                        s.passed ? (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            Passed
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                            Failed
+                          </Badge>
+                        )
+                      ) : (
+                        <Badge variant="secondary">{s.status.replace('_', ' ')}</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {s.completed_at
+                        ? new Date(s.completed_at).toLocaleDateString()
+                        : s.created_at
+                          ? new Date(s.created_at).toLocaleDateString()
+                          : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

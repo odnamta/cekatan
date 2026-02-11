@@ -9,10 +9,12 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Shield, UserMinus, Crown } from 'lucide-react'
+import { ArrowLeft, Shield, UserMinus, Crown, Mail, Send, X } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { getOrgMembers, updateMemberRole, removeMember } from '@/actions/org-actions'
+import { inviteMember, getOrgInvitations, revokeInvitation } from '@/actions/invitation-actions'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -29,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { OrganizationMember, OrgRole } from '@/types/database'
+import type { OrganizationMember, OrgRole, Invitation } from '@/types/database'
 
 const ROLE_LABELS: Record<OrgRole, string> = {
   owner: 'Owner',
@@ -49,22 +51,61 @@ export default function OrgMembersPage() {
   const { org, role } = useOrg()
   const router = useRouter()
   const [members, setMembers] = useState<OrganizationMember[]>([])
+  const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<OrganizationMember | null>(null)
 
+  // Invite form state
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<OrgRole>('candidate')
+  const [inviting, setInviting] = useState(false)
+
   useEffect(() => {
-    loadMembers()
+    loadData()
   }, [])
 
-  async function loadMembers() {
+  async function loadData() {
     setLoading(true)
-    const result = await getOrgMembers()
-    if (result.ok) {
-      setMembers(result.data ?? [])
-    }
+    const [mResult, iResult] = await Promise.all([
+      getOrgMembers(),
+      getOrgInvitations(),
+    ])
+    if (mResult.ok) setMembers(mResult.data ?? [])
+    if (iResult.ok) setInvitations(iResult.data ?? [])
     setLoading(false)
+  }
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    setInviting(true)
+
+    const result = await inviteMember(inviteEmail, inviteRole)
+    if (result.ok) {
+      setSuccess(`Invitation sent to ${inviteEmail}`)
+      setInviteEmail('')
+      setInviteRole('candidate')
+      await loadData()
+    } else if (!result.ok) {
+      setError(result.error)
+    }
+    setInviting(false)
+  }
+
+  async function handleRevokeInvitation(invitationId: string) {
+    setError(null)
+    startTransition(async () => {
+      const result = await revokeInvitation(invitationId)
+      if (result.ok) {
+        await loadData()
+      } else if (!result.ok) {
+        setError(result.error)
+      }
+    })
   }
 
   if (role !== 'owner' && role !== 'admin') {
@@ -81,7 +122,7 @@ export default function OrgMembersPage() {
     startTransition(async () => {
       const result = await updateMemberRole(memberId, newRole)
       if (result.ok) {
-        await loadMembers()
+        await loadData()
       } else {
         setError(result.error)
       }
@@ -99,7 +140,7 @@ export default function OrgMembersPage() {
       const result = await removeMember(confirmRemove.id)
       if (result.ok) {
         setConfirmRemove(null)
-        await loadMembers()
+        await loadData()
       } else {
         setError(result.error)
         setConfirmRemove(null)
@@ -126,6 +167,91 @@ export default function OrgMembersPage() {
         <p className="text-sm text-red-600 dark:text-red-400 mb-4" role="alert">
           {error}
         </p>
+      )}
+
+      {success && (
+        <p className="text-sm text-green-600 dark:text-green-400 mb-4" role="status">
+          {success}
+        </p>
+      )}
+
+      {/* Invite Member Form */}
+      <form onSubmit={handleInvite} className="mb-6 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+          <Mail className="h-4 w-4" />
+          Invite Member
+        </h2>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <Input
+              label="Email"
+              type="email"
+              placeholder="colleague@example.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="w-[130px]">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Role
+            </label>
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as OrgRole)}
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+            >
+              <option value="candidate">Candidate</option>
+              <option value="creator">Creator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <Button type="submit" size="sm" loading={inviting} disabled={inviting || !inviteEmail}>
+            <Send className="h-4 w-4 mr-1" />
+            Invite
+          </Button>
+        </div>
+      </form>
+
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+            Pending Invitations ({invitations.length})
+          </h2>
+          <div className="space-y-2">
+            {invitations.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Mail className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-700 dark:text-slate-300 truncate">{inv.email}</p>
+                    <p className="text-xs text-slate-500">
+                      Expires {new Date(inv.expires_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={ROLE_COLORS[inv.role as OrgRole]}>
+                    {ROLE_LABELS[inv.role as OrgRole]}
+                  </Badge>
+                  <button
+                    onClick={() => handleRevokeInvitation(inv.id)}
+                    className="p-1 rounded text-slate-400 hover:text-red-500 transition-colors"
+                    title="Revoke invitation"
+                    disabled={isPending}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Separator className="mt-6" />
+        </div>
       )}
 
       {loading ? (

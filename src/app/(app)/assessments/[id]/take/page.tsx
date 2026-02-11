@@ -16,6 +16,7 @@ import {
   completeSession,
   getAssessment,
   getSessionQuestions,
+  getExistingAnswers,
 } from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 import type { Assessment, AssessmentSession } from '@/types/database'
@@ -79,27 +80,42 @@ export default function TakeAssessmentPage() {
 
       // Fetch question stems and options via server action
       const qResult = await getSessionQuestions(sessionData.id)
+      let qs: QuestionData[]
       if (qResult.ok && qResult.data) {
-        const qs: QuestionData[] = qResult.data.map((q) => ({
+        qs = qResult.data.map((q) => ({
           cardTemplateId: q.cardTemplateId,
           stem: q.stem,
           options: q.options,
           selectedIndex: null,
           answered: false,
         }))
-        setQuestions(qs)
       } else {
         // Fallback: show placeholders
-        const qs: QuestionData[] = sessionData.question_order.map((cardId) => ({
+        qs = sessionData.question_order.map((cardId) => ({
           cardTemplateId: cardId,
           stem: '',
           options: [],
           selectedIndex: null,
           answered: false,
         }))
-        setQuestions(qs)
       }
 
+      // Restore previously submitted answers (session resume)
+      const existingResult = await getExistingAnswers(sessionData.id)
+      if (existingResult.ok && existingResult.data && existingResult.data.length > 0) {
+        const answerMap = new Map(
+          existingResult.data.map((a) => [a.cardTemplateId, a.selectedIndex])
+        )
+        qs = qs.map((q) => {
+          const existing = answerMap.get(q.cardTemplateId)
+          if (existing !== undefined) {
+            return { ...q, selectedIndex: existing, answered: true }
+          }
+          return q
+        })
+      }
+
+      setQuestions(qs)
       setLoading(false)
     }
     init()
