@@ -387,7 +387,8 @@ export async function startAssessmentSession(
 export async function submitAnswer(
   sessionId: string,
   cardTemplateId: string,
-  selectedIndex: number
+  selectedIndex: number,
+  timeRemainingSeconds?: number
 ): Promise<ActionResultV2<{ isCorrect: boolean }>> {
   return withOrgUser(async ({ user, supabase }) => {
     const validation = submitAnswerSchema.safeParse({ sessionId, cardTemplateId, selectedIndex })
@@ -434,6 +435,14 @@ export async function submitAnswer(
 
     if (error) {
       return { ok: false, error: error.message }
+    }
+
+    // Persist timer snapshot for session resume
+    if (timeRemainingSeconds !== undefined && timeRemainingSeconds >= 0) {
+      await supabase
+        .from('assessment_sessions')
+        .update({ time_remaining_seconds: timeRemainingSeconds })
+        .eq('id', sessionId)
     }
 
     return { ok: true, data: { isCorrect } }
@@ -724,19 +733,19 @@ export async function getAssessmentResultsDetailed(
       return a.org_id === org.id
     })
 
-    // Get user emails for all unique user IDs
+    // Bulk-fetch user emails from profiles table
     const userIds = [...new Set(orgSessions.map((s) => s.user_id))]
     const userEmailMap = new Map<string, string>()
 
     if (userIds.length > 0) {
-      // Use auth admin to get user emails - fallback to user_id display
-      for (const uid of userIds) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', uid)
-          .maybeSingle()
-        userEmailMap.set(uid, profile?.email ?? `user-${uid.slice(0, 8)}`)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', userIds)
+      if (profiles) {
+        for (const p of profiles) {
+          userEmailMap.set(p.id, p.email)
+        }
       }
     }
 

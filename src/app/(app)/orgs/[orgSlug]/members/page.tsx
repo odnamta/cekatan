@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Shield, UserMinus, Crown, Mail, Send, X } from 'lucide-react'
+import { ArrowLeft, Shield, UserMinus, Crown, Mail, Send, X, Copy, Check } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { getOrgMembers, updateMemberRole, removeMember } from '@/actions/org-actions'
 import { inviteMember, getOrgInvitations, revokeInvitation } from '@/actions/invitation-actions'
@@ -62,6 +62,7 @@ export default function OrgMembersPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<OrgRole>('candidate')
   const [inviting, setInviting] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -106,6 +107,13 @@ export default function OrgMembersPage() {
         setError(result.error)
       }
     })
+  }
+
+  async function handleCopyInviteLink(inv: Invitation) {
+    const url = `${window.location.origin}/invite/${inv.token}`
+    await navigator.clipboard.writeText(url)
+    setCopiedId(inv.id)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   if (role !== 'owner' && role !== 'admin') {
@@ -238,6 +246,17 @@ export default function OrgMembersPage() {
                   <Badge className={ROLE_COLORS[inv.role as OrgRole]}>
                     {ROLE_LABELS[inv.role as OrgRole]}
                   </Badge>
+                  <button
+                    onClick={() => handleCopyInviteLink(inv)}
+                    className="p-1 rounded text-slate-400 hover:text-blue-500 transition-colors"
+                    title="Copy invite link"
+                  >
+                    {copiedId === inv.id ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
                   <button
                     onClick={() => handleRevokeInvitation(inv.id)}
                     className="p-1 rounded text-slate-400 hover:text-red-500 transition-colors"

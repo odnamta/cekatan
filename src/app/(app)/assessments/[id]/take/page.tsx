@@ -181,8 +181,8 @@ export default function TakeAssessmentPage() {
     updated[currentIndex] = { ...q, selectedIndex: optionIndex, answered: true }
     setQuestions(updated)
 
-    // Submit to server
-    await submitAnswer(session.id, q.cardTemplateId, optionIndex)
+    // Submit to server (piggyback timer sync)
+    await submitAnswer(session.id, q.cardTemplateId, optionIndex, timeRemaining ?? undefined)
   }
 
   async function handleComplete() {
