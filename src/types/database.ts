@@ -54,6 +54,87 @@ export interface OrganizationWithMemberCount extends Organization {
 }
 
 // ============================================
+// Invitation Types (V13 - Member Invitations)
+// ============================================
+
+export interface Invitation {
+  id: string
+  org_id: string
+  email: string
+  role: OrgRole
+  invited_by: string
+  token: string
+  accepted_at: string | null
+  expires_at: string
+  created_at: string
+}
+
+// ============================================
+// Assessment Types (V13 - Assessment Engine)
+// ============================================
+
+export type AssessmentStatus = 'draft' | 'published' | 'archived'
+export type SessionStatus = 'in_progress' | 'completed' | 'timed_out'
+
+export interface Assessment {
+  id: string
+  org_id: string
+  deck_template_id: string
+  title: string
+  description: string | null
+  time_limit_minutes: number
+  pass_score: number
+  question_count: number
+  shuffle_questions: boolean
+  shuffle_options: boolean
+  show_results: boolean
+  max_attempts: number | null
+  status: AssessmentStatus
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AssessmentSession {
+  id: string
+  assessment_id: string
+  user_id: string
+  started_at: string
+  completed_at: string | null
+  time_remaining_seconds: number | null
+  score: number | null
+  passed: boolean | null
+  question_order: string[] // card_template_ids
+  status: SessionStatus
+  created_at: string
+}
+
+export interface AssessmentAnswer {
+  id: string
+  session_id: string
+  card_template_id: string
+  selected_index: number | null
+  is_correct: boolean | null
+  answered_at: string | null
+}
+
+/**
+ * Assessment with deck info for list views
+ */
+export interface AssessmentWithDeck extends Assessment {
+  deck_title: string
+  session_count: number
+}
+
+/**
+ * Session with score for results views
+ */
+export interface SessionWithAssessment extends AssessmentSession {
+  assessment_title: string
+  total_questions: number
+}
+
+// ============================================
 // Legacy Types (V1 — DO NOT USE for new code)
 // ============================================
 

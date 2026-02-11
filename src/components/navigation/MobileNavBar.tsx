@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Library, User, BarChart3 } from 'lucide-react';
+import { Home, Library, User, BarChart3, ClipboardCheck } from 'lucide-react';
 import { ReactNode } from 'react';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 export interface NavItem {
   href: string;
@@ -58,17 +59,27 @@ export const GLASS_NAV_CLASSES = 'bg-white/80 backdrop-blur-lg border-t border-w
 
 export function MobileNavBar({ className = '' }: MobileNavBarProps) {
   const pathname = usePathname();
+  const { org } = useOrg();
+
+  const items = [...NAV_ITEMS];
+  if (org.settings?.features?.assessment_mode) {
+    items.splice(2, 0, {
+      href: '/assessments',
+      icon: <ClipboardCheck className="h-5 w-5" />,
+      label: 'Assess',
+    });
+  }
 
   return (
-    <nav 
+    <nav
       className={`fixed bottom-0 left-0 right-0 ${GLASS_NAV_CLASSES} md:hidden z-40 pb-safe ${className}`}
       role="navigation"
       aria-label="Mobile navigation"
     >
       <div className="flex items-center justify-around">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const isActive = isNavItemActive(pathname, item.href);
-          
+
           return (
             <Link
               key={item.href}

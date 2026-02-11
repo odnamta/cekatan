@@ -134,6 +134,42 @@ export const inviteMemberSchema = z.object({
   role: z.enum(['admin', 'creator', 'candidate']),
 });
 
+// ============================================
+// Assessment Validation Schemas (V13)
+// ============================================
+
+export const createAssessmentSchema = z.object({
+  deckTemplateId: z.string().uuid('Invalid deck ID'),
+  title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
+  description: z.string().max(2000, 'Description too long').optional(),
+  timeLimitMinutes: z.number().int().min(1, 'Minimum 1 minute').max(480, 'Maximum 8 hours'),
+  passScore: z.number().int().min(0).max(100, 'Pass score must be 0-100'),
+  questionCount: z.number().int().min(1, 'At least 1 question').max(500, 'Maximum 500 questions'),
+  shuffleQuestions: z.boolean().default(true),
+  shuffleOptions: z.boolean().default(false),
+  showResults: z.boolean().default(true),
+  maxAttempts: z.number().int().min(1).optional(),
+});
+
+export const updateAssessmentSchema = z.object({
+  assessmentId: z.string().uuid('Invalid assessment ID'),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  timeLimitMinutes: z.number().int().min(1).max(480).optional(),
+  passScore: z.number().int().min(0).max(100).optional(),
+  questionCount: z.number().int().min(1).max(500).optional(),
+  shuffleQuestions: z.boolean().optional(),
+  shuffleOptions: z.boolean().optional(),
+  showResults: z.boolean().optional(),
+  maxAttempts: z.number().int().min(1).nullable().optional(),
+});
+
+export const submitAnswerSchema = z.object({
+  sessionId: z.string().uuid('Invalid session ID'),
+  cardTemplateId: z.string().uuid('Invalid card ID'),
+  selectedIndex: z.number().int().min(0),
+});
+
 // Export types inferred from schemas
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -152,3 +188,6 @@ export type ReorderLessonItemsInput = z.infer<typeof reorderLessonItemsSchema>;
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;
 export type UpdateOrgSettingsInput = z.infer<typeof updateOrgSettingsSchema>;
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
+export type CreateAssessmentInput = z.infer<typeof createAssessmentSchema>;
+export type UpdateAssessmentInput = z.infer<typeof updateAssessmentSchema>;
+export type SubmitAnswerInput = z.infer<typeof submitAnswerSchema>;

@@ -1,0 +1,198 @@
+'use client'
+
+/**
+ * V13: Assessment Dashboard
+ *
+ * Shows available assessments (candidates) or all assessments (creators).
+ * Role-based views with session history.
+ */
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle } from 'lucide-react'
+import { useOrg } from '@/components/providers/OrgProvider'
+import { getOrgAssessments, getMyAssessmentSessions } from '@/actions/assessment-actions'
+import { hasMinimumRole } from '@/lib/org-authorization'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import type { AssessmentWithDeck, SessionWithAssessment } from '@/types/database'
+
+export default function AssessmentsPage() {
+  const { org, role } = useOrg()
+  const router = useRouter()
+  const [assessments, setAssessments] = useState<AssessmentWithDeck[]>([])
+  const [sessions, setSessions] = useState<SessionWithAssessment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const isCreator = hasMinimumRole(role, 'creator')
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    setLoading(true)
+    const [aResult, sResult] = await Promise.all([
+      getOrgAssessments(),
+      getMyAssessmentSessions(),
+    ])
+    if (aResult.ok) setAssessments(aResult.data ?? [])
+    if (sResult.ok) setSessions(sResult.data ?? [])
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-500">
+        Loading assessments...
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Assessments</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{org.name}</p>
+        </div>
+        {isCreator && (
+          <Button onClick={() => router.push('/assessments/create')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Assessment
+          </Button>
+        )}
+      </div>
+
+      {/* Available Assessments */}
+      {assessments.length === 0 ? (
+        <div className="text-center py-16 text-slate-500 dark:text-slate-400">
+          <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+          <p className="text-lg font-medium">No assessments yet</p>
+          {isCreator && (
+            <p className="mt-1">Create your first assessment to get started.</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3 mb-8">
+          {assessments.map((assessment) => {
+            const mySessions = sessions.filter((s) => s.assessment_id === assessment.id)
+            const lastSession = mySessions[0]
+
+            return (
+              <div
+                key={assessment.id}
+                className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                        {assessment.title}
+                      </h3>
+                      <Badge variant={assessment.status === 'published' ? 'default' : 'secondary'}>
+                        {assessment.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      {assessment.deck_title}
+                    </p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {assessment.time_limit_minutes} min
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Target className="h-3 w-3" />
+                        {assessment.pass_score}% to pass
+                      </span>
+                      <span>{assessment.question_count} questions</span>
+                      {isCreator && (
+                        <span>{assessment.session_count} attempts</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    {lastSession?.status === 'completed' && (
+                      <div className="text-right mr-2">
+                        <div className={`text-lg font-bold ${lastSession.passed ? 'text-green-600' : 'text-red-500'}`}>
+                          {lastSession.score}%
+                        </div>
+                        <div className="flex items-center gap-1 text-xs">
+                          {lastSession.passed ? (
+                            <><CheckCircle2 className="h-3 w-3 text-green-600" /> Passed</>
+                          ) : (
+                            <><XCircle className="h-3 w-3 text-red-500" /> Failed</>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {assessment.status === 'published' && (
+                      <Button
+                        size="sm"
+                        onClick={() => router.push(`/assessments/${assessment.id}/take`)}
+                      >
+                        <Play className="h-4 w-4 mr-1" />
+                        {lastSession ? 'Retake' : 'Start'}
+                      </Button>
+                    )}
+
+                    {isCreator && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => router.push(`/assessments/${assessment.id}/results`)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* My Recent Sessions */}
+      {sessions.length > 0 && (
+        <>
+          <Separator className="mb-6" />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">My Attempts</h2>
+          <div className="space-y-2">
+            {sessions.slice(0, 10).map((session) => (
+              <div
+                key={session.id}
+                className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {session.assessment_title}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {session.completed_at
+                      ? new Date(session.completed_at).toLocaleDateString()
+                      : 'In progress'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {session.status === 'completed' && session.score !== null && (
+                    <span className={`text-sm font-bold ${session.passed ? 'text-green-600' : 'text-red-500'}`}>
+                      {session.score}%
+                    </span>
+                  )}
+                  <Badge variant="secondary" className="text-xs">
+                    {session.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
