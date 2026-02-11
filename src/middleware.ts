@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/study', '/decks']
+  const protectedRoutes = ['/dashboard', '/study', '/decks', '/library', '/stats', '/admin', '/profile', '/orgs']
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   )
@@ -47,6 +47,21 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  // V13: Org membership check for authenticated users on protected routes
+  // Skip for /orgs/create (that's where users go to create their first org)
+  if (user && isProtectedRoute && pathname !== '/orgs/create') {
+    const { count } = await supabase
+      .from('organization_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+
+    if (!count || count === 0) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/orgs/create'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

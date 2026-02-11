@@ -5,8 +5,10 @@
  * CRUD operations for organizations and membership management.
  */
 
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { withUser, withOrgUser } from '@/actions/_helpers'
+import { ACTIVE_ORG_COOKIE } from '@/lib/org-context'
 import type { ActionResultV2 } from '@/types/actions'
 import type { Organization, OrganizationMember, OrgRole } from '@/types/database'
 import { createOrgSchema, updateOrgSettingsSchema } from '@/lib/validations'
@@ -280,5 +282,38 @@ export async function hasOrgFeature(
     const features = (org.settings?.features ?? {}) as unknown as Record<string, boolean>
     const enabled = features[featureName] ?? false
     return { ok: true, data: enabled }
+  })
+}
+
+/**
+ * Switch the user's active organization.
+ * Verifies membership before setting the cookie.
+ */
+export async function switchOrganization(
+  orgId: string
+): Promise<ActionResultV2<void>> {
+  return withUser(async ({ user, supabase }) => {
+    // Verify user is a member of the target org
+    const { data: membership, error } = await supabase
+      .from('organization_members')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .eq('org_id', orgId)
+      .single()
+
+    if (error || !membership) {
+      return { ok: false, error: 'You are not a member of this organization' }
+    }
+
+    // Set active org cookie
+    const cookieStore = await cookies()
+    cookieStore.set(ACTIVE_ORG_COOKIE, orgId, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    })
+
+    revalidatePath('/', 'layout')
+    return { ok: true }
   })
 }
