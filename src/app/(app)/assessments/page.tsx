@@ -12,7 +12,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle,
-  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database, Users, Bell, Link2,
+  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database, Users, Bell, Link2, Trash2, RotateCcw, AlarmClock,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import {
@@ -21,8 +21,12 @@ import {
   publishAssessment,
   archiveAssessment,
   duplicateAssessment,
+  batchPublishAssessments,
+  batchArchiveAssessments,
+  batchDeleteAssessments,
+  unpublishAssessment,
 } from '@/actions/assessment-actions'
-import { sendAssessmentReminder } from '@/actions/notification-actions'
+import { sendAssessmentReminder, sendDeadlineReminders } from '@/actions/notification-actions'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -42,9 +46,61 @@ export default function AssessmentsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
   const [displayLimit, setDisplayLimit] = useState(20)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { showToast } = useToast()
   const isCreator = hasMinimumRole(role, 'creator')
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handleBatchPublish() {
+    const ids = [...selectedIds]
+    startTransition(async () => {
+      const result = await batchPublishAssessments(ids)
+      if (result.ok) {
+        showToast(`${result.data?.published ?? 0} assessment(s) published`, 'success')
+        setSelectedIds(new Set())
+        await loadData()
+      } else {
+        showToast(result.error, 'error')
+      }
+    })
+  }
+
+  function handleBatchArchive() {
+    const ids = [...selectedIds]
+    startTransition(async () => {
+      const result = await batchArchiveAssessments(ids)
+      if (result.ok) {
+        showToast(`${result.data?.archived ?? 0} assessment(s) archived`, 'success')
+        setSelectedIds(new Set())
+        await loadData()
+      } else {
+        showToast(result.error, 'error')
+      }
+    })
+  }
+
+  function handleBatchDelete() {
+    const ids = [...selectedIds]
+    startTransition(async () => {
+      const result = await batchDeleteAssessments(ids)
+      if (result.ok) {
+        showToast(`${result.data?.deleted ?? 0} assessment(s) deleted`, 'success')
+        setSelectedIds(new Set())
+        await loadData()
+      } else {
+        showToast(result.error, 'error')
+      }
+    })
+  }
 
   useEffect(() => {
     loadData()
@@ -116,12 +172,42 @@ export default function AssessmentsPage() {
     })
   }
 
+  function handleUnpublish(assessmentId: string) {
+    startTransition(async () => {
+      const result = await unpublishAssessment(assessmentId)
+      if (result.ok) {
+        showToast('Assessment reverted to draft', 'success')
+        await loadData()
+      } else {
+        showToast(result.error, 'error')
+      }
+    })
+  }
+
   function handleCopyLink(assessment: AssessmentWithDeck) {
     const base = `${window.location.origin}/assessments/${assessment.id}/take`
     navigator.clipboard.writeText(base).then(() => {
       showToast('Assessment link copied to clipboard', 'success')
     }).catch(() => {
       showToast('Failed to copy link', 'error')
+    })
+  }
+
+  function handleDeadlineReminders() {
+    startTransition(async () => {
+      const result = await sendDeadlineReminders()
+      if (result.ok && result.data) {
+        const { notified, assessments: count } = result.data
+        if (count === 0) {
+          showToast('No assessments with upcoming deadlines', 'info')
+        } else if (notified === 0) {
+          showToast(`${count} assessment(s) closing soon — all candidates have completed`, 'success')
+        } else {
+          showToast(`Deadline reminders sent to ${notified} candidate(s) for ${count} assessment(s)`, 'success')
+        }
+      } else if (!result.ok) {
+        showToast(result.error, 'error')
+      }
     })
   }
 
@@ -153,6 +239,10 @@ export default function AssessmentsPage() {
         </div>
         {isCreator && (
           <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="secondary" onClick={handleDeadlineReminders} disabled={isPending} title="Send deadline reminders for assessments closing within 24h">
+              <AlarmClock className="h-4 w-4 mr-2" />
+              Deadline Reminders
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => router.push('/assessments/candidates')}>
               <Users className="h-4 w-4 mr-2" />
               Candidates
@@ -201,6 +291,35 @@ export default function AssessmentsPage() {
         )}
       </div>
 
+      {/* Batch Action Bar */}
+      {isCreator && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-900/10">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button size="sm" variant="secondary" onClick={handleBatchPublish} disabled={isPending}>
+              <Send className="h-3.5 w-3.5 mr-1" />
+              Publish
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleBatchArchive} disabled={isPending}>
+              <Archive className="h-3.5 w-3.5 mr-1" />
+              Archive
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleBatchDelete} disabled={isPending}>
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Delete
+            </Button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 ml-1"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Available Assessments */}
       {assessments.length === 0 ? (
         <div className="text-center py-16 text-slate-500 dark:text-slate-400">
@@ -248,10 +367,24 @@ export default function AssessmentsPage() {
             return (
               <div
                 key={assessment.id}
-                className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                className={`p-4 rounded-lg border bg-white dark:bg-slate-800 ${
+                  selectedIds.has(assessment.id)
+                    ? 'border-blue-400 dark:border-blue-600 ring-1 ring-blue-400/30'
+                    : 'border-slate-200 dark:border-slate-700'
+                }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 flex gap-3">
+                    {isCreator && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(assessment.id)}
+                        onChange={() => toggleSelect(assessment.id)}
+                        className="mt-1 rounded border-slate-300 flex-shrink-0"
+                        aria-label={`Select ${assessment.title}`}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
                         {assessment.title}
@@ -299,6 +432,7 @@ export default function AssessmentsPage() {
                         </span>
                       )}
                     </div>
+                  </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -391,6 +525,19 @@ export default function AssessmentsPage() {
                         title="Archive assessment"
                       >
                         <Archive className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Creator: Revert published to draft */}
+                    {isCreator && assessment.status === 'published' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleUnpublish(assessment.id)}
+                        disabled={isPending}
+                        title="Revert to draft (edit settings)"
+                      >
+                        <RotateCcw className="h-4 w-4" />
                       </Button>
                     )}
 

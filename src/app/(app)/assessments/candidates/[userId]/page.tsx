@@ -7,7 +7,7 @@
  * Creator+ only.
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useTransition } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -18,12 +18,15 @@ import {
   XCircle,
   AlertTriangle,
   Clock,
+  RotateCcw,
+  Download,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
-import { getCandidateProgress } from '@/actions/assessment-actions'
+import { getCandidateProgress, resetCandidateAttempts, exportCandidateProfile } from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/components/ui/Toast'
 
 type SessionRow = {
   assessmentTitle: string
@@ -48,6 +51,9 @@ export default function CandidateProgressPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedViolation, setExpandedViolation] = useState<number | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const [confirmReset, setConfirmReset] = useState(false)
+  const { showToast } = useToast()
 
   useEffect(() => {
     if (!isCreator) return
@@ -62,6 +68,43 @@ export default function CandidateProgressPage() {
       setLoading(false)
     })
   }, [userId, isCreator])
+
+  function handleResetAttempts() {
+    startTransition(async () => {
+      const result = await resetCandidateAttempts(userId)
+      if (result.ok) {
+        showToast(`${result.data?.deleted ?? 0} attempt(s) deleted`, 'success')
+        setConfirmReset(false)
+        // Reload data
+        const fresh = await getCandidateProgress(userId)
+        if (fresh.ok && fresh.data) {
+          setSessions(fresh.data.sessions)
+          setSummary(fresh.data.summary)
+        }
+      } else {
+        showToast(result.error, 'error')
+      }
+    })
+  }
+
+  function handleExportProfile() {
+    startTransition(async () => {
+      const result = await exportCandidateProfile(userId)
+      if (result.ok && result.data) {
+        const json = JSON.stringify(result.data, null, 2)
+        const blob = new Blob([json], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `candidate-${result.data.candidate.email}-${new Date().toISOString().slice(0, 10)}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+        showToast('Profile exported', 'success')
+      } else if (!result.ok) {
+        showToast(result.error, 'error')
+      }
+    })
+  }
 
   if (!isCreator) {
     return (
@@ -104,10 +147,42 @@ export default function CandidateProgressPage() {
         {candidate.fullName || candidate.email}
       </h1>
       {candidate.fullName && (
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           {candidate.email}
         </p>
       )}
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2 mt-3 mb-6">
+        <Button size="sm" variant="secondary" onClick={handleExportProfile} disabled={isPending}>
+          <Download className="h-4 w-4 mr-1" />
+          Export Profile
+        </Button>
+        {!confirmReset ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setConfirmReset(true)}
+            disabled={isPending || sessions.length === 0}
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            Reset Attempts
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-red-600 dark:text-red-400">Delete all attempts?</span>
+            <Button size="sm" variant="secondary" onClick={handleResetAttempts} disabled={isPending} className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20">
+              Confirm
+            </Button>
+            <button
+              onClick={() => setConfirmReset(false)}
+              className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Summary Stats */}
       {summary && (

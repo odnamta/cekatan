@@ -19,6 +19,7 @@ import {
   Trophy,
   Percent,
   Download,
+  AlertTriangle,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
@@ -39,6 +40,9 @@ type AnalyticsSummary = {
   totalStarted: number
   totalCompleted: number
   topPerformers: Array<{ email: string; score: number; completedAt: string }>
+  tabSwitchCorrelation: Array<{ tabSwitches: number; score: number }>
+  attemptsByHour: number[]
+  scoreTrend: Array<{ attempt: number; avgScore: number }>
 }
 
 type QuestionStat = {
@@ -47,6 +51,7 @@ type QuestionStat = {
   totalAttempts: number
   correctCount: number
   percentCorrect: number
+  avgTimeSeconds: number | null
 }
 
 export default function AssessmentAnalyticsPage() {
@@ -255,6 +260,99 @@ export default function AssessmentAnalyticsPage() {
         </div>
       )}
 
+      {/* Score Trend Across Attempts */}
+      {summary && summary.scoreTrend.length > 1 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            Score Trend Across Attempts
+          </h2>
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <div className="flex items-end gap-2 h-32">
+              {summary.scoreTrend.map((point) => (
+                <div key={point.attempt} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-xs text-slate-500 font-medium">{point.avgScore}%</span>
+                  <div
+                    className="w-full rounded-t bg-blue-500"
+                    style={{ height: `${point.avgScore}%` }}
+                  />
+                  <span className="text-[10px] text-slate-400">#{point.attempt}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 text-center mt-2">Average score by attempt number</p>
+          </div>
+        </div>
+      )}
+
+      {/* Attempt Timing by Hour */}
+      {summary && summary.totalStarted > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            Attempt Timing
+          </h2>
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <div className="flex items-end gap-px h-20">
+              {summary.attemptsByHour.map((count, hour) => {
+                const maxHour = Math.max(...summary.attemptsByHour, 1)
+                const height = (count / maxHour) * 100
+                return (
+                  <div key={hour} className="flex-1 flex flex-col items-center">
+                    <div
+                      className="w-full rounded-t bg-indigo-400 dark:bg-indigo-500"
+                      style={{ height: `${Math.max(height, count > 0 ? 4 : 0)}%` }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex gap-px mt-1">
+              {summary.attemptsByHour.map((_, hour) => (
+                <div key={hour} className="flex-1 text-center text-[8px] text-slate-400">
+                  {hour % 6 === 0 ? `${hour}h` : ''}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 text-center mt-2">When candidates start their attempts (hour of day)</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Switch vs Score */}
+      {summary && summary.tabSwitchCorrelation.length > 0 && summary.tabSwitchCorrelation.some((d) => d.tabSwitches > 0) && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Tab Switch Impact
+          </h2>
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            {(() => {
+              const withSwitches = summary.tabSwitchCorrelation.filter((d) => d.tabSwitches > 0)
+              const noSwitches = summary.tabSwitchCorrelation.filter((d) => d.tabSwitches === 0)
+              const avgWithSwitches = withSwitches.length > 0
+                ? Math.round(withSwitches.reduce((s, d) => s + d.score, 0) / withSwitches.length)
+                : null
+              const avgNoSwitches = noSwitches.length > 0
+                ? Math.round(noSwitches.reduce((s, d) => s + d.score, 0) / noSwitches.length)
+                : null
+              return (
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-600">{avgNoSwitches ?? '—'}%</div>
+                    <div className="text-xs text-slate-500 mt-1">Avg score — no violations</div>
+                    <div className="text-xs text-slate-400">{noSwitches.length} sessions</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-amber-600">{avgWithSwitches ?? '—'}%</div>
+                    <div className="text-xs text-slate-500 mt-1">Avg score — with violations</div>
+                    <div className="text-xs text-slate-400">{withSwitches.length} sessions</div>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Question Difficulty */}
       {questionStats.length > 0 && (
         <div className="mb-8">
@@ -287,6 +385,12 @@ export default function AssessmentAnalyticsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {q.avgTimeSeconds != null && (
+                      <span className="text-xs text-slate-400 inline-flex items-center gap-0.5">
+                        <Clock className="h-3 w-3" />
+                        {q.avgTimeSeconds}s
+                      </span>
+                    )}
                     <span
                       className={`text-sm font-bold ${
                         isHard ? 'text-red-500' : isMedium ? 'text-amber-600' : 'text-green-600'

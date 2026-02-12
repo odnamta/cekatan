@@ -37,6 +37,7 @@ import {
   getSessionWeakAreas,
   expireStaleSessions,
   getActiveSessionsForAssessment,
+  getSessionPercentile,
 } from '@/actions/assessment-actions'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -105,15 +106,17 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
   const [session, setSession] = useState<AssessmentSession | null>(null)
   const [answers, setAnswers] = useState<EnrichedAnswer[]>([])
   const [weakAreas, setWeakAreas] = useState<TopicBreakdown[]>([])
+  const [percentile, setPercentile] = useState<{ percentile: number; rank: number; totalSessions: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [aResult, sResult, wResult] = await Promise.all([
+      const [aResult, sResult, wResult, pResult] = await Promise.all([
         getAssessment(assessmentId),
         getSessionResults(sessionId),
         getSessionWeakAreas(sessionId),
+        getSessionPercentile(sessionId),
       ])
 
       if (aResult.ok && aResult.data) setAssessment(aResult.data)
@@ -125,6 +128,9 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
       }
       if (wResult.ok && wResult.data) {
         setWeakAreas(wResult.data.topics)
+      }
+      if (pResult.ok && pResult.data) {
+        setPercentile(pResult.data)
       }
       setLoading(false)
     }
@@ -234,6 +240,11 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
             </span>
           )}
         </div>
+        {percentile && percentile.totalSessions > 1 && (
+          <p className="text-sm text-blue-600 dark:text-blue-400 mt-3 font-medium">
+            Better than {percentile.percentile}% of takers · Rank {percentile.rank} of {percentile.totalSessions}
+          </p>
+        )}
       </div>
 
       {/* Topic Breakdown (weak areas) */}

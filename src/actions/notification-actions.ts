@@ -219,3 +219,77 @@ export async function sendAssessmentReminder(
     return { ok: true, data: { notified: pendingMembers.length } }
   })
 }
+
+/**
+ * Send deadline approaching notifications for assessments with end_date
+ * within the next 24 hours. Targets candidates who haven't completed.
+ * Creator+ only.
+ */
+export async function sendDeadlineReminders(): Promise<ActionResultV2<{ notified: number; assessments: number }>> {
+  return withOrgUser(async ({ user, supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    const now = new Date()
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+    // Find published assessments with end_date in the next 24h
+    const { data: assessments } = await supabase
+      .from('assessments')
+      .select('id, title, end_date')
+      .eq('org_id', org.id)
+      .eq('status', 'published')
+      .not('end_date', 'is', null)
+      .gte('end_date', now.toISOString())
+      .lte('end_date', in24h.toISOString())
+
+    if (!assessments || assessments.length === 0) {
+      return { ok: true, data: { notified: 0, assessments: 0 } }
+    }
+
+    // Get all org members except creators
+    const { data: members } = await supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('org_id', org.id)
+      .eq('role', 'candidate')
+
+    if (!members || members.length === 0) {
+      return { ok: true, data: { notified: 0, assessments: assessments.length } }
+    }
+
+    let totalNotified = 0
+
+    for (const assessment of assessments) {
+      // Get users who already completed
+      const { data: completedSessions } = await supabase
+        .from('assessment_sessions')
+        .select('user_id')
+        .eq('assessment_id', assessment.id)
+        .in('status', ['completed', 'timed_out'])
+
+      const completedIds = new Set((completedSessions ?? []).map((s) => s.user_id))
+      const pending = members.filter((m) => !completedIds.has(m.user_id))
+
+      if (pending.length === 0) continue
+
+      const endDate = new Date(assessment.end_date!)
+      const hoursLeft = Math.round((endDate.getTime() - now.getTime()) / (60 * 60 * 1000))
+
+      const rows = pending.map((m) => ({
+        user_id: m.user_id,
+        org_id: org.id,
+        type: 'assessment_deadline_approaching',
+        title: 'Deadline Approaching',
+        body: `"${assessment.title}" closes in ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}. Complete it before it closes.`,
+        link: `/assessments/${assessment.id}/take`,
+      }))
+
+      const { error } = await supabase.from('notifications').insert(rows)
+      if (!error) totalNotified += pending.length
+    }
+
+    return { ok: true, data: { notified: totalNotified, assessments: assessments.length } }
+  })
+}

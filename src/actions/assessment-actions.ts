@@ -264,6 +264,127 @@ export async function archiveAssessment(
 }
 
 /**
+ * Revert a published assessment back to draft.
+ * Only allowed if there are no in-progress sessions.
+ * Creator+ only.
+ */
+export async function unpublishAssessment(
+  assessmentId: string
+): Promise<ActionResultV2<void>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Check for active in-progress sessions
+    const { data: activeSessions } = await supabase
+      .from('assessment_sessions')
+      .select('id')
+      .eq('assessment_id', assessmentId)
+      .eq('status', 'in_progress')
+      .limit(1)
+
+    if (activeSessions && activeSessions.length > 0) {
+      return { ok: false, error: 'Cannot revert — there are active sessions in progress' }
+    }
+
+    const { error } = await supabase
+      .from('assessments')
+      .update({ status: 'draft', updated_at: new Date().toISOString() })
+      .eq('id', assessmentId)
+      .eq('org_id', org.id)
+      .eq('status', 'published')
+
+    if (error) return { ok: false, error: error.message }
+
+    revalidatePath('/assessments')
+    return { ok: true }
+  })
+}
+
+/**
+ * Batch publish multiple draft assessments.
+ * Creator+ only.
+ */
+export async function batchPublishAssessments(
+  assessmentIds: string[]
+): Promise<ActionResultV2<{ published: number }>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    const { data, error } = await supabase
+      .from('assessments')
+      .update({ status: 'published', updated_at: new Date().toISOString() })
+      .in('id', assessmentIds)
+      .eq('org_id', org.id)
+      .eq('status', 'draft')
+      .select('id')
+
+    if (error) return { ok: false, error: error.message }
+
+    revalidatePath('/assessments')
+    return { ok: true, data: { published: data?.length ?? 0 } }
+  })
+}
+
+/**
+ * Batch archive multiple published assessments.
+ * Creator+ only.
+ */
+export async function batchArchiveAssessments(
+  assessmentIds: string[]
+): Promise<ActionResultV2<{ archived: number }>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    const { data, error } = await supabase
+      .from('assessments')
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .in('id', assessmentIds)
+      .eq('org_id', org.id)
+      .eq('status', 'published')
+      .select('id')
+
+    if (error) return { ok: false, error: error.message }
+
+    revalidatePath('/assessments')
+    return { ok: true, data: { archived: data?.length ?? 0 } }
+  })
+}
+
+/**
+ * Batch delete multiple assessments (draft or archived only).
+ * Creator+ only.
+ */
+export async function batchDeleteAssessments(
+  assessmentIds: string[]
+): Promise<ActionResultV2<{ deleted: number }>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Only allow deleting draft/archived assessments (not published with active sessions)
+    const { data, error } = await supabase
+      .from('assessments')
+      .delete()
+      .in('id', assessmentIds)
+      .eq('org_id', org.id)
+      .in('status', ['draft', 'archived'])
+      .select('id')
+
+    if (error) return { ok: false, error: error.message }
+
+    revalidatePath('/assessments')
+    return { ok: true, data: { deleted: data?.length ?? 0 } }
+  })
+}
+
+/**
  * Duplicate an assessment as a new draft.
  */
 export async function duplicateAssessment(
@@ -697,6 +818,46 @@ export async function getSessionResults(
 }
 
 /**
+ * Get percentile ranking for a completed session.
+ * Returns what percentage of other takers the candidate scored better than.
+ */
+export async function getSessionPercentile(
+  sessionId: string
+): Promise<ActionResultV2<{ percentile: number; rank: number; totalSessions: number }>> {
+  return withOrgUser(async ({ supabase }) => {
+    // Get the session's assessment_id and score
+    const { data: session } = await supabase
+      .from('assessment_sessions')
+      .select('id, assessment_id, score')
+      .eq('id', sessionId)
+      .single()
+
+    if (!session || session.score == null) {
+      return { ok: false, error: 'Session not found or not scored' }
+    }
+
+    // Get all completed/timed_out sessions for this assessment
+    const { data: allSessions } = await supabase
+      .from('assessment_sessions')
+      .select('id, score')
+      .eq('assessment_id', session.assessment_id)
+      .in('status', ['completed', 'timed_out'])
+      .not('score', 'is', null)
+
+    if (!allSessions || allSessions.length === 0) {
+      return { ok: true, data: { percentile: 100, rank: 1, totalSessions: 1 } }
+    }
+
+    const scores = allSessions.map((s) => s.score as number).sort((a, b) => b - a)
+    const rank = scores.findIndex((s) => s <= session.score!) + 1
+    const belowCount = scores.filter((s) => s < session.score!).length
+    const percentile = Math.round((belowCount / scores.length) * 100)
+
+    return { ok: true, data: { percentile, rank, totalSessions: scores.length } }
+  })
+}
+
+/**
  * Get all sessions for an assessment (creator/admin view).
  */
 export async function getAssessmentResults(
@@ -923,6 +1084,9 @@ export async function getAssessmentAnalyticsSummary(
   totalStarted: number
   totalCompleted: number
   topPerformers: Array<{ email: string; score: number; completedAt: string }>
+  tabSwitchCorrelation: Array<{ tabSwitches: number; score: number }>
+  attemptsByHour: number[] // 24 buckets (0-23)
+  scoreTrend: Array<{ attempt: number; avgScore: number }>
 }>> {
   return withOrgUser(async ({ supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
@@ -998,6 +1162,52 @@ export async function getAssessmentAnalyticsSummary(
       completedAt: s.completed_at ?? '',
     }))
 
+    // Tab-switch vs score correlation (for completed/timed_out sessions with scores)
+    const tabSwitchCorrelation = orgSessions
+      .filter((s) => s.score != null && (s.status === 'completed' || s.status === 'timed_out'))
+      .map((s) => ({
+        tabSwitches: s.tab_switch_count ?? 0,
+        score: s.score ?? 0,
+      }))
+
+    // Attempts by hour of day
+    const attemptsByHour = Array(24).fill(0)
+    for (const s of orgSessions) {
+      if (s.started_at) {
+        const hour = new Date(s.started_at).getHours()
+        attemptsByHour[hour]++
+      }
+    }
+
+    // Score trend: average score grouped by attempt number per user
+    const userAttempts = new Map<string, number[]>()
+    // Sort by started_at ascending to get correct attempt ordering
+    const sorted = [...orgSessions]
+      .filter((s) => s.score != null && (s.status === 'completed' || s.status === 'timed_out'))
+      .sort((a, b) => a.started_at.localeCompare(b.started_at))
+    for (const s of sorted) {
+      const arr = userAttempts.get(s.user_id) ?? []
+      arr.push(s.score ?? 0)
+      userAttempts.set(s.user_id, arr)
+    }
+    const maxAttemptNum = Math.min(
+      10,
+      Math.max(...[...userAttempts.values()].map((a) => a.length), 0)
+    )
+    const scoreTrend: Array<{ attempt: number; avgScore: number }> = []
+    for (let i = 0; i < maxAttemptNum; i++) {
+      const scoresAtAttempt: number[] = []
+      for (const arr of userAttempts.values()) {
+        if (i < arr.length) scoresAtAttempt.push(arr[i])
+      }
+      if (scoresAtAttempt.length > 0) {
+        scoreTrend.push({
+          attempt: i + 1,
+          avgScore: Math.round(scoresAtAttempt.reduce((a, b) => a + b, 0) / scoresAtAttempt.length),
+        })
+      }
+    }
+
     return {
       ok: true,
       data: {
@@ -1008,6 +1218,9 @@ export async function getAssessmentAnalyticsSummary(
         totalStarted,
         totalCompleted,
         topPerformers,
+        tabSwitchCorrelation,
+        attemptsByHour,
+        scoreTrend,
       },
     }
   })
@@ -1927,5 +2140,191 @@ export async function getActiveSessionsForAssessment(
     })
 
     return { ok: true, data: result }
+  })
+}
+
+// ============================================
+// Candidate Management
+// ============================================
+
+/**
+ * Reset all assessment attempts for a candidate in the org.
+ * Deletes their sessions and answers. Creator+ only.
+ */
+export async function resetCandidateAttempts(
+  userId: string
+): Promise<ActionResultV2<{ deleted: number }>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Verify user is in org
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('org_id', org.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!membership) {
+      return { ok: false, error: 'Candidate not found in this organization' }
+    }
+
+    // Get org assessment IDs
+    const { data: orgAssessments } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('org_id', org.id)
+
+    if (!orgAssessments || orgAssessments.length === 0) {
+      return { ok: true, data: { deleted: 0 } }
+    }
+
+    const assessmentIds = orgAssessments.map((a) => a.id)
+
+    // Get sessions to delete
+    const { data: sessions } = await supabase
+      .from('assessment_sessions')
+      .select('id')
+      .eq('user_id', userId)
+      .in('assessment_id', assessmentIds)
+
+    if (!sessions || sessions.length === 0) {
+      return { ok: true, data: { deleted: 0 } }
+    }
+
+    const sessionIds = sessions.map((s) => s.id)
+
+    // Delete answers first (FK constraint)
+    await supabase
+      .from('assessment_answers')
+      .delete()
+      .in('session_id', sessionIds)
+
+    // Delete sessions
+    const { error } = await supabase
+      .from('assessment_sessions')
+      .delete()
+      .in('id', sessionIds)
+
+    if (error) {
+      return { ok: false, error: error.message }
+    }
+
+    return { ok: true, data: { deleted: sessions.length } }
+  })
+}
+
+/**
+ * Export a candidate's assessment profile data as JSON.
+ * Returns all session results for the candidate in the org. Creator+ only.
+ */
+export async function exportCandidateProfile(
+  userId: string
+): Promise<ActionResultV2<{
+  candidate: { email: string; fullName: string | null }
+  exportedAt: string
+  sessions: Array<{
+    assessmentTitle: string
+    status: string
+    score: number | null
+    passed: boolean | null
+    completedAt: string | null
+    startedAt: string
+    tabSwitchCount: number
+    answers: Array<{
+      questionText: string
+      selectedOption: string | null
+      correctOption: string
+      isCorrect: boolean
+      timeSpentSeconds: number | null
+    }>
+  }>
+}>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Verify user is in org
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('org_id', org.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!membership) {
+      return { ok: false, error: 'Candidate not found in this organization' }
+    }
+
+    // Get profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', userId)
+      .single()
+
+    // Get all sessions with assessment info
+    const { data: sessionsData } = await supabase
+      .from('assessment_sessions')
+      .select('*, assessments!inner(org_id, title)')
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+
+    const orgSessions = (sessionsData ?? []).filter((s) => {
+      const a = s.assessments as unknown as { org_id: string }
+      return a.org_id === org.id
+    })
+
+    // Get all answers for these sessions
+    const sessionIds = orgSessions.map((s) => s.id)
+    const { data: allAnswers } = sessionIds.length > 0
+      ? await supabase
+          .from('assessment_answers')
+          .select('*')
+          .in('session_id', sessionIds)
+      : { data: [] as never[] }
+
+    const answersBySession = new Map<string, typeof allAnswers>()
+    for (const answer of (allAnswers ?? [])) {
+      const arr = answersBySession.get(answer.session_id) ?? []
+      arr.push(answer)
+      answersBySession.set(answer.session_id, arr)
+    }
+
+    const sessions = orgSessions.map((s) => {
+      const answers = (answersBySession.get(s.id) ?? []).map((a: Record<string, unknown>) => ({
+        questionText: (a.question_text as string) ?? '',
+        selectedOption: (a.selected_option_id as string) ?? null,
+        correctOption: (a.correct_option_id as string) ?? '',
+        isCorrect: (a.is_correct as boolean) ?? false,
+        timeSpentSeconds: (a.time_spent_seconds as number) ?? null,
+      }))
+
+      return {
+        assessmentTitle: (s.assessments as unknown as { title: string }).title,
+        status: s.status,
+        score: s.score,
+        passed: s.passed,
+        completedAt: s.completed_at,
+        startedAt: s.started_at,
+        tabSwitchCount: s.tab_switch_count ?? 0,
+        answers,
+      }
+    })
+
+    return {
+      ok: true,
+      data: {
+        candidate: {
+          email: profile?.email ?? `user-${userId.slice(0, 8)}`,
+          fullName: profile?.full_name ?? null,
+        },
+        exportedAt: new Date().toISOString(),
+        sessions,
+      },
+    }
   })
 }
