@@ -24,6 +24,7 @@ import {
   getMyAssessmentSessions,
   expireStaleSessions,
 } from '@/actions/assessment-actions'
+import { useOrg } from '@/components/providers/OrgProvider'
 import { Button } from '@/components/ui/Button'
 import type { Assessment, AssessmentSession } from '@/types/database'
 
@@ -60,7 +61,9 @@ function seededShuffle(seed: string, length: number): number[] {
 export default function TakeAssessmentPage() {
   const router = useRouter()
   const params = useParams()
+  const { org } = useOrg()
   const assessmentId = params.id as string
+  const proctoringEnabled = org.settings.features.proctoring
 
   const [phase, setPhase] = useState<'loading' | 'instructions' | 'exam'>('loading')
   const [assessment, setAssessment] = useState<Assessment | null>(null)
@@ -80,6 +83,7 @@ export default function TakeAssessmentPage() {
   const [accessCodeInput, setAccessCodeInput] = useState('')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const completingRef = useRef(false)
+  const questionStartRef = useRef<number>(Date.now())
 
   // Load assessment info (not session yet) for instructions
   useEffect(() => {
@@ -209,13 +213,15 @@ export default function TakeAssessmentPage() {
     setStarting(false)
     setPhase('exam')
 
-    // Request fullscreen for exam lockdown (best-effort, some browsers may deny)
-    try {
-      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-        await document.documentElement.requestFullscreen().catch(() => {})
+    // Request fullscreen for exam lockdown (only when proctoring is enabled)
+    if (proctoringEnabled) {
+      try {
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen().catch(() => {})
+        }
+      } catch {
+        // Fullscreen not supported or denied — continue without it
       }
-    } catch {
-      // Fullscreen not supported or denied — continue without it
     }
   }
 
@@ -263,9 +269,9 @@ export default function TakeAssessmentPage() {
     }
   }, [timeRemaining !== null, completing, handleCompleteRef])
 
-  // Tab-switch detection
+  // Tab-switch detection (only when proctoring is enabled)
   useEffect(() => {
-    if (!session || completing) return
+    if (!proctoringEnabled || !session || completing) return
 
     const sessionId = session.id
     function handleVisibilityChange() {
@@ -281,9 +287,9 @@ export default function TakeAssessmentPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [session, completing])
 
-  // Fullscreen exit detection
+  // Fullscreen exit detection (only when proctoring is enabled)
   useEffect(() => {
-    if (phase !== 'exam' || !session || completing) return
+    if (!proctoringEnabled || phase !== 'exam' || !session || completing) return
 
     function handleFullscreenChange() {
       if (!document.fullscreenElement) {
@@ -309,6 +315,11 @@ export default function TakeAssessmentPage() {
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [session, completing])
+
+  // Reset per-question timer when navigating between questions
+  useEffect(() => {
+    questionStartRef.current = Date.now()
+  }, [currentIndex])
 
   // Keyboard navigation
   useEffect(() => {
@@ -385,7 +396,8 @@ export default function TakeAssessmentPage() {
 
     // Map display index → original index for server submission
     const originalIndex = q.optionMap[displayIndex] ?? displayIndex
-    await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined)
+    const timeSpent = Math.round((Date.now() - questionStartRef.current) / 1000)
+    await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
   }
 
   async function handleComplete() {
@@ -484,10 +496,12 @@ export default function TakeAssessmentPage() {
                 <span>Answer review is not available for this assessment</span>
               </div>
             )}
-            <div className="flex items-center gap-3">
-              <Shield className="h-4 w-4 text-red-500 flex-shrink-0" />
-              <span>Fullscreen mode is required — tab switches and exits are monitored</span>
-            </div>
+            {proctoringEnabled && (
+              <div className="flex items-center gap-3">
+                <Shield className="h-4 w-4 text-red-500 flex-shrink-0" />
+                <span>Fullscreen mode is required — tab switches and exits are monitored</span>
+              </div>
+            )}
           </div>
         </div>
 

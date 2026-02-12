@@ -8,7 +8,7 @@
  * 2. Without sessionId — Creator view: aggregate stats + all candidate sessions
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -21,6 +21,10 @@ import {
   TrendingUp,
   Target,
   Download,
+  AlertTriangle,
+  Shield,
+  ChevronDown,
+  BookOpen,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
@@ -32,6 +36,7 @@ import {
   exportResultsCsv,
   getSessionWeakAreas,
   expireStaleSessions,
+  getActiveSessionsForAssessment,
 } from '@/actions/assessment-actions'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -94,6 +99,8 @@ type TopicBreakdown = {
 
 function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: string; sessionId: string }) {
   const router = useRouter()
+  const { org } = useOrg()
+  const certificationEnabled = org.settings.features.certification
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [session, setSession] = useState<AssessmentSession | null>(null)
   const [answers, setAnswers] = useState<EnrichedAnswer[]>([])
@@ -266,6 +273,43 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
         </div>
       )}
 
+      {/* Study Recommendations — based on weak topics */}
+      {(() => {
+        const weak = weakAreas.filter((t) => t.percent < 70)
+        if (weak.length === 0) return null
+        const weakTagIds = weak.map((t) => t.tagId).join(',')
+        return (
+          <div className="mb-8 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-900/10">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-600" />
+              Study Recommendations
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+              Focus on these {weak.length} topic{weak.length !== 1 ? 's' : ''} to improve your score:
+            </p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {weak.map((t) => (
+                <span
+                  key={t.tagId}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                >
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.tagColor }} />
+                  {t.tagName}
+                  <span className="text-red-500 ml-0.5">{t.percent}%</span>
+                </span>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              onClick={() => router.push(`/study/global?tags=${weakTagIds}`)}
+            >
+              <BookOpen className="h-4 w-4 mr-1" />
+              Study Weak Topics
+            </Button>
+          </div>
+        )
+      })()}
+
       {/* Per-Question Review — gated by allow_review */}
       {answers.length > 0 && assessment?.allow_review && (
         <div>
@@ -336,8 +380,8 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
         </div>
       )}
 
-      {/* Certificate link for passed sessions */}
-      {passed && (
+      {/* Certificate link for passed sessions (gated by feature flag) */}
+      {passed && certificationEnabled && (
         <div className="mt-6 text-center">
           <Button
             variant="secondary"
@@ -374,11 +418,14 @@ type QuestionStat = {
   totalAttempts: number
   correctCount: number
   percentCorrect: number
+  avgTimeSeconds: number | null
 }
 
 function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
   const router = useRouter()
+  const { org } = useOrg()
   const { showToast } = useToast()
+  const proctoringEnabled = org.settings.features.proctoring
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [sessions, setSessions] = useState<SessionWithEmail[]>([])
   const [stats, setStats] = useState<{ avgScore: number; passRate: number; totalAttempts: number } | null>(null)
@@ -386,6 +433,18 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionLimit, setSessionLimit] = useState(20)
+  const [expandedViolation, setExpandedViolation] = useState<string | null>(null)
+  const [activeSessions, setActiveSessions] = useState<Array<{
+    sessionId: string; userEmail: string; startedAt: string
+    timeRemainingSeconds: number | null; questionsAnswered: number
+    totalQuestions: number; tabSwitchCount: number
+  }>>([])
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const pollActiveSessions = useCallback(async () => {
+    const result = await getActiveSessionsForAssessment(assessmentId)
+    if (result.ok) setActiveSessions(result.data ?? [])
+  }, [assessmentId])
 
   useEffect(() => {
     async function load() {
@@ -409,9 +468,17 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
         setQuestionStats(qResult.data.questions)
       }
       setLoading(false)
+
+      // Initial poll + start interval for live monitoring
+      pollActiveSessions()
     }
     load()
-  }, [assessmentId])
+
+    pollingRef.current = setInterval(pollActiveSessions, 15000) // every 15s
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [assessmentId, pollActiveSessions])
 
   if (loading) {
     return (
@@ -504,6 +571,131 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
         </div>
       )}
 
+      {/* Live Active Sessions Monitor */}
+      {activeSessions.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+            </span>
+            Live — {activeSessions.length} Active {activeSessions.length === 1 ? 'Session' : 'Sessions'}
+          </h2>
+          <div className="grid grid-cols-1 gap-2">
+            {activeSessions.map((s) => {
+              const mins = s.timeRemainingSeconds != null ? Math.floor(s.timeRemainingSeconds / 60) : null
+              const progress = s.totalQuestions > 0
+                ? Math.round((s.questionsAnswered / s.totalQuestions) * 100)
+                : 0
+              return (
+                <div
+                  key={s.sessionId}
+                  className="p-3 rounded-lg border border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10 flex items-center gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                      {s.userEmail}
+                    </p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {mins != null ? `${mins}m left` : '—'}
+                      </span>
+                      <span>{s.questionsAnswered}/{s.totalQuestions} answered</span>
+                      {s.tabSwitchCount > 0 && (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          <AlertTriangle className="h-3 w-3 inline mr-0.5" />
+                          {s.tabSwitchCount} switches
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-24 flex-shrink-0">
+                    <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 text-right mt-0.5">{progress}%</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Flagged Sessions — Proctoring Violations (gated by feature flag) */}
+      {proctoringEnabled && (() => {
+        const flagged = sessions.filter((s) => s.tab_switch_count >= 3)
+        if (flagged.length === 0) return null
+        return (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+              <Shield className="h-5 w-5 text-amber-500" />
+              Flagged Sessions ({flagged.length})
+            </h2>
+            <div className="space-y-2">
+              {flagged
+                .sort((a, b) => b.tab_switch_count - a.tab_switch_count)
+                .map((s) => {
+                  const isHigh = s.tab_switch_count >= 10
+                  const log = Array.isArray(s.tab_switch_log) ? s.tab_switch_log as Array<{ timestamp: string; type: string }> : []
+                  const isExpanded = expandedViolation === s.id
+                  return (
+                    <div
+                      key={s.id}
+                      className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${isHigh ? 'text-red-500' : 'text-amber-500'}`} />
+                          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {s.user_email}
+                          </span>
+                          <Badge className={isHigh
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                          }>
+                            {s.tab_switch_count} violations
+                          </Badge>
+                          {s.score !== null && (
+                            <span className="text-xs text-slate-500">{s.score}%</span>
+                          )}
+                        </div>
+                        {log.length > 0 && (
+                          <button
+                            onClick={() => setExpandedViolation(isExpanded ? null : s.id)}
+                            className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1"
+                          >
+                            <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            Timeline
+                          </button>
+                        )}
+                      </div>
+                      {isExpanded && log.length > 0 && (
+                        <div className="mt-3 ml-7 space-y-1">
+                          {log.map((entry, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs">
+                              <span className="text-slate-400 font-mono w-20 flex-shrink-0">
+                                {new Date(entry.timestamp).toLocaleTimeString()}
+                              </span>
+                              <span className={entry.type === 'tab_hidden' ? 'text-red-500' : 'text-green-500'}>
+                                {entry.type === 'tab_hidden' ? 'Left exam' : 'Returned'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Question Difficulty Analysis */}
       {questionStats.length > 0 && (
         <div className="mb-8">
@@ -540,6 +732,12 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {q.avgTimeSeconds != null && (
+                      <span className="text-xs text-slate-400 inline-flex items-center gap-0.5">
+                        <Clock className="h-3 w-3" />
+                        {q.avgTimeSeconds}s
+                      </span>
+                    )}
                     <span
                       className={`text-sm font-bold ${
                         isHard
@@ -580,8 +778,8 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
                   <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Candidate</th>
                   <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Score</th>
                   <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Status</th>
-                  <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Tab Switches</th>
-                  <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">IP</th>
+                  {proctoringEnabled && <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Tab Switches</th>}
+                  {proctoringEnabled && <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">IP</th>}
                   <th className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Date</th>
                 </tr>
               </thead>
@@ -619,18 +817,22 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
                         <Badge variant="secondary">In Progress</Badge>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {s.tab_switch_count > 0 ? (
-                        <span className="text-amber-600 dark:text-amber-400 font-medium">
-                          {s.tab_switch_count}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">0</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-400 font-mono">
-                      {s.ip_address ?? '—'}
-                    </td>
+                    {proctoringEnabled && (
+                      <td className="px-4 py-3">
+                        {s.tab_switch_count > 0 ? (
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">
+                            {s.tab_switch_count}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
+                      </td>
+                    )}
+                    {proctoringEnabled && (
+                      <td className="px-4 py-3 text-xs text-slate-400 font-mono">
+                        {s.ip_address ?? '—'}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-slate-500">
                       {s.completed_at
                         ? new Date(s.completed_at).toLocaleDateString()

@@ -521,7 +521,8 @@ export async function submitAnswer(
   sessionId: string,
   cardTemplateId: string,
   selectedIndex: number,
-  timeRemainingSeconds?: number
+  timeRemainingSeconds?: number,
+  timeSpentSeconds?: number
 ): Promise<ActionResultV2<{ isCorrect: boolean }>> {
   return withOrgUser(async ({ user, supabase }) => {
     const validation = submitAnswerSchema.safeParse({ sessionId, cardTemplateId, selectedIndex })
@@ -562,6 +563,7 @@ export async function submitAnswer(
         selected_index: selectedIndex,
         is_correct: isCorrect,
         answered_at: new Date().toISOString(),
+        ...(timeSpentSeconds !== undefined && { time_spent_seconds: Math.round(timeSpentSeconds) }),
       })
       .eq('session_id', sessionId)
       .eq('card_template_id', cardTemplateId)
@@ -679,6 +681,7 @@ export async function getSessionResults(
         selected_index: a.selected_index,
         is_correct: a.is_correct,
         answered_at: a.answered_at,
+        time_spent_seconds: a.time_spent_seconds ?? null,
         stem: card.stem,
         options: card.options,
         correct_index: card.correct_index,
@@ -1023,6 +1026,7 @@ export async function getQuestionAnalytics(
     totalAttempts: number
     correctCount: number
     percentCorrect: number
+    avgTimeSeconds: number | null
   }>
 }>> {
   return withOrgUser(async ({ supabase, org, role }) => {
@@ -1058,7 +1062,7 @@ export async function getQuestionAnalytics(
     // Get all answers for these sessions
     const { data: answers } = await supabase
       .from('assessment_answers')
-      .select('card_template_id, is_correct')
+      .select('card_template_id, is_correct, time_spent_seconds')
       .in('session_id', sessionIds)
 
     if (!answers) {
@@ -1066,11 +1070,15 @@ export async function getQuestionAnalytics(
     }
 
     // Aggregate per question
-    const questionMap = new Map<string, { total: number; correct: number }>()
+    const questionMap = new Map<string, { total: number; correct: number; timeSum: number; timeCount: number }>()
     for (const a of answers) {
-      const entry = questionMap.get(a.card_template_id) ?? { total: 0, correct: 0 }
+      const entry = questionMap.get(a.card_template_id) ?? { total: 0, correct: 0, timeSum: 0, timeCount: 0 }
       entry.total++
       if (a.is_correct) entry.correct++
+      if (a.time_spent_seconds != null && a.time_spent_seconds > 0) {
+        entry.timeSum += a.time_spent_seconds
+        entry.timeCount++
+      }
       questionMap.set(a.card_template_id, entry)
     }
 
@@ -1098,6 +1106,7 @@ export async function getQuestionAnalytics(
           totalAttempts: stats.total,
           correctCount: stats.correct,
           percentCorrect: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
+          avgTimeSeconds: stats.timeCount > 0 ? Math.round(stats.timeSum / stats.timeCount) : null,
         }
       })
       .sort((a, b) => a.percentCorrect - b.percentCorrect)
@@ -1826,5 +1835,97 @@ export async function expireStaleSessions(): Promise<ActionResultV2<{ expired: n
     }
 
     return { ok: true, data: { expired: expiredCount } }
+  })
+}
+
+/**
+ * Get active in-progress sessions for an assessment.
+ * Creator+ only. Used for live monitoring.
+ */
+export async function getActiveSessionsForAssessment(
+  assessmentId: string
+): Promise<ActionResultV2<Array<{
+  sessionId: string
+  userEmail: string
+  startedAt: string
+  timeRemainingSeconds: number | null
+  questionsAnswered: number
+  totalQuestions: number
+  tabSwitchCount: number
+}>>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    const { data: sessions } = await supabase
+      .from('assessment_sessions')
+      .select('id, user_id, started_at, time_remaining_seconds, tab_switch_count, question_order, assessments!inner(org_id, question_count, time_limit_minutes)')
+      .eq('assessment_id', assessmentId)
+      .eq('status', 'in_progress')
+
+    if (!sessions || sessions.length === 0) {
+      return { ok: true, data: [] }
+    }
+
+    // Filter to org
+    const orgSessions = sessions.filter((s) => {
+      const a = s.assessments as unknown as { org_id: string }
+      return a.org_id === org.id
+    })
+
+    if (orgSessions.length === 0) {
+      return { ok: true, data: [] }
+    }
+
+    // Get user emails
+    const userIds = [...new Set(orgSessions.map((s) => s.user_id))]
+    const emailMap = new Map<string, string>()
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', userIds)
+      if (profiles) {
+        for (const p of profiles) emailMap.set(p.id, p.email)
+      }
+    }
+
+    // Get answer counts per session
+    const sessionIds = orgSessions.map((s) => s.id)
+    const { data: answers } = await supabase
+      .from('assessment_answers')
+      .select('session_id, is_correct')
+      .in('session_id', sessionIds)
+      .not('selected_index', 'is', null)
+
+    const answerCounts = new Map<string, number>()
+    if (answers) {
+      for (const a of answers) {
+        answerCounts.set(a.session_id, (answerCounts.get(a.session_id) ?? 0) + 1)
+      }
+    }
+
+    const now = Date.now()
+    const result = orgSessions.map((s) => {
+      const a = s.assessments as unknown as { question_count: number; time_limit_minutes: number }
+      // Calculate estimated time remaining from server perspective
+      const startedMs = new Date(s.started_at).getTime()
+      const elapsedSeconds = Math.floor((now - startedMs) / 1000)
+      const totalSeconds = a.time_limit_minutes * 60
+      const estimatedRemaining = Math.max(0, totalSeconds - elapsedSeconds)
+
+      return {
+        sessionId: s.id,
+        userEmail: emailMap.get(s.user_id) ?? `user-${s.user_id.slice(0, 8)}`,
+        startedAt: s.started_at,
+        timeRemainingSeconds: s.time_remaining_seconds ?? estimatedRemaining,
+        questionsAnswered: answerCounts.get(s.id) ?? 0,
+        totalQuestions: a.question_count,
+        tabSwitchCount: s.tab_switch_count ?? 0,
+      }
+    })
+
+    return { ok: true, data: result }
   })
 }

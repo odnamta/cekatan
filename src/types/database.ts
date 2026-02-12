@@ -160,6 +160,7 @@ export interface AssessmentAnswer {
   selected_index: number | null
   is_correct: boolean | null
   answered_at: string | null
+  time_spent_seconds: number | null
 }
 
 /**
