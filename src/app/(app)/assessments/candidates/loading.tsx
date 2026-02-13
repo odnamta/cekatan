@@ -1,15 +1,17 @@
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
+
 export default function CandidatesLoading() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
-      <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded mb-6" />
-      <div className="h-7 w-48 bg-slate-200 dark:bg-slate-700 rounded mb-1" />
-      <div className="h-4 w-36 bg-slate-200 dark:bg-slate-700 rounded mb-6" />
-      <div className="h-10 w-full bg-slate-200 dark:bg-slate-700 rounded-lg mb-4" />
+    <SkeletonGroup className="max-w-4xl mx-auto px-4 py-8">
+      <Skeleton h="h-4" w="w-32" className="mb-6" />
+      <Skeleton h="h-7" w="w-48" className="mb-1" />
+      <Skeleton h="h-4" w="w-36" className="mb-6" />
+      <Skeleton h="h-10" className="w-full rounded-lg mb-4" />
       <div className="space-y-2">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" />
+          <Skeleton key={i} h="h-16" className="rounded-lg border border-slate-200 dark:border-slate-700" />
         ))}
       </div>
-    </div>
+    </SkeletonGroup>
   )
 }

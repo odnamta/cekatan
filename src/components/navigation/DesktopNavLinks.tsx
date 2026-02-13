@@ -30,13 +30,14 @@ export function DesktopNavLinks() {
   ]
 
   return (
-    <nav className="hidden sm:flex items-center gap-4">
+    <nav className="hidden sm:flex items-center gap-4" aria-label="Main navigation">
       {links.map((link) => {
         const isActive = pathname.startsWith(link.href)
         return (
           <a
             key={link.href}
             href={link.href}
+            aria-current={isActive ? 'page' : undefined}
             className={`text-sm font-medium transition-colors ${
               isActive
                 ? 'text-slate-900 dark:text-slate-100'

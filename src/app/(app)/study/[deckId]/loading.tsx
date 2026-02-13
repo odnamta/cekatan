@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/Card'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 
 /**
  * Loading skeleton for the deck study page.
@@ -6,27 +7,26 @@ import { Card } from '@/components/ui/Card'
 export default function StudyLoading() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      {/* Progress bar skeleton */}
-      <div className="mb-6 animate-pulse">
+      <SkeletonGroup className="mb-6">
         <div className="flex justify-between mb-2">
-          <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded" />
-          <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded" />
+          <Skeleton h="h-4" w="w-20" />
+          <Skeleton h="h-4" w="w-16" />
         </div>
-        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full" />
-      </div>
+        <Skeleton h="h-2" className="w-full rounded-full" />
+      </SkeletonGroup>
 
-      {/* Card skeleton */}
-      <Card className="animate-pulse">
-        <div className="min-h-[300px] flex flex-col">
-          <div className="h-48 w-full bg-slate-200 dark:bg-slate-700 rounded-lg mb-4" />
-          <div className="h-6 w-3/4 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
-          <div className="h-6 w-1/2 bg-slate-200 dark:bg-slate-700 rounded" />
-        </div>
+      <Card>
+        <SkeletonGroup>
+          <div className="min-h-[300px] flex flex-col">
+            <Skeleton h="h-48" className="w-full rounded-lg mb-4" />
+            <Skeleton h="h-6" className="w-3/4 mb-2" />
+            <Skeleton h="h-6" className="w-1/2" />
+          </div>
+        </SkeletonGroup>
       </Card>
 
-      {/* Button skeleton */}
       <div className="mt-6 flex justify-center">
-        <div className="h-12 w-40 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+        <Skeleton h="h-12" w="w-40" className="rounded-lg" />
       </div>
     </div>
   )

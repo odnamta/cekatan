@@ -2591,3 +2591,58 @@ export async function deleteAssessmentTemplate(
     return { ok: true, data: undefined }
   })
 }
+
+// ============================================
+// Question Preview (Creator)
+// ============================================
+
+type PreviewQuestion = {
+  id: string
+  stem: string
+  options: string[]
+  correctIndex: number
+}
+
+/**
+ * Fetches a sample of questions from an assessment's deck for creator preview.
+ * Returns up to `limit` questions with correct answers visible.
+ */
+export async function getAssessmentPreviewQuestions(
+  assessmentId: string,
+  limit = 10,
+): Promise<ActionResultV2<PreviewQuestion[]>> {
+  return withOrgUser(async ({ supabase, org }) => {
+    if (!hasMinimumRole('creator', 'creator')) {
+      return { ok: false, error: 'Creator role required' }
+    }
+
+    const { data: assessment } = await supabase
+      .from('assessments')
+      .select('id, deck_template_id')
+      .eq('id', assessmentId)
+      .eq('org_id', org.id)
+      .single()
+
+    if (!assessment) {
+      return { ok: false, error: 'Assessment not found' }
+    }
+
+    const { data: cards, error } = await supabase
+      .from('card_templates')
+      .select('id, stem, options, correct_index')
+      .eq('deck_template_id', assessment.deck_template_id)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) return { ok: false, error: error.message }
+
+    const questions: PreviewQuestion[] = (cards ?? []).map((c) => ({
+      id: c.id,
+      stem: c.stem,
+      options: c.options ?? [],
+      correctIndex: c.correct_index ?? 0,
+    }))
+
+    return { ok: true, data: questions }
+  })
+}

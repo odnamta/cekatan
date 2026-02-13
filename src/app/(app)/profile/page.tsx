@@ -7,11 +7,21 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { SPECIALTIES } from '@/components/onboarding/OnboardingModal'
 import { enrollInStarterPack } from '@/actions/onboarding-actions'
-import { User, Mail, Stethoscope, LogOut } from 'lucide-react'
+import { getMyAssessmentSessions } from '@/actions/assessment-actions'
+import { User, Mail, Stethoscope, LogOut, Trophy, Clock, Bell, BellOff, Globe } from 'lucide-react'
+import type { SessionWithAssessment } from '@/types/database'
+
+const COMMON_TIMEZONES = [
+  'Pacific/Honolulu', 'America/Anchorage', 'America/Los_Angeles', 'America/Denver',
+  'America/Chicago', 'America/New_York', 'America/Sao_Paulo', 'Europe/London',
+  'Europe/Paris', 'Europe/Berlin', 'Europe/Istanbul', 'Asia/Dubai',
+  'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Shanghai', 'Asia/Tokyo',
+  'Asia/Seoul', 'Australia/Sydney', 'Pacific/Auckland',
+]
 
 /**
  * Profile Settings Page
- * V10.5.1: Allows users to view and update their profile settings
+ * Allows users to view/update profile, timezone, notification prefs, and exam history.
  */
 export default function ProfilePage() {
   const router = useRouter()
@@ -25,18 +35,34 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('')
   const [specialty, setSpecialty] = useState('')
   const [originalSpecialty, setOriginalSpecialty] = useState('')
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const [emailNotifications, setEmailNotifications] = useState(true)
+  const [examReminders, setExamReminders] = useState(true)
+
+  // Exam history
+  const [completedSessions, setCompletedSessions] = useState<SessionWithAssessment[]>([])
 
   useEffect(() => {
     async function loadUser() {
       const supabase = createSupabaseBrowserClient()
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (user) {
         setEmail(user.email || '')
         setDisplayName(user.user_metadata?.full_name || user.user_metadata?.name || '')
         setSpecialty(user.user_metadata?.specialty || '')
         setOriginalSpecialty(user.user_metadata?.specialty || '')
+        setTimezone(user.user_metadata?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
+        setEmailNotifications(user.user_metadata?.email_notifications !== false)
+        setExamReminders(user.user_metadata?.exam_reminders !== false)
       }
+
+      // Load exam history
+      const sessResult = await getMyAssessmentSessions()
+      if (sessResult.ok && sessResult.data) {
+        setCompletedSessions(sessResult.data.filter((s) => s.status === 'completed'))
+      }
+
       setIsLoading(false)
     }
     loadUser()
@@ -56,6 +82,9 @@ export default function ProfilePage() {
           full_name: displayName,
           name: displayName,
           specialty,
+          timezone,
+          email_notifications: emailNotifications,
+          exam_reminders: examReminders,
         },
       })
 
@@ -183,6 +212,121 @@ export default function ProfilePage() {
           Save Changes
         </Button>
       </Card>
+
+      {/* Timezone */}
+      <Card variant="elevated" padding="lg" className="mb-6">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+          <Globe className="h-4 w-4 text-blue-500" />
+          Timezone
+        </h2>
+        <select
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {COMMON_TIMEZONES.map((tz) => (
+            <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-500 mt-1">Used for scheduling reminders and displaying times</p>
+      </Card>
+
+      {/* Notification Preferences */}
+      <Card variant="elevated" padding="lg" className="mb-6">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+          <Bell className="h-4 w-4 text-amber-500" />
+          Notification Preferences
+        </h2>
+        <div className="space-y-3">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-700 dark:text-slate-300">Email notifications</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEmailNotifications(!emailNotifications)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                emailNotifications ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'
+              }`}
+              role="switch"
+              aria-checked={emailNotifications}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${emailNotifications ? 'translate-x-5' : ''}`} />
+            </button>
+          </label>
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-2">
+              {examReminders ? <Bell className="h-4 w-4 text-slate-400" /> : <BellOff className="h-4 w-4 text-slate-400" />}
+              <span className="text-sm text-slate-700 dark:text-slate-300">Exam reminders</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExamReminders(!examReminders)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                examReminders ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'
+              }`}
+              role="switch"
+              aria-checked={examReminders}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${examReminders ? 'translate-x-5' : ''}`} />
+            </button>
+          </label>
+        </div>
+      </Card>
+
+      {/* Exam History Summary */}
+      {completedSessions.length > 0 && (
+        <Card variant="elevated" padding="lg" className="mb-6">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-green-500" />
+            Exam History
+          </h2>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{completedSessions.length}</div>
+              <div className="text-xs text-slate-500">Taken</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {completedSessions.filter((s) => s.passed).length}
+              </div>
+              <div className="text-xs text-slate-500">Passed</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {completedSessions.length > 0
+                  ? Math.round(completedSessions.reduce((sum, s) => sum + (s.score ?? 0), 0) / completedSessions.length)
+                  : 0}%
+              </div>
+              <div className="text-xs text-slate-500">Avg Score</div>
+            </div>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {completedSessions.slice(0, 5).map((s) => (
+              <div key={s.id} className="flex items-center justify-between text-sm py-1.5 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.passed ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-slate-700 dark:text-slate-300 truncate">{s.assessment_title}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-slate-500 text-xs">
+                    {new Date(s.completed_at ?? s.created_at).toLocaleDateString()}
+                  </span>
+                  <span className={`font-medium ${s.passed ? 'text-green-600' : 'text-red-500'}`}>
+                    {s.score ?? 0}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {completedSessions.length > 5 && (
+            <p className="text-xs text-slate-400 text-center mt-2">
+              +{completedSessions.length - 5} more
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Sign Out */}
       <button

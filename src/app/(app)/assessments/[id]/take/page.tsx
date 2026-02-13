@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle,
-  Target, Shuffle, RotateCcw, Eye, EyeOff, Shield,
+  Target, Shuffle, RotateCcw, Eye, EyeOff, Shield, Flag,
 } from 'lucide-react'
 import {
   startAssessmentSession,
@@ -36,6 +36,7 @@ type QuestionData = {
   optionMap: number[]
   selectedIndex: number | null
   answered: boolean
+  flagged: boolean
 }
 
 /**
@@ -76,6 +77,7 @@ export default function TakeAssessmentPage() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfirmFinish, setShowConfirmFinish] = useState(false)
+  const [showReview, setShowReview] = useState(false)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [showTabWarning, setShowTabWarning] = useState(false)
   const [fullscreenExited, setFullscreenExited] = useState(false)
@@ -168,6 +170,7 @@ export default function TakeAssessmentPage() {
             optionMap: shuffled,
             selectedIndex: null,
             answered: false,
+            flagged: false,
           }
         }
         return {
@@ -177,6 +180,7 @@ export default function TakeAssessmentPage() {
           optionMap: identity,
           selectedIndex: null,
           answered: false,
+          flagged: false,
         }
       })
     } else {
@@ -187,6 +191,7 @@ export default function TakeAssessmentPage() {
         optionMap: [],
         selectedIndex: null,
         answered: false,
+        flagged: false,
       }))
     }
 
@@ -362,6 +367,10 @@ export default function TakeAssessmentPage() {
         case 'e': case 'E': case '5':
           if (q.options.length > 4) handleSelectAnswer(4)
           break
+        case 'f': case 'F':
+          e.preventDefault()
+          toggleFlag()
+          break
         case 'Enter':
           e.preventDefault()
           if (currentIndex < questions.length - 1) {
@@ -382,6 +391,14 @@ export default function TakeAssessmentPage() {
     const s = seconds % 60
     return `${m}:${s.toString().padStart(2, '0')}`
   }, [])
+
+  function toggleFlag() {
+    const updated = [...questions]
+    const q = updated[currentIndex]
+    if (!q) return
+    updated[currentIndex] = { ...q, flagged: !q.flagged }
+    setQuestions(updated)
+  }
 
   async function handleSelectAnswer(displayIndex: number) {
     if (!session || completing) return
@@ -619,9 +636,22 @@ export default function TakeAssessmentPage() {
       {/* Question */}
       {currentQuestion && (
         <div className="mb-8">
-          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-6 leading-relaxed">
-            {currentQuestion.stem || `Question ${currentIndex + 1}`}
-          </h2>
+          <div className="flex items-start justify-between gap-3 mb-6">
+            <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 leading-relaxed">
+              {currentQuestion.stem || `Question ${currentIndex + 1}`}
+            </h2>
+            <button
+              onClick={toggleFlag}
+              aria-label={currentQuestion.flagged ? 'Unflag this question' : 'Flag this question for review'}
+              className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${
+                currentQuestion.flagged
+                  ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                  : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Flag className="h-4 w-4" fill={currentQuestion.flagged ? 'currentColor' : 'none'} />
+            </button>
+          </div>
 
           <div className="space-y-3" role="radiogroup" aria-label={`Options for question ${currentIndex + 1}`}>
             {currentQuestion.options.map((option, idx) => {
@@ -684,36 +714,40 @@ export default function TakeAssessmentPage() {
                 className={`w-2.5 h-2.5 rounded-full transition-colors ${
                   idx === currentIndex
                     ? 'bg-blue-600'
-                    : q.answered
-                      ? 'bg-green-500'
-                      : 'bg-slate-300 dark:bg-slate-600'
+                    : q.flagged
+                      ? 'bg-amber-400 ring-1 ring-amber-500'
+                      : q.answered
+                        ? 'bg-green-500'
+                        : 'bg-slate-300 dark:bg-slate-600'
                 }`}
-                aria-label={`Question ${idx + 1}${q.answered ? ', answered' : ', unanswered'}${idx === currentIndex ? ', current' : ''}`}
+                aria-label={`Question ${idx + 1}${q.answered ? ', answered' : ', unanswered'}${q.flagged ? ', flagged' : ''}${idx === currentIndex ? ', current' : ''}`}
                 aria-current={idx === currentIndex ? 'step' : undefined}
               />
             ))}
           </nav>
         </div>
 
-        {isLastQuestion ? (
-          <Button
-            size="sm"
-            onClick={() => setShowConfirmFinish(true)}
-            disabled={completing}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-1" />
-            Finish
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isLastQuestion ? (
+            <Button
+              size="sm"
+              onClick={() => setShowConfirmFinish(true)}
+              disabled={completing}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Review &amp; Submit
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Keyboard hints */}
@@ -721,6 +755,7 @@ export default function TakeAssessmentPage() {
         <span className="inline-flex items-center gap-3">
           <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">A-E</kbd> select</span>
           <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">&larr; &rarr;</kbd> navigate</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">F</kbd> flag</span>
           <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">Enter</kbd> next</span>
         </span>
       </div>
@@ -761,42 +796,92 @@ export default function TakeAssessmentPage() {
         </div>
       )}
 
-      {/* Confirm Finish Modal */}
-      {showConfirmFinish && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="confirm-finish-title">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl">
-            <h3 id="confirm-finish-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              Submit Assessment?
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-              You have answered {answeredCount} of {questions.length} questions.
-            </p>
-            {answeredCount < questions.length && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-                {questions.length - answeredCount} question(s) are unanswered and will be marked incorrect.
-              </p>
-            )}
-            <div className="flex items-center gap-3 mt-4">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowConfirmFinish(false)}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-              <Button
-                size="sm"
-                loading={completing}
-                onClick={handleComplete}
-                className="flex-1"
-              >
-                Submit
-              </Button>
+      {/* Review Summary */}
+      {showConfirmFinish && (() => {
+        const flaggedCount = questions.filter((q) => q.flagged).length
+        const unansweredCount = questions.length - answeredCount
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="review-title">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-lg mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
+              <h3 id="review-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                Review Before Submitting
+              </h3>
+
+              {/* Stats */}
+              <div className="flex items-center gap-4 mb-4 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  <span className="text-slate-600 dark:text-slate-400">{answeredCount} answered</span>
+                </div>
+                {unansweredCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                    <span className="text-slate-600 dark:text-slate-400">{unansweredCount} unanswered</span>
+                  </div>
+                )}
+                {flaggedCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    <span className="text-slate-600 dark:text-slate-400">{flaggedCount} flagged</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Question grid */}
+              <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5 mb-4">
+                {questions.map((q, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setCurrentIndex(idx)
+                      setShowConfirmFinish(false)
+                    }}
+                    className={`relative w-full aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-colors ${
+                      q.flagged
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400'
+                        : q.answered
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                    } hover:ring-2 hover:ring-blue-400`}
+                    aria-label={`Question ${idx + 1}: ${q.answered ? 'answered' : 'unanswered'}${q.flagged ? ', flagged' : ''}`}
+                  >
+                    {idx + 1}
+                    {q.flagged && (
+                      <Flag className="absolute -top-1 -right-1 h-2.5 w-2.5 text-amber-500" fill="currentColor" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {unansweredCount > 0 && (
+                <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
+                  {unansweredCount} unanswered question{unansweredCount !== 1 ? 's' : ''} will be marked incorrect.
+                </p>
+              )}
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowConfirmFinish(false)}
+                  className="flex-1"
+                >
+                  Back to Exam
+                </Button>
+                <Button
+                  size="sm"
+                  loading={completing}
+                  onClick={handleComplete}
+                  className="flex-1"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Submit
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

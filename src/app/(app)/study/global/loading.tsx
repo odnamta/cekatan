@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/Card'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 
 /**
  * Loading skeleton for the global study session page.
@@ -6,30 +7,26 @@ import { Card } from '@/components/ui/Card'
 export default function GlobalStudyLoading() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      {/* Header skeleton */}
-      <div className="mb-6 animate-pulse">
-        <div className="h-8 w-48 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
-        <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded" />
-      </div>
+      <SkeletonGroup className="mb-6">
+        <Skeleton h="h-8" w="w-48" className="mb-2" />
+        <Skeleton h="h-4" w="w-32" />
+      </SkeletonGroup>
 
-      {/* Progress bar skeleton */}
-      <div className="mb-6 animate-pulse">
-        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full" />
-      </div>
+      <SkeletonGroup className="mb-6">
+        <Skeleton h="h-2" className="w-full rounded-full" />
+      </SkeletonGroup>
 
-      {/* Card skeleton */}
-      <Card className="animate-pulse">
-        <div className="min-h-[300px] flex flex-col">
-          <div className="h-6 w-3/4 bg-slate-200 dark:bg-slate-700 rounded mb-4" />
-          <div className="space-y-3 flex-1">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-16 w-full bg-slate-200 dark:bg-slate-700 rounded-lg"
-              />
-            ))}
+      <Card>
+        <SkeletonGroup>
+          <div className="min-h-[300px] flex flex-col">
+            <Skeleton h="h-6" className="w-3/4 mb-4" />
+            <div className="space-y-3 flex-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} h="h-16" className="w-full rounded-lg" />
+              ))}
+            </div>
           </div>
-        </div>
+        </SkeletonGroup>
       </Card>
     </div>
   )

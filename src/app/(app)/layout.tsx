@@ -41,11 +41,18 @@ export default async function AppLayout({
           userName={user.user_metadata?.full_name || user.email?.split('@')[0]}
         />
         <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+          {/* Skip to content link for keyboard/screen-reader users */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm focus:font-medium"
+          >
+            Skip to content
+          </a>
           {/* Header with glassmorphism */}
-          <header className="sticky top-0 z-40 border-b border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
+          <header className="sticky top-0 z-40 border-b border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg" role="banner">
             <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <a href="/dashboard" className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                <a href="/dashboard" className="text-xl font-semibold text-slate-900 dark:text-slate-100" aria-label="GamaTest — Go to dashboard">
                   GamaTest
                 </a>
                 <DesktopNavLinks />
@@ -64,7 +71,7 @@ export default async function AppLayout({
               </div>
             </div>
           </header>
-          <main className="flex-1 pb-16 md:pb-0">
+          <main id="main-content" className="flex-1 pb-16 md:pb-0" tabIndex={-1}>
             <Suspense fallback={null}>
               {children}
             </Suspense>
