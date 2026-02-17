@@ -558,7 +558,7 @@ export async function autoTagCards(
 
   // V9.3: Use provided subject or fall back to deck subject or default
   const firstDeck = cardTemplates[0].deck_templates as unknown as { subject?: string }
-  const effectiveSubject = subject || firstDeck.subject || 'Obstetrics & Gynecology'
+  const effectiveSubject = subject || firstDeck.subject || 'General'
 
   // V9.3: Process all cards in parallel using Promise.all
   const results = await Promise.all(

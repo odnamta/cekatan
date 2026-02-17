@@ -10,7 +10,7 @@ import {
 import type { Source, DeckSource, Deck } from '@/types/database';
 
 /**
- * **Feature: cellines-obgyn-prep-v2, Property 15: Source-Deck Linking**
+ * **Feature: gamatest, Property 15: Source-Deck Linking**
  * **Validates: Requirements 8.3, 9.3**
  *
  * For any source linked to a deck:

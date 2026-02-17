@@ -10,7 +10,7 @@ import { getHeatmapIntensity, HeatmapIntensity, generateDayArray, DayData } from
  */
 
 /**
- * **Feature: cellines-obgyn-prep-v1, Property 5: Heatmap Color Intensity Mapping**
+ * **Feature: gamatest, Property 5: Heatmap Color Intensity Mapping**
  * **Validates: Requirements 2.3**
  * 
  * For any `cards_reviewed` count:

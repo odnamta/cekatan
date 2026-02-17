@@ -11,7 +11,7 @@ import { getCardDefaults, validateCardDefaults } from '../lib/card-defaults'
  */
 
 /**
- * **Feature: cellines-obgyn-prep, Property 10: Card Default Values on Creation**
+ * **Feature: gamatest, Property 10: Card Default Values on Creation**
  * **Validates: Requirements 3.1**
  * 
  * For any newly created card, the initial values SHALL be:

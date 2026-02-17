@@ -44,7 +44,7 @@ If NO question is visible, say so instead of inventing one.`
 /**
  * V9.1: Default subject for backward compatibility
  */
-const DEFAULT_SUBJECT = 'Obstetrics & Gynecology'
+const DEFAULT_SUBJECT = 'General'
 
 /**
  * V11.2.1: Hard ban on meta-language patterns in Extract mode
@@ -154,7 +154,7 @@ ${DATA_INTEGRITY_RULES}`
 
 /**
  * V9.1: Get the appropriate system prompt based on mode and subject.
- * Subject defaults to 'Obstetrics & Gynecology' for backward compatibility.
+ * Subject defaults to 'General' for backward compatibility.
  */
 function getSystemPrompt(mode: AIMode = 'extract', subject?: string): string {
   // V9.1: Normalize subject - use default if null, empty, or whitespace only

@@ -201,7 +201,7 @@ describe('Property 2: Onboarding Modal Visibility', () => {
  */
 describe('Property 3: Onboarding Metadata Persistence', () => {
   const SPECIALTIES = [
-    'OBGYN',
+    'General',
     'Surgery',
     'Internal Medicine',
     'Pediatrics',

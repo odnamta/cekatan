@@ -1,12 +1,12 @@
 # Product Overview
 
-**Specialize** is a spaced repetition learning application for medical board exam preparation. Built for busy medical residents with a mobile-first, "Clinical Glass" aesthetic.
+**GamaTest** is a domain-agnostic organizational assessment and study platform. Multi-tenant SaaS with mobile-first design.
 
 ## Target Audience
 
-- Medical Residents preparing for board exams
-- Mobile-first users (tired eyes, on-the-go studying)
-- Initially focused on OBGYN, expandable to other specialties
+- Organizations needing assessment and training platforms
+- Mobile-first users (on-the-go studying)
+- Domain-agnostic, supporting any subject area
 
 ## Core Features
 

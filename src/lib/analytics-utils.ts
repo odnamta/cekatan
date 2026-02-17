@@ -63,7 +63,7 @@ export function generateImproveUrl(tagId: string): string {
 // V10.3: Subject Badge & Radar Chart Utilities
 // ============================================
 
-const DEFAULT_SUBJECT = 'OBGYN'
+const DEFAULT_SUBJECT = 'General'
 
 /**
  * Derives subject name from user's first active deck.

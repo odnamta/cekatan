@@ -21,7 +21,7 @@ export interface EnrollResult {
  * 
  * Requirements: 4.1, 4.2, 4.4, 4.5
  * 
- * @param specialty - The user's selected specialty (e.g., 'OBGYN')
+ * @param specialty - The user's selected specialty (e.g., 'General')
  * @returns EnrollResult with success status and count of enrolled decks
  */
 export async function enrollInStarterPack(specialty: string): Promise<EnrollResult> {
@@ -30,7 +30,7 @@ export async function enrollInStarterPack(specialty: string): Promise<EnrollResu
     return { success: false, enrolledCount: 0, error: 'Authentication required' }
   }
 
-  // For V1, only OBGYN is supported
+  // For V1, only General is supported
   if (!isSupportedSpecialty(specialty)) {
     // Gracefully handle unsupported specialties - just return success with 0 enrollments
     return { success: true, enrolledCount: 0 }
@@ -39,7 +39,7 @@ export async function enrollInStarterPack(specialty: string): Promise<EnrollResu
   const supabase = await createSupabaseServerClient()
 
   // Get all public deck templates for the starter pack
-  // For V1, we enroll users in ALL public decks (OBGYN content)
+  // For V1, we enroll users in ALL public decks
   const { data: publicDecks, error: decksError } = await supabase
     .from('deck_templates')
     .select('id')

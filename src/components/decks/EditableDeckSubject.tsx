@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/Toast'
  * V9.1: Common medical specialties for subject dropdown
  */
 const COMMON_SUBJECTS = [
-  'Obstetrics & Gynecology',
+  'General',
   'Internal Medicine',
   'Pediatrics',
   'Surgery',
@@ -40,8 +40,8 @@ type EditState = 'viewing' | 'editing' | 'saving'
  */
 export function EditableDeckSubject({ deckId, initialSubject }: EditableDeckSubjectProps) {
   const [state, setState] = useState<EditState>('viewing')
-  const [subject, setSubject] = useState(initialSubject || 'Obstetrics & Gynecology')
-  const [editValue, setEditValue] = useState(initialSubject || 'Obstetrics & Gynecology')
+  const [subject, setSubject] = useState(initialSubject || 'General')
+  const [editValue, setEditValue] = useState(initialSubject || 'General')
   const selectRef = useRef<HTMLSelectElement>(null)
   const { showToast } = useToast()
 

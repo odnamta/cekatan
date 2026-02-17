@@ -13,7 +13,7 @@ import * as fc from 'fast-check'
 // Constants
 // ============================================
 
-const DEFAULT_SUBJECT = 'Obstetrics & Gynecology'
+const DEFAULT_SUBJECT = 'General'
 
 // ============================================
 // Property 5: Subject Fallback
@@ -24,7 +24,7 @@ const DEFAULT_SUBJECT = 'Obstetrics & Gynecology'
  * **Validates: Requirements 3.3, 5.3**
  * 
  * For any deck template with null or empty subject, the AI prompt builder
- * should use 'Obstetrics & Gynecology' as the subject value.
+ * should use 'General' as the subject value.
  */
 describe('Property 5: Subject Fallback', () => {
   /**
@@ -166,7 +166,7 @@ describe('Property 6: Dynamic Subject Interpolation', () => {
 
   it('should handle common medical specialties', () => {
     const specialties = [
-      'Obstetrics & Gynecology',
+      'General',
       'Internal Medicine',
       'Pediatrics',
       'Surgery',

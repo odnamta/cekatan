@@ -74,9 +74,9 @@ describe('V10.3 Analytics Utility Properties', () => {
       )
     })
 
-    it('returns OBGYN as default when no default specified and no decks', () => {
+    it('returns General as default when no default specified and no decks', () => {
       const result = deriveSubjectFromDecks([])
-      expect(result).toBe('OBGYN')
+      expect(result).toBe('General')
     })
   })
 
@@ -328,12 +328,12 @@ describe('V10.3 Component Integration Tests', () => {
   describe('SubjectBadge derivation', () => {
     it('derives subject from deck with explicit subject field', () => {
       const decks = [
-        { title: 'OBGYN Deck', subject: 'Obstetrics & Gynecology' },
+        { title: 'General Deck', subject: 'General' },
         { title: 'Another Deck', subject: 'Pediatrics' },
       ]
-      
+
       const subject = deriveSubjectFromDecks(decks)
-      expect(subject).toBe('Obstetrics & Gynecology')
+      expect(subject).toBe('General')
     })
 
     it('falls back to title when no subject field', () => {

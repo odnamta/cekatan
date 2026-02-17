@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**GamaTest** is a multi-tenant assessment and study platform. Forked from "Celline's OBGYN Prep" (Specialize), it's being refactored from a single-user medical study app into a domain-agnostic organizational assessment platform.
+**GamaTest** is a domain-agnostic organizational assessment and study platform.
 
 **Architecture:** ONE platform, TWO modes (Study Mode + Assessment Mode).
 **Multi-tenant:** Each organization is a tenant with its own content, users, and configuration.

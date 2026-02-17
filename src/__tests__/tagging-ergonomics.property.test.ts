@@ -507,7 +507,7 @@ interface ImportContext {
   sessionTagIds: string[]
 }
 
-const STORAGE_KEY_PREFIX = 'specialize:import-context:'
+const STORAGE_KEY_PREFIX = 'gamatest:import-context:'
 
 function getStorageKey(deckId: string): string {
   return `${STORAGE_KEY_PREFIX}${deckId}`

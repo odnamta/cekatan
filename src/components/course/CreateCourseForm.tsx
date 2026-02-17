@@ -26,7 +26,7 @@ export function CreateCourseForm() {
         <Input
           label="Course Title"
           name="title"
-          placeholder="e.g., OBGYN Board Review"
+          placeholder="e.g., Safety Training Basics"
           error={!state.success ? state.fieldErrors?.title?.[0] : undefined}
         />
       </div>

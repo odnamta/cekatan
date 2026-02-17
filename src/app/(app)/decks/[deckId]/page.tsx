@@ -261,7 +261,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
         {isAuthor && (
           <EditableDeckSubject 
             deckId={deckId} 
-            initialSubject={deckTemplate.subject || 'Obstetrics & Gynecology'} 
+            initialSubject={deckTemplate.subject || 'General'}
           />
         )}
         {/* V10.4: Visibility toggle for authors */}
@@ -328,7 +328,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
         {cardsError ? (
           <p className="text-red-600 dark:text-red-400">Error loading cards: {cardsError.message}</p>
         ) : (
-          <CardList cards={cardList} deckId={deckId} deckTitle={deckTemplate.title} allTags={allTags} isAuthor={isAuthor} deckSubject={deckTemplate.subject || 'Obstetrics & Gynecology'} />
+          <CardList cards={cardList} deckId={deckId} deckTitle={deckTemplate.title} allTags={allTags} isAuthor={isAuthor} deckSubject={deckTemplate.subject || 'General'} />
         )}
       </div>
     </div>

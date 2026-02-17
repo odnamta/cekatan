@@ -6,7 +6,7 @@
  */
 
 /**
- * The Golden List of approved Topic tags for OBGYN medical exam preparation.
+ * The Golden List of approved Topic tags for assessment topic management.
  * AI classification will only suggest topics from this list.
  */
 export const GOLDEN_TOPIC_TAGS = [

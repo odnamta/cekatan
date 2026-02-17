@@ -1,9 +1,9 @@
-# 🛡️ Agent Steering Rules: "Specialize" (V10)
+# 🛡️ Agent Steering Rules: "GamaTest" (V12)
 
 ## 1. Product Identity & Design
 
-- **Name:** "Specialize" (Medical Board Prep).
-- **Target Audience:** Busy Medical Residents (Mobile-first, tired eyes).
+- **Name:** "GamaTest" (Assessment & Study Platform).
+- **Target Audience:** Organizations and their members (Mobile-first).
 - **Aesthetic:** "Clinical Glass." Use `bg-slate-50`, `backdrop-blur-md`, and `bg-white/80`.
 - **UI System:** Do NOT use external UI libraries (Shadcn CLI). Use the custom components in `src/components/ui`.
 - **Buttons:** Must have `active:scale-95` micro-interaction.

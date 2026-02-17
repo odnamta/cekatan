@@ -275,7 +275,7 @@ export interface SubjectResult {
 
 /**
  * Gets the user's current subject from their first active deck.
- * Returns "OBGYN" as default if no decks found.
+ * Returns "General" as default if no decks found.
  * 
  * Requirements: 2.2, 2.3
  */
@@ -284,7 +284,7 @@ export async function getUserSubject(): Promise<SubjectResult> {
   if (!user) {
     return {
       success: false,
-      subject: 'OBGYN',
+      subject: 'General',
       error: 'Authentication required',
     }
   }
@@ -302,7 +302,7 @@ export async function getUserSubject(): Promise<SubjectResult> {
     if (userDecksError) {
       return {
         success: false,
-        subject: 'OBGYN',
+        subject: 'General',
         error: userDecksError.message,
       }
     }
@@ -322,7 +322,7 @@ export async function getUserSubject(): Promise<SubjectResult> {
     console.error('getUserSubject error:', error)
     return {
       success: false,
-      subject: 'OBGYN',
+      subject: 'General',
       error: 'Failed to fetch subject',
     }
   }

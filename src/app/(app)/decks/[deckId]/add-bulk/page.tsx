@@ -53,8 +53,8 @@ export default async function BulkImportPage({ params }: BulkImportPageProps) {
     redirect(`/decks/${resolved.id}`)
   }
 
-  // V9.1: Pass subject to client (default to OBGYN if not set)
-  const subject = deckTemplate.subject || 'Obstetrics & Gynecology'
+  // V9.1: Pass subject to client (default to General if not set)
+  const subject = deckTemplate.subject || 'General'
 
   return <BulkImportClient deckId={resolved.id} subject={subject} />
 }

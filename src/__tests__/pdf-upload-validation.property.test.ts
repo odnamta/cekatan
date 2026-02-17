@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { validatePdfFile } from '../lib/pdf-validation';
 
 /**
- * **Feature: cellines-obgyn-prep-v2, Property 14: PDF Upload Validation**
+ * **Feature: gamatest, Property 14: PDF Upload Validation**
  * **Validates: Requirements 8.4**
  *
  * For any file upload:

@@ -12,7 +12,7 @@
  * 
  * Requirements: 4.1
  */
-export const SUPPORTED_SPECIALTIES = ['OBGYN'] as const
+export const SUPPORTED_SPECIALTIES = ['General'] as const
 export type SupportedSpecialty = typeof SUPPORTED_SPECIALTIES[number]
 
 /**

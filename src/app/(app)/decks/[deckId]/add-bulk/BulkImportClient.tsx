@@ -109,7 +109,7 @@ interface BulkImportClientProps {
   subject?: string  // V9.1: Medical specialty for AI prompts
 }
 
-export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynecology' }: BulkImportClientProps) {
+export default function BulkImportClient({ deckId, subject = 'General' }: BulkImportClientProps) {
   const { showToast } = useToast()
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null)

@@ -13,7 +13,7 @@ export interface ImportContext {
   sessionTagIds: string[]
 }
 
-const STORAGE_KEY_PREFIX = 'specialize:import-context:'
+const STORAGE_KEY_PREFIX = 'gamatest:import-context:'
 
 /**
  * Get the localStorage key for a deck's import context

@@ -7,7 +7,7 @@ import { BarChart3 } from 'lucide-react'
 import { ExportStudyDataButton } from '@/components/analytics/ExportStudyDataButton'
 
 export const metadata = {
-  title: 'Stats | Specialize',
+  title: 'Stats',
   description: 'Track your study performance and identify areas for improvement',
 }
 

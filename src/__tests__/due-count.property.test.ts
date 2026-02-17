@@ -24,7 +24,7 @@ const cardArb: fc.Arbitrary<CardForDueCount> = fc.record({
 const cardsArb = fc.array(cardArb, { minLength: 0, maxLength: 100 });
 
 /**
- * **Feature: cellines-obgyn-prep, Property 12: Due Count Calculation Correctness**
+ * **Feature: gamatest, Property 12: Due Count Calculation Correctness**
  * **Validates: Requirements 6.2**
  * 
  * For any deck displayed on the dashboard, the due_count SHALL equal the count

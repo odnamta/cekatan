@@ -314,7 +314,7 @@ describe('Feature: v9.3-batch-tagger', () => {
    */
   describe('Property 10: Subject included in AI prompt', () => {
     const MEDICAL_SUBJECTS = [
-      'Obstetrics & Gynecology',
+      'General',
       'Surgery',
       'Internal Medicine',
       'Pediatrics',
@@ -345,11 +345,11 @@ describe('Feature: v9.3-batch-tagger', () => {
     })
 
     test('Default subject is used when not provided', () => {
-      const defaultSubject = 'Obstetrics & Gynecology'
+      const defaultSubject = 'General'
       const providedSubject: string | undefined = undefined
       const effectiveSubject = providedSubject || defaultSubject
 
-      expect(effectiveSubject).toBe('Obstetrics & Gynecology')
+      expect(effectiveSubject).toBe('General')
     })
   })
 
@@ -442,7 +442,7 @@ describe('Feature: v9.3-batch-tagger', () => {
  */
 describe('Property 9: Subject persistence round-trip', () => {
   const VALID_SUBJECTS = [
-    'Obstetrics & Gynecology',
+    'General',
     'Surgery',
     'Internal Medicine',
     'Pediatrics',

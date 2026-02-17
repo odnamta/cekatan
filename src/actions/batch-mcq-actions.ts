@@ -49,7 +49,7 @@ If the text references a Figure (e.g., "Figure 19-1", "See diagram", "as shown b
 /**
  * V9.1: Default subject for backward compatibility
  */
-const DEFAULT_SUBJECT = 'Obstetrics & Gynecology'
+const DEFAULT_SUBJECT = 'General'
 
 /**
  * V11.2.1: Hard ban on meta-language patterns in Extract mode
@@ -100,8 +100,8 @@ This is WRONG because it's a comprehension question about the document, not a re
 function buildBatchExtractPrompt(goldenTopics: string[], subject: string = DEFAULT_SUBJECT): string {
   const topicList = goldenTopics.length > 0 
     ? goldenTopics.join(', ')
-    : 'Anatomy, Endocrinology, Infections, Oncology, MaternalFetal, Obstetrics, Gynecology'
-  
+    : 'General, Safety, Operations, Management, Technical, Compliance'
+
   return `You are a medical board exam expert specializing in ${subject}.
 Your task is to COPY existing exam-style multiple-choice questions from the provided text.
 
@@ -189,8 +189,8 @@ Example response format:
 function buildBatchGeneratePrompt(goldenTopics: string[], subject: string = DEFAULT_SUBJECT): string {
   const topicList = goldenTopics.length > 0 
     ? goldenTopics.join(', ')
-    : 'Anatomy, Endocrinology, Infections, Oncology, MaternalFetal, Obstetrics, Gynecology'
-  
+    : 'General, Safety, Operations, Management, Technical, Compliance'
+
   return `You are a medical board exam expert specializing in ${subject}.
 Your task is to CREATE multiple high-yield board-style MCQs from the provided textbook passage.
 

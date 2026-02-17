@@ -95,8 +95,8 @@ describe('V10.5 Brand Unification & Starter Packs - Property Tests', () => {
       )
     })
 
-    it('should have OBGYN as a valid specialty option', () => {
-      expect(SPECIALTIES).toContain('OBGYN')
+    it('should have General as a valid specialty option', () => {
+      expect(SPECIALTIES).toContain('General')
     })
   })
 
@@ -139,7 +139,7 @@ describe('V10.5 Brand Unification & Starter Packs - Property Tests', () => {
 
   /**
    * **Feature: v10.5-brand-unification-starter-packs, Property 4: Starter Pack Enrollment Creates Active Subscriptions**
-   * *For any* supported specialty (currently OBGYN), calling `enrollInStarterPack`
+   * *For any* supported specialty (currently General), calling `enrollInStarterPack`
    * should create `user_decks` records where each record has `is_active = true`.
    * **Validates: Requirements 4.1, 4.2**
    */
@@ -293,8 +293,8 @@ describe('V10.5 Brand Unification & Starter Packs - Property Tests', () => {
    * Additional test: Supported specialty validation
    */
   describe('Supported Specialty Validation', () => {
-    it('should recognize OBGYN as supported', () => {
-      expect(isSupportedSpecialty('OBGYN')).toBe(true)
+    it('should recognize General as supported', () => {
+      expect(isSupportedSpecialty('General')).toBe(true)
     })
 
     it('should not recognize unsupported specialties', () => {
@@ -322,8 +322,8 @@ describe('V10.5 Brand Unification - Unit Tests', () => {
    * **Validates: Requirements 3.2**
    */
   describe('Specialty Options', () => {
-    it('should include Obstetrics & Gynecology option (OBGYN)', () => {
-      expect(SPECIALTIES).toContain('OBGYN')
+    it('should include General option (General)', () => {
+      expect(SPECIALTIES).toContain('General')
     })
 
     it('should have at least one specialty option', () => {
@@ -341,8 +341,8 @@ describe('V10.5 Brand Unification - Unit Tests', () => {
    * **Validates: Requirements 4.1**
    */
   describe('Supported Specialties for Starter Packs', () => {
-    it('should support OBGYN specialty', () => {
-      expect(SUPPORTED_SPECIALTIES).toContain('OBGYN')
+    it('should support General specialty', () => {
+      expect(SUPPORTED_SPECIALTIES).toContain('General')
     })
 
     it('should have at least one supported specialty', () => {

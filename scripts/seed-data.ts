@@ -1,11 +1,10 @@
 /**
- * Database Seed Script for Celline's OBGYN Prep
- * 
- * This script creates a demo user and seeds the database with 10 high-yield
- * OBGYN flashcards for Specialist Entrance Exam preparation.
- * 
+ * Database Seed Script for GamaTest
+ *
+ * Legacy seed script — will be replaced with multi-tenant seed data.
+ *
  * Usage: npm run seed
- * 
+ *
  * Prerequisites:
  * - Supabase project with schema.sql applied
  * - SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local
@@ -33,7 +32,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
-const DEMO_EMAIL = 'demo@celline.com';
+const DEMO_EMAIL = 'demo@gamatest.com';
 const DEMO_PASSWORD = 'password123';
 
 interface Card {

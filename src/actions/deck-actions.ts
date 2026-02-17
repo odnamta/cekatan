@@ -35,8 +35,8 @@ export async function createDeckAction(
   }
 
   const { title } = validationResult.data
-  // V9.1: Get subject from form data, default to OBGYN
-  const subject = (formData.get('subject') as string)?.trim() || 'Obstetrics & Gynecology'
+  // V9.1: Get subject from form data, default to General
+  const subject = (formData.get('subject') as string)?.trim() || 'General'
 
   const supabase = await createSupabaseServerClient()
 
@@ -471,7 +471,7 @@ export async function updateDeckSubject(
   }
 
   // Validate subject (allow empty to reset to default)
-  const trimmedSubject = newSubject.trim() || 'Obstetrics & Gynecology'
+  const trimmedSubject = newSubject.trim() || 'General'
   if (trimmedSubject.length > 100) {
     return { success: false, error: 'Subject must be at most 100 characters' }
   }
@@ -532,7 +532,7 @@ export async function getDeckSubject(deckId: string): Promise<string> {
     .eq('id', deckId)
     .single()
 
-  return deckTemplate?.subject?.trim() || 'Obstetrics & Gynecology'
+  return deckTemplate?.subject?.trim() || 'General'
 }
 
 

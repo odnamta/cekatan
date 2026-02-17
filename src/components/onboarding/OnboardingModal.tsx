@@ -10,7 +10,7 @@ import { enrollInStarterPack } from '@/actions/onboarding-actions';
  * Specialty options for onboarding
  */
 export const SPECIALTIES = [
-  'OBGYN',
+  'General',
   'Surgery',
   'Internal Medicine',
   'Pediatrics',
