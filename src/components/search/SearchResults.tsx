@@ -80,7 +80,7 @@ export function SearchResults({
               <Icon className={`w-4 h-4 ${cfg.color} mt-0.5 flex-shrink-0`} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={result.stem}>
                     {result.stem}
                   </p>
                   {result.type !== 'card' && (

@@ -212,7 +212,7 @@ export function DeckDraftsPanel({ deckId, isAuthor, onRefresh }: DeckDraftsPanel
                         <td className="p-3 text-slate-600 dark:text-slate-400 font-mono">
                           {draft.questionNumber ?? '-'}
                         </td>
-                        <td className="p-3 text-slate-800 dark:text-slate-200 line-clamp-2">
+                        <td className="p-3 text-slate-800 dark:text-slate-200 line-clamp-2" title={draft.stem}>
                           {truncateStem(draft.stem)}
                         </td>
                         <td className="p-3">
@@ -259,7 +259,7 @@ export function DeckDraftsPanel({ deckId, isAuthor, onRefresh }: DeckDraftsPanel
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-800 dark:text-slate-200 line-clamp-2">
+                      <p className="text-sm text-slate-800 dark:text-slate-200 line-clamp-2" title={draft.stem}>
                         {truncateStem(draft.stem, 80)}
                       </p>
                       {draft.tags.length > 0 && (

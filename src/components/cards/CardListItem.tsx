@@ -85,7 +85,7 @@ export const CardListItem = memo(function CardListItem({ card, deckId, tags = []
         )}
         {/* Card content */}
         <div className="flex-1 min-w-0">
-          <p className="text-slate-900 dark:text-slate-100 line-clamp-2 text-sm">
+          <p className="text-slate-900 dark:text-slate-100 line-clamp-2 text-sm" title={preview || undefined}>
             {preview}
           </p>
           <div className="flex flex-wrap gap-2 mt-2">

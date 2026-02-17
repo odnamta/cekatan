@@ -143,6 +143,7 @@ export function TagCreateDialog({
               autoFocus
               maxLength={50}
             />
+            <p className="text-xs text-slate-400 text-right mt-1">{name.length}/50</p>
           </div>
 
           {/* Category select */}

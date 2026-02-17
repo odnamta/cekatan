@@ -108,6 +108,7 @@ export default function CreateOrgPage() {
               autoFocus
               maxLength={100}
             />
+            <p className="text-xs text-slate-400 text-right">{name.length}/100</p>
           </div>
 
           <div className="space-y-1">
@@ -132,9 +133,12 @@ export default function CreateOrgPage() {
                 maxLength={50}
               />
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Lowercase letters, numbers, and hyphens only.
-            </p>
+            <div className="flex justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Lowercase letters, numbers, and hyphens only.
+              </p>
+              <p className="text-xs text-slate-400">{slug.length}/50</p>
+            </div>
           </div>
 
           {error && (
