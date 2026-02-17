@@ -121,10 +121,7 @@ describe('BatchReviewPanel Property Tests', () => {
       fc.assert(
         fc.property(
           fc.array(
-            fc.record({
-              ...draftUIArb.model,
-              include: fc.constant(false),
-            }),
+            draftUIArb.map((d) => ({ ...d, include: false })),
             { minLength: 1, maxLength: 5 }
           ),
           (drafts) => {

@@ -32,8 +32,7 @@ describe('PDF State Persistence - Property Tests', () => {
   beforeEach(() => {
     mockStorage = createMockLocalStorage()
     originalLocalStorage = global.localStorage
-    // @ts-expect-error - mocking localStorage
-    global.localStorage = mockStorage
+    global.localStorage = mockStorage as unknown as Storage
     // Also need to mock Object.keys for clearAllPdfPages
     vi.spyOn(Object, 'keys').mockImplementation((obj) => {
       if (obj === mockStorage) {

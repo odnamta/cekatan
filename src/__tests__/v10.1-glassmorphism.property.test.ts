@@ -160,11 +160,10 @@ describe('Property 2: Onboarding Modal Visibility', () => {
     fc.assert(
       fc.property(
         fc.record({
-          specialty: fc.option(fc.string()),
-          examDate: fc.option(fc.string()),
+          onboarded: fc.constant(undefined),
         }),
         (metadata) => {
-          expect(shouldShowOnboardingModal(metadata)).toBe(true);
+          expect(shouldShowOnboardingModal(metadata as { onboarded?: boolean })).toBe(true);
         }
       ),
       { numRuns: 100 }

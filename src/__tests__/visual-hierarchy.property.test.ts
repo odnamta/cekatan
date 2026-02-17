@@ -16,6 +16,7 @@ const tagNameArb = fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim
 const tagArb = fc.record({
   id: fc.uuid(),
   user_id: fc.uuid(),
+  org_id: fc.constant('org-1'),
   name: tagNameArb,
   color: fc.constantFrom('blue', 'purple', 'green', 'red', 'gray'),
   category: tagCategoryArb,
@@ -26,6 +27,7 @@ const tagArb = fc.record({
 const tagWithOptionalCategoryArb = fc.record({
   id: fc.uuid(),
   user_id: fc.uuid(),
+  org_id: fc.constant('org-1'),
   name: tagNameArb,
   color: fc.constantFrom('blue', 'purple', 'green', 'red', 'gray'),
   category: fc.option(tagCategoryArb, { nil: undefined }),
@@ -133,6 +135,7 @@ describe('V9.4: Tag Sorting - sortTagsByCategory', () => {
     const tag: Tag = {
       id: '1',
       user_id: 'u1',
+      org_id: 'org-1',
       name: 'Test',
       color: 'blue',
       category: 'source',
@@ -146,9 +149,9 @@ describe('V9.4: Tag Sorting - sortTagsByCategory', () => {
   // Edge case: uncategorized tags appear last
   it('places uncategorized tags after all categorized tags', () => {
     const tags: Tag[] = [
-      { id: '1', user_id: 'u1', name: 'Uncategorized', color: 'gray', category: undefined as unknown as TagCategory, created_at: '' },
-      { id: '2', user_id: 'u1', name: 'Source', color: 'blue', category: 'source', created_at: '' },
-      { id: '3', user_id: 'u1', name: 'Concept', color: 'green', category: 'concept', created_at: '' },
+      { id: '1', user_id: 'u1', org_id: 'org-1', name: 'Uncategorized', color: 'gray', category: undefined as unknown as TagCategory, created_at: '' },
+      { id: '2', user_id: 'u1', org_id: 'org-1', name: 'Source', color: 'blue', category: 'source', created_at: '' },
+      { id: '3', user_id: 'u1', org_id: 'org-1', name: 'Concept', color: 'green', category: 'concept', created_at: '' },
     ]
     
     const sorted = sortTagsByCategory(tags)

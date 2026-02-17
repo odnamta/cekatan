@@ -224,7 +224,7 @@ type Notification = {
   type: NotificationType
   title: string
   body: string | null
-  link: string | null
+  link: '/assessments' | null
   read_at: string | null
   created_at: string
 }

@@ -31,7 +31,16 @@ export const PROGRESS_DEFAULTS = {
 export function createProgressRecord(
   userId: string,
   cardTemplateId: string,
-  overrides: Partial<typeof PROGRESS_DEFAULTS> = {}
+  overrides: Partial<{
+    is_flagged: boolean
+    notes: string | null
+    interval: number
+    ease_factor: number
+    repetitions: number
+    suspended: boolean
+    correct_count: number
+    total_attempts: number
+  }> = {}
 ): {
   user_id: string
   card_template_id: string

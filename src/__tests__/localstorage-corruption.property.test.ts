@@ -58,11 +58,11 @@ describe('Property 1: localStorage Corruption Recovery', () => {
           mockStorage[key] = corruptedData
           
           // Should not throw
-          let result: ReturnType<typeof loadAutoScanState>
+          let result: ReturnType<typeof loadAutoScanState> = null
           expect(() => {
             result = loadAutoScanState(deckId, sourceId)
           }).not.toThrow()
-          
+
           // Should return null for invalid data
           // (unless by chance the random string is valid JSON with correct shape)
           // We verify it doesn't crash - that's the key property
@@ -131,11 +131,11 @@ describe('Property 1: localStorage Corruption Recovery', () => {
           mockStorage[key] = JSON.stringify(partialState)
           
           // Should not throw
-          let result: ReturnType<typeof loadAutoScanState>
+          let result: ReturnType<typeof loadAutoScanState> = null
           expect(() => {
             result = loadAutoScanState(deckId, sourceId)
           }).not.toThrow()
-          
+
           // Should return null for incomplete state
           expect(result).toBeNull()
         }
@@ -180,11 +180,11 @@ describe('Property 1: localStorage Corruption Recovery', () => {
           mockStorage[key] = JSON.stringify(validState)
           
           // Should not throw
-          let result: ReturnType<typeof loadAutoScanState>
+          let result: ReturnType<typeof loadAutoScanState> = null
           expect(() => {
             result = loadAutoScanState(deckId, sourceId)
           }).not.toThrow()
-          
+
           // Should return the valid state
           expect(result).not.toBeNull()
           expect(result).toEqual(validState)

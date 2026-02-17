@@ -72,7 +72,7 @@ describe('V11.7: Tag-Filtered Global Study', () => {
     it('should return base path when tagIds is empty', () => {
       fc.assert(
         fc.property(
-          fc.constant([]),
+          fc.constant([] as string[]),
           (tagIds) => {
             const url = buildStudyUrl(tagIds)
             expect(url).toBe('/study/global')
