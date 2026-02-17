@@ -61,8 +61,6 @@ async function migrateLegacyDeck(
   legacyDeckId: string,
   userId: string
 ): Promise<{ templateId: string; authorId: string } | null> {
-  console.log(`[migrateLegacyDeck] Attempting migration for legacy deck: ${legacyDeckId}`)
-
   // 1. Query legacy deck from public.decks
   const { data: legacyDeck, error: legacyError } = await supabase
     .from('decks')
@@ -71,16 +69,11 @@ async function migrateLegacyDeck(
     .single()
 
   if (legacyError || !legacyDeck) {
-    console.log('[migrateLegacyDeck] Legacy deck not found:', legacyDeckId)
     return null
   }
 
   // 2. Verify ownership - only owner can trigger migration
   if (legacyDeck.user_id !== userId) {
-    console.log('[migrateLegacyDeck] User is not owner, skipping migration:', {
-      deckOwner: legacyDeck.user_id,
-      currentUser: userId,
-    })
     return null
   }
 
@@ -92,7 +85,6 @@ async function migrateLegacyDeck(
     .single()
 
   if (existing) {
-    console.log('[migrateLegacyDeck] Already migrated:', existing.id)
     return { templateId: existing.id, authorId: existing.author_id }
   }
 
@@ -125,7 +117,6 @@ async function migrateLegacyDeck(
     // Don't fail - deck was created successfully
   }
 
-  console.log(`[migrateLegacyDeck] Successfully migrated ${legacyDeckId} → ${newTemplate.id}`)
   return { templateId: newTemplate.id, authorId: newTemplate.author_id }
 }
 
@@ -150,7 +141,6 @@ async function resolveDeckTemplateId(
     .single()
 
   if (directMatch) {
-    console.log('[resolveDeckTemplateId] Step 1 matched: Direct V2 ID')
     return { templateId: directMatch.id, authorId: directMatch.author_id }
   }
 
@@ -162,7 +152,6 @@ async function resolveDeckTemplateId(
     .single()
 
   if (legacyMatch) {
-    console.log('[resolveDeckTemplateId] Step 2 matched: Legacy ID (already migrated)')
     return { templateId: legacyMatch.id, authorId: legacyMatch.author_id }
   }
 
@@ -175,20 +164,16 @@ async function resolveDeckTemplateId(
     .single()
 
   if (userDeckMatch?.deck_templates) {
-    console.log('[resolveDeckTemplateId] Step 3 matched: User Deck subscription')
     const template = userDeckMatch.deck_templates as unknown as { id: string; author_id: string }
     return { templateId: template.id, authorId: template.author_id }
   }
 
   // Step 4: V8.2.4 - Legacy table lookup + auto-migration
-  console.log('[resolveDeckTemplateId] Step 4: Attempting legacy auto-migration for:', deckId)
   const migrated = await migrateLegacyDeck(supabase, deckId, userId)
   if (migrated) {
-    console.log('[resolveDeckTemplateId] Step 4 matched: Legacy auto-migration successful')
     return migrated
   }
 
-  console.log('[resolveDeckTemplateId] All 4 steps failed for deckId:', deckId)
   return null
 }
 
@@ -248,16 +233,12 @@ export async function uploadSourceAction(
     // V8.2.3: Robust ID resolution with 3-step lookup
     let resolvedTemplateId: string | null = null
     if (validatedDeckId) {
-      console.log('[uploadSourceAction] Received deckId:', validatedDeckId, 'User:', user.id)
-      
       const resolved = await resolveDeckTemplateId(supabase, validatedDeckId, user.id)
       
       if (!resolved) {
         console.warn('[uploadSourceAction] Deck not found after 4-step lookup:', validatedDeckId, 'User:', user.id)
         return { success: false, error: 'Deck not found. Please verify the deck exists or create a new one.' }
       }
-
-      console.log('[uploadSourceAction] Resolved template:', resolved.templateId, 'from input:', validatedDeckId)
 
       // Only authors can upload PDFs to a deck
       if (resolved.authorId !== user.id) {
@@ -281,8 +262,6 @@ export async function uploadSourceAction(
 
     // Upload to Supabase Storage (Requirements: 9.2)
     // Uses the "sources" bucket - must be created in Supabase Dashboard
-    console.log('[uploadSourceAction] DB check passed, attempting storage upload for:', filePath)
-    
     const { error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET)
       .upload(filePath, fileBuffer, {
@@ -462,16 +441,12 @@ export async function linkSourceToDeckAction(
   }
 
   // V8.2.3: Robust ID resolution with 3-step lookup
-  console.log('[linkSourceToDeckAction] Received deckId:', deckId, 'User:', user.id)
-  
   const resolved = await resolveDeckTemplateId(supabase, deckId, user.id)
   
   if (!resolved) {
     console.warn('[linkSourceToDeckAction] Deck not found after 4-step lookup:', deckId, 'User:', user.id)
     return { success: false, error: 'Deck not found. Please verify the deck exists or create a new one.' }
   }
-
-  console.log('[linkSourceToDeckAction] Resolved template:', resolved.templateId, 'from input:', deckId)
 
   if (resolved.authorId !== user.id) {
     console.warn('[linkSourceToDeckAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })

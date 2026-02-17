@@ -109,18 +109,9 @@ export async function logMigrationStatus(): Promise<void> {
   try {
     const status = await checkMigrationStatus()
 
-    console.log('=== V8.0 Migration Status ===')
-    console.log(`Legacy cards: ${status.legacyCardsCount}`)
-    console.log(`Legacy decks: ${status.legacyDecksCount}`)
-    console.log(`V2 card_templates: ${status.v2CardTemplatesCount}`)
-    console.log(`V2 deck_templates: ${status.v2DeckTemplatesCount}`)
-    console.log(`Migration complete: ${status.migrationComplete}`)
-
     for (const warning of status.warnings) {
       console.warn(warning)
     }
-
-    console.log('=============================')
   } catch (error) {
     console.error('Failed to check migration status:', error)
   }

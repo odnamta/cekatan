@@ -4,15 +4,17 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Search, X } from 'lucide-react'
 import { CardListItem } from './CardListItem'
+import dynamic from 'next/dynamic'
 import { BulkActionsBar } from './BulkActionsBar'
-import { BulkTagModal } from './BulkTagModal'
 import { DeckSelector } from './DeckSelector'
 import { StatusFilterChips, getDefaultStatusFilter, type StatusFilter } from './StatusFilterChips'
 import { PublishAllConfirmDialog } from './PublishAllConfirmDialog'
-import { CardEditorPanel } from './CardEditorPanel'
 import { FilterBar } from '@/components/tags/FilterBar'
 import { TagSelector } from '@/components/tags/TagSelector'
-import { AutoTagProgressModal } from '@/components/tags/AutoTagProgressModal'
+
+const BulkTagModal = dynamic(() => import('./BulkTagModal').then(m => ({ default: m.BulkTagModal })), { ssr: false })
+const CardEditorPanel = dynamic(() => import('./CardEditorPanel').then(m => ({ default: m.CardEditorPanel })), { ssr: false })
+const AutoTagProgressModal = dynamic(() => import('@/components/tags/AutoTagProgressModal').then(m => ({ default: m.AutoTagProgressModal })), { ssr: false })
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { deleteCard, duplicateCard, bulkDeleteCards, bulkMoveCards, getAllCardIdsInDeck, bulkPublishCards } from '@/actions/card-actions'
 import { useAutoTag } from '@/hooks/use-auto-tag'

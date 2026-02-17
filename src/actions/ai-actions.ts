@@ -241,20 +241,6 @@ export async function draftMCQFromText(input: DraftMCQInput): Promise<MCQDraftRe
   
   const { sourceText, deckName, mode = 'extract', subject, imageBase64, imageUrl } = validationResult.data
   
-  // V6.6: Debug logging for image presence
-  if (imageBase64 || imageUrl) {
-    console.log('[draftMCQFromText] Image provided:', {
-      hasBase64: !!imageBase64,
-      base64Length: imageBase64?.length || 0,
-      hasUrl: !!imageUrl,
-    })
-  }
-  
-  // V9.1: Log subject for debugging
-  if (subject) {
-    console.log('[draftMCQFromText] Using subject:', subject)
-  }
-  
   try {
     // Build message content (with optional image for Vision MVP)
     const userContent = buildMessageContent(

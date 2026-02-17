@@ -177,20 +177,12 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     if (!deckId || !sourceId) return
     const saved = loadAutoScanState(deckId, sourceId)
     if (saved && saved.isScanning) {
-      // V8.4: Log when resumable state is found
-      console.log('[useAutoScan] Found resumable state', {
-        currentPage: saved.currentPage,
-        cardsCreated: saved.stats.cardsCreated,
-        pagesProcessed: saved.stats.pagesProcessed,
-      })
       // There's a resumable state
       setHasResumableState(true)
       setCurrentPage(saved.currentPage)
       setStats(saved.stats)
       setSkippedPages(saved.skippedPages)
       setConsecutiveErrors(saved.consecutiveErrors)
-    } else {
-      console.log('[useAutoScan] No resumable state found for', { deckId, sourceId })
     }
   }, [deckId, sourceId])
 
@@ -261,15 +253,6 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
         tagNames: draft.aiTags,  // V7.1: Fixed - MCQBatchDraftUI uses aiTags not tagNames
       }))
 
-      // V7.2.1: Deep logging - AutoScan caller
-      // V11.3: Include importSessionId for draft/publish workflow
-      console.log('[AutoScan] Calling bulkCreateMCQV2', {
-        deckTemplateId: deckId,
-        page: pageNumber,
-        cardsCount: cards.length,
-        importSessionId,
-      })
-      
       // V11.3: Pass importSessionId for draft/publish workflow
       const saveResult = await bulkCreateMCQV2({
         deckTemplateId: deckId,
@@ -297,7 +280,6 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
       
       if (!isRetry) {
         // Retry once
-        console.log(`[useAutoScan] Retrying page ${pageNumber}...`)
         return processPage(pageNumber, true)
       }
 
@@ -353,11 +335,6 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     // React's batched updates may delay the useEffect-based persist, so we call it explicitly
     currentPageRef.current = currentPageRef.current + 1
     persistState()
-    console.log('[useAutoScan] State persisted after page', page, {
-      nextPage: currentPageRef.current,
-      cardsCreated: statsRef.current.cardsCreated,
-      pagesProcessed: statsRef.current.pagesProcessed,
-    })
 
     // Schedule next iteration
     setTimeout(runScanIteration, SCAN_DELAY_MS)
@@ -418,7 +395,6 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
       }
       
       // Resume mode: Use saved currentPage, preserve stats
-      console.log('[useAutoScan] Starting in RESUME mode from page', saved.currentPage)
       // V8.6: Sync refs BEFORE setTimeout to prevent race conditions
       isScanningRef.current = true
       currentPageRef.current = saved.currentPage
@@ -429,8 +405,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     } else {
       // Fresh start mode: Use startPage or default to 1, reset stats
       const effectiveStartPage = startPage ?? 1
-      console.log('[useAutoScan] Starting in FRESH mode from page', effectiveStartPage)
-      
+
       // Clear localStorage state for fresh start
       if (deckId && sourceId) {
         clearAutoScanState(deckId, sourceId)
@@ -502,7 +477,6 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     // V8.4: Update ref before persist to ensure isScanning=false is saved
     isScanningRef.current = false
     persistState()
-    console.log('[useAutoScan] Scan paused, state persisted at page', currentPageRef.current)
   }, [persistState])
 
   // Stop scanning (preserves stats for review)

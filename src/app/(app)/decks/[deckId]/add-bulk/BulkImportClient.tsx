@@ -218,8 +218,8 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
       // V11.3: Update import session stats
       importSession.incrementDraftCount(cardsCreated)
     },
-    onError: (page, error) => {
-      console.warn(`[AutoScan] Page ${page} failed:`, error)
+    onError: (_page, _error) => {
+      // Errors tracked in skippedPages state
     },
     onComplete: (stats) => {
       showToast(`Auto-scan complete! Created ${stats.cardsCreated} cards.`, 'success')
@@ -297,7 +297,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
         })
       }
     } catch (err) {
-      console.error('PDF upload error:', err)
+      if (process.env.NODE_ENV !== 'production') console.error('PDF upload error:', err)
       let errorMessage = 'An unexpected error occurred'
       if (err instanceof Error) {
         if (err.message.includes('Body exceeded') || err.message.includes('413')) {
@@ -580,7 +580,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
         showToast(result.error.message || 'Failed to generate drafts', 'error')
       }
     } catch (err) {
-      console.error('Page scan error:', err)
+      if (process.env.NODE_ENV !== 'production') console.error('Page scan error:', err)
       showToast('Failed to extract text from page. Please try again.', 'error')
     } finally {
       setIsPageScanning(false)
@@ -606,7 +606,7 @@ export default function BulkImportClient({ deckId, subject = 'Obstetrics & Gynec
       
       showToast(`Appended text from page ${nextPageNumber}`, 'success')
     } catch (err) {
-      console.error('Append page error:', err)
+      if (process.env.NODE_ENV !== 'production') console.error('Append page error:', err)
       showToast('Failed to extract text from next page', 'error')
     } finally {
       setIsAppending(false)

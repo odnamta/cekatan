@@ -9,6 +9,7 @@ interface InputProps extends React.ComponentProps<"input"> {
 
 function Input({ className, type, label, error, id, ...props }: InputProps) {
   const inputId = id || props.name
+  const errorId = error && inputId ? `${inputId}-error` : undefined
 
   return (
     <div className="space-y-1">
@@ -32,10 +33,11 @@ function Input({ className, type, label, error, id, ...props }: InputProps) {
           className
         )}
         aria-invalid={!!error}
+        aria-describedby={errorId}
         {...props}
       />
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p id={errorId} className="text-sm text-destructive" role="alert">
           {error}
         </p>
       )}

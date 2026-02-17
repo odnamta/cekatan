@@ -3,10 +3,12 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { BookOpen, FolderTree, Lightbulb, Merge, Loader2, Pencil, Sparkles, Settings, Plus, Trash2 } from 'lucide-react'
 import { TagBadge } from './TagBadge'
-import { TagMergeModal } from './TagMergeModal'
+import dynamic from 'next/dynamic'
 import { TagCreateDialog } from './TagCreateDialog'
 import { DeleteTagConfirmDialog } from './DeleteTagConfirmDialog'
-import { SmartCleanupTab } from './SmartCleanupTab'
+
+const TagMergeModal = dynamic(() => import('./TagMergeModal').then(m => ({ default: m.TagMergeModal })), { ssr: false })
+const SmartCleanupTab = dynamic(() => import('./SmartCleanupTab').then(m => ({ default: m.SmartCleanupTab })), { ssr: false })
 import { getCategoryColorClasses } from '@/lib/tag-colors'
 import { 
   getTagsByCategory, 

@@ -315,11 +315,6 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
   
   const { text, defaultTags, mode = 'extract', subject, imageBase64, imageUrl } = validationResult.data
   
-  // V9.1: Log subject for debugging
-  if (subject) {
-    console.log('[draftBatchMCQFromText] V9.1: Using subject:', subject)
-  }
-  
   // V9: Fetch Golden List topics for AI classification
   let goldenTopics: string[] = []
   try {
@@ -333,7 +328,6 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
         .eq('category', 'topic')
         .order('name')
       goldenTopics = topics?.map(t => t.name) || []
-      console.log(`[draftBatchMCQFromText] V9: Loaded ${goldenTopics.length} Golden List topics`)
     }
   } catch (e) {
     console.warn('[draftBatchMCQFromText] V9: Failed to load Golden List, using defaults')
@@ -388,14 +382,7 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
         validDrafts.push(itemResult.data)
       } else {
         filteredCount++
-        // V8.5: Log validation failures for debugging
-        console.log(`[draftBatchMCQFromText] Filtered question with invalid data:`, itemResult.error.issues.map(i => i.message).join(', '))
       }
-    }
-    
-    // V8.5: Log summary of filtered questions
-    if (filteredCount > 0) {
-      console.log(`[draftBatchMCQFromText] Filtered ${filteredCount} questions with invalid tags or data`)
     }
     
     // V12: Quality Scanner Integration (advisory only, never blocks)
@@ -406,8 +393,7 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
     try {
       // Step 1: Scan the raw text chunk
       scanResult = scanChunkForQuestionsAndOptions(text)
-      console.log(`[draftBatchMCQFromText] V12: Scanned ${scanResult.rawQuestionCount} questions from source text`)
-      
+
       // Step 2: Compare with AI drafts
       const aiDraftOptionCounts = validDrafts.map(d => d.options.length)
       scanResult = compareWithAIDrafts(scanResult, validDrafts.length, aiDraftOptionCounts)
@@ -420,14 +406,6 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
         }
       }
       
-      // Log quality summary
-      if (scanResult.globalIssues.length > 0 || numQuestionsWithMissingOptions > 0 || numQuestionsWithExtraOptions > 0) {
-        console.log(`[draftBatchMCQFromText] V12: Quality issues detected:`, {
-          globalIssues: scanResult.globalIssues.length,
-          missingOptions: numQuestionsWithMissingOptions,
-          extraOptions: numQuestionsWithExtraOptions,
-        })
-      }
     } catch (scanError) {
       // V12: Fail soft - log and continue without quality data
       console.warn('[draftBatchMCQFromText] V12: Quality scan failed, continuing without quality data:', scanError)
@@ -521,18 +499,6 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
   // When importSessionId is provided, cards are drafts; otherwise published (backwards compatible)
   const cardStatus = importSessionId ? 'draft' : 'published'
   
-  // V11/V11.3: Log structured content context if provided
-  if (bookSourceId || chapterId || matchingGroupId || matchingBlockData || importSessionId) {
-    console.log('[bulkCreateMCQV2] V11.3: Content context:', {
-      bookSourceId,
-      chapterId,
-      matchingGroupId,
-      hasMatchingBlockData: !!matchingBlockData,
-      importSessionId,
-      cardStatus,
-    })
-  }
-  
   // V11.5.1: Use withUser for auth
   const authResult = await withUser(async ({ user, supabase }: AuthContext) => {
     // V8.0: Direct deck_template lookup - NO FALLBACK
@@ -583,7 +549,6 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
       
       if (existingCards) {
         existingStems = new Set(existingCards.map((c) => normalizeStem(c.stem)))
-        console.log(`[bulkCreateMCQV2] V11.6: Found ${existingStems.size} existing cards in session`)
       }
     }
     
@@ -596,14 +561,11 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
       
       if (existingStems.has(normalized) || batchStems.has(normalized)) {
         skippedCount++
-        console.log(`[bulkCreateMCQV2] V11.6: Skipping duplicate stem`)
       } else {
         cardsToCreate.push(card)
         batchStems.add(normalized)
       }
     }
-    
-    console.log(`[bulkCreateMCQV2] V11.6: ${cardsToCreate.length} to create, ${skippedCount} duplicates skipped`)
     
     // If all cards were duplicates, return early with success
     if (cardsToCreate.length === 0) {
@@ -615,9 +577,6 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     let effectiveMatchingGroupId = matchingGroupId || null
     
     if (matchingBlockData && matchingBlockData.commonOptions.length >= 2) {
-      console.log('[bulkCreateMCQV2] V11: Creating matching_group for block with', 
-        matchingBlockData.commonOptions.length, 'options')
-      
       const { data: newGroup, error: groupError } = await supabase
         .from('matching_groups')
         .insert({
@@ -633,7 +592,6 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
         // Non-fatal: continue without matching group linking
       } else if (newGroup) {
         effectiveMatchingGroupId = newGroup.id
-        console.log('[bulkCreateMCQV2] V11: Created matching_group:', effectiveMatchingGroupId)
       }
     }
     
@@ -649,8 +607,7 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
       const card = cardsToCreate[cardIdx]
       // V8.4: Defensive check - ensure tagNames exists and is an array
       const cardTags = Array.isArray(card.tagNames) ? card.tagNames : []
-      console.log(`[bulkCreateMCQV2] Card ${cardIdx}: ${cardTags.length} AI tags received`)
-      
+
       for (const tagName of cardTags) {
         const trimmed = tagName.trim()
         if (trimmed) {
@@ -662,8 +619,6 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
         }
       }
     }
-    
-    console.log(`[bulkCreateMCQV2] Total unique tags to resolve: ${allTagNames.size}`, Array.from(allTagNames))
     
     // V11.5.1: Import tag resolver for canonical topic tag matching
     const { resolveTopicTag } = await import('@/lib/tag-resolver')
@@ -748,8 +703,6 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     const cardTagRows: { card_template_id: string; tag_id: string }[] = []
     const seenPairs = new Set<string>()
     
-    console.log(`[bulkCreateMCQV2] Resolved ${tagNameToId.size} unique tags to IDs`)
-    
     for (let i = 0; i < insertedTemplates.length; i++) {
       const cardTemplateId = insertedTemplates[i].id
       let cardTagCount = 0
@@ -786,11 +739,8 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
         }
       }
       
-      console.log(`[bulkCreateMCQV2] Card ${i} (${cardTemplateId}): linking ${cardTagCount} tags`)
     }
-    
-    console.log(`[bulkCreateMCQV2] Inserting ${cardTagRows.length} card-tag links`)
-    
+
     if (cardTagRows.length > 0) {
       const { error: tagLinkError } = await supabase.from('card_template_tags').insert(cardTagRows)
       if (tagLinkError) {
