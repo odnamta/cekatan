@@ -8,6 +8,7 @@
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { withUser, withOrgUser } from '@/actions/_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { ACTIVE_ORG_COOKIE } from '@/lib/org-context'
 import type { ActionResultV2 } from '@/types/actions'
 import type { Organization, OrganizationMember, OrganizationMemberWithProfile, OrgRole, AssessmentDefaults } from '@/types/database'
@@ -66,7 +67,7 @@ export async function createOrganization(
 
     revalidatePath('/dashboard')
     return { ok: true, data: org as Organization }
-  })
+  }, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -543,5 +544,5 @@ export async function joinOrgBySlug(
 
     revalidatePath('/', 'layout')
     return { ok: true, data: { orgName: org.name } }
-  })
+  }, RATE_LIMITS.standard)
 }

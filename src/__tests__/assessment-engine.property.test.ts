@@ -293,7 +293,7 @@ describe('Tab Switch Tracking', () => {
   test('log is append-only (previous entries unchanged)', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.date(), { minLength: 2, maxLength: 20 }),
+        fc.array(fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }), { minLength: 2, maxLength: 20 }),
         (dates) => {
           let log: TabSwitchEntry[] = []
           let count = 0

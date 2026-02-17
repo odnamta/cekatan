@@ -121,15 +121,20 @@ export async function updateUserProfile(
     updateData.name = displayName
   }
 
-  const { error: updateError } = await supabase.auth.admin.updateUserById(
-    user.id,
-    { user_metadata: { ...user.user_metadata, ...updateData } }
-  )
+  const { error: updateError } = await supabase.auth.updateUser({
+    data: { ...user.user_metadata, ...updateData },
+  })
 
   if (updateError) {
-    // Fallback: try client-side update approach via RPC or direct metadata update
-    // For now, return error - admin API requires service role
     return { success: false, error: 'Unable to update profile. Please try again.' }
+  }
+
+  // Sync full_name to profiles table
+  if (displayName !== undefined) {
+    await supabase
+      .from('profiles')
+      .update({ full_name: displayName })
+      .eq('id', user.id)
   }
 
   // If specialty changed, re-enroll in starter pack

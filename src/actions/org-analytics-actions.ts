@@ -159,13 +159,17 @@ export async function getOrgAnalytics(): Promise<ActionResultV2<OrgAnalytics>> {
       }
     }
 
-    // Fetch emails for candidates
+    // Fetch emails for candidates from profiles table
     if (userScoreMap.size > 0) {
-      const { data: profiles } = await supabase.auth.admin.listUsers({ perPage: 1000 })
-      if (profiles?.users) {
-        for (const u of profiles.users) {
-          const entry = userScoreMap.get(u.id)
-          if (entry) entry.email = u.email ?? 'Unknown'
+      const userIds = [...userScoreMap.keys()]
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', userIds)
+      if (profiles) {
+        for (const p of profiles) {
+          const entry = userScoreMap.get(p.id)
+          if (entry) entry.email = p.email ?? 'Unknown'
         }
       }
     }

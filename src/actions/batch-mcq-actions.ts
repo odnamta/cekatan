@@ -5,6 +5,7 @@ import { openai } from '@/lib/openai-client'
 import { MCQ_MODEL, MCQ_TEMPERATURE, MCQ_MAX_TOKENS } from '@/lib/ai-config'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { withUser, type AuthContext } from './_helpers'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { getCardDefaults } from '@/lib/card-defaults'
 import {
   draftBatchInputSchema,
@@ -314,11 +315,19 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
   }
   
   const { text, defaultTags, mode = 'extract', subject, imageBase64, imageUrl } = validationResult.data
-  
+
+  // Rate limit check (sensitive: AI batch operation)
+  const user = await getUser()
+  if (user) {
+    const rateLimitResult = checkRateLimit(`user:${user.id}:draftBatchMCQ`, RATE_LIMITS.sensitive)
+    if (!rateLimitResult.allowed) {
+      return { ok: false, error: { message: 'Rate limit exceeded. Please try again later.', code: 'RATE_LIMITED' } }
+    }
+  }
+
   // V9: Fetch Golden List topics for AI classification
   let goldenTopics: string[] = []
   try {
-    const user = await getUser()
     if (user) {
       const supabase = await createSupabaseServerClient()
       const { data: topics } = await supabase
@@ -498,7 +507,17 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
   // V11.3: Determine card status based on importSessionId
   // When importSessionId is provided, cards are drafts; otherwise published (backwards compatible)
   const cardStatus = importSessionId ? 'draft' : 'published'
-  
+
+  // Rate limit check (sensitive: bulk card creation)
+  const rateLimitUser = await getUser()
+  if (!rateLimitUser) {
+    return { ok: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } }
+  }
+  const bulkCreateRateLimit = checkRateLimit(`user:${rateLimitUser.id}:bulkCreateMCQ`, RATE_LIMITS.sensitive)
+  if (!bulkCreateRateLimit.allowed) {
+    return { ok: false, error: { message: 'Rate limit exceeded. Please try again later.', code: 'RATE_LIMITED' } }
+  }
+
   // V11.5.1: Use withUser for auth
   const authResult = await withUser(async ({ user, supabase }: AuthContext) => {
     // V8.0: Direct deck_template lookup - NO FALLBACK
@@ -952,7 +971,7 @@ export async function bulkPublishDrafts(
     }
 
     return { ok: true, data: { updatedCount: count || cardIds.length } }
-  }) as Promise<ActionResultV2<{ updatedCount: number }>>
+  }, RATE_LIMITS.bulk) as Promise<ActionResultV2<{ updatedCount: number }>>
 }
 
 /**
@@ -1013,5 +1032,5 @@ export async function bulkArchiveDrafts(
     }
 
     return { ok: true, data: { updatedCount: count || cardIds.length } }
-  }) as Promise<ActionResultV2<{ updatedCount: number }>>
+  }, RATE_LIMITS.bulk) as Promise<ActionResultV2<{ updatedCount: number }>>
 }

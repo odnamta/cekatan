@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { withUser, withOrgUser, type AuthContext, type OrgAuthContext } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { getCategoryColor } from '@/lib/tag-colors'
 import { TAG_CATEGORIES, isValidTagCategory } from '@/lib/constants'
 import type { Tag, TagCategory } from '@/types/database'
@@ -463,7 +464,7 @@ export async function bulkAddTagToCards(
     }
 
     return { ok: true, data: { taggedCount: totalTagged } }
-  })
+  }, undefined, RATE_LIMITS.bulk)
 }
 
 

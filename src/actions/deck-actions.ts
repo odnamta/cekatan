@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { withUser, withOrgUser, type AuthContext, type OrgAuthContext } from './_helpers'
 import { createDeckSchema } from '@/lib/validations'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import type { ActionResult, ActionResultV2 } from '@/types/actions'
 
 /**
@@ -32,6 +33,12 @@ export async function createDeckAction(
   const user = await getUser()
   if (!user) {
     return { success: false, error: 'Authentication required' }
+  }
+
+  // Rate limit check
+  const rateLimitResult = checkRateLimit(`user:${user.id}:createDeck`, RATE_LIMITS.standard)
+  if (!rateLimitResult.allowed) {
+    return { success: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const { title } = validationResult.data
@@ -100,7 +107,7 @@ export async function deleteDeckAction(deckId: string): Promise<ActionResultV2> 
 
     revalidatePath('/dashboard')
     return { ok: true }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 
@@ -320,6 +327,12 @@ export async function createDeckTemplateAction(
   const user = await getUser()
   if (!user) {
     return { success: false, error: 'Authentication required' }
+  }
+
+  // Rate limit check
+  const rateLimitResult = checkRateLimit(`user:${user.id}:createDeckTemplate`, RATE_LIMITS.standard)
+  if (!rateLimitResult.allowed) {
+    return { success: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const { title } = validationResult.data

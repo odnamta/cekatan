@@ -65,6 +65,7 @@ export async function createAssessment(
       .from('deck_templates')
       .select('id, org_id')
       .eq('id', input.deckTemplateId)
+      .eq('org_id', org.id)
       .single()
 
     if (!deck) {
@@ -680,7 +681,7 @@ export async function submitAnswer(
     // Verify session is active and belongs to user
     const { data: session } = await supabase
       .from('assessment_sessions')
-      .select('id, status')
+      .select('id, status, question_order')
       .eq('id', sessionId)
       .eq('user_id', user.id)
       .eq('status', 'in_progress')
@@ -688,6 +689,12 @@ export async function submitAnswer(
 
     if (!session) {
       return { ok: false, error: 'Session not found or already completed' }
+    }
+
+    // Verify the card belongs to this session's question set
+    const questionOrder = session.question_order as string[]
+    if (!questionOrder.includes(cardTemplateId)) {
+      return { ok: false, error: 'Question not part of this session' }
     }
 
     // Get the correct answer
@@ -1073,6 +1080,18 @@ export async function getExistingAnswers(
   sessionId: string
 ): Promise<ActionResultV2<{ cardTemplateId: string; selectedIndex: number }[]>> {
   return withOrgUser(async ({ user, supabase }) => {
+    // Verify session belongs to the calling user
+    const { data: session } = await supabase
+      .from('assessment_sessions')
+      .select('id')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!session) {
+      return { ok: false, error: 'Session not found' }
+    }
+
     const { data: answers, error } = await supabase
       .from('assessment_answers')
       .select('card_template_id, selected_index')

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { createCardSchema } from '@/lib/validations'
 import { getCardDefaults } from '@/lib/card-defaults'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import type { ActionResult } from '@/types/actions'
 
 /**
@@ -52,6 +53,12 @@ export async function createCardAction(
   const user = await getUser()
   if (!user) {
     return { success: false, error: 'Authentication required' }
+  }
+
+  // Rate limit check
+  const rateLimitResult = checkRateLimit(`user:${user.id}:createCard`, RATE_LIMITS.standard)
+  if (!rateLimitResult.allowed) {
+    return { success: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const { deckId, front, back } = validationResult.data
@@ -373,6 +380,12 @@ export async function bulkDeleteCards(cardIds: string[]): Promise<CardActionResu
     return { ok: false, error: 'Authentication required' }
   }
 
+  // Rate limit check
+  const rateLimitResult = checkRateLimit(`user:${user.id}:bulkDeleteCards`, RATE_LIMITS.bulk)
+  if (!rateLimitResult.allowed) {
+    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
+  }
+
   const supabase = await createSupabaseServerClient()
 
   // V8.0: Verify ownership of all card_templates via deck_template join
@@ -436,6 +449,12 @@ export async function bulkMoveCards(
   const user = await getUser()
   if (!user) {
     return { ok: false, error: 'Authentication required' }
+  }
+
+  // Rate limit check
+  const rateLimitResult = checkRateLimit(`user:${user.id}:bulkMoveCards`, RATE_LIMITS.bulk)
+  if (!rateLimitResult.allowed) {
+    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -671,6 +690,12 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
   const user = await getUser()
   if (!user) {
     return { ok: false, error: 'Authentication required' }
+  }
+
+  // Rate limit check
+  const rateLimitResult = checkRateLimit(`user:${user.id}:bulkPublishCards`, RATE_LIMITS.bulk)
+  if (!rateLimitResult.allowed) {
+    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const supabase = await createSupabaseServerClient()
