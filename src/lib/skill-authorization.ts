@@ -42,3 +42,19 @@ export function canViewOwnSkillScores(
   if (hasMinimumRole(role, 'admin')) return true
   return skillsVisibleToCandidates
 }
+
+/**
+ * Can the user manage role profiles (create/update/delete)?
+ * Requires admin+ role.
+ */
+export function canManageRoleProfiles(role: OrgRole): boolean {
+  return hasMinimumRole(role, 'admin')
+}
+
+/**
+ * Can the user assign employees to role profiles?
+ * Requires admin+ role.
+ */
+export function canAssignRoles(role: OrgRole): boolean {
+  return hasMinimumRole(role, 'admin')
+}

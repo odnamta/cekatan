@@ -1,16 +1,16 @@
 'use client'
 
 /**
- * V19: Skills Management Page
+ * V19/V19.1: Skills Management Page
  *
- * Admin: Create/edit/delete skill domains, view org-wide heatmap.
- * All members: View skill domains and their own scores.
+ * Admin: Create/edit/delete skill domains and role profiles, view org-wide heatmap.
+ * All members: View skill domains, role profiles, and their own scores.
  */
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { Plus, Target, X } from 'lucide-react'
+import { Plus, Target, Users, X } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import {
   getOrgSkillDomains,
@@ -19,13 +19,20 @@ import {
   deleteSkillDomain,
   getOrgSkillHeatmap,
 } from '@/actions/skill-actions'
-import { canManageSkillDomains } from '@/lib/skill-authorization'
+import {
+  getOrgRoleProfiles,
+  createRoleProfile,
+  updateRoleProfile,
+  deleteRoleProfile,
+} from '@/actions/role-actions'
+import { canManageSkillDomains, canManageRoleProfiles } from '@/lib/skill-authorization'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { SkillDomainCard } from '@/components/skills/SkillDomainCard'
+import { RoleProfileCard } from '@/components/skills/RoleProfileCard'
 import { SkillHeatmap } from '@/components/skills/SkillHeatmap'
-import type { SkillDomain } from '@/types/database'
+import type { SkillDomain, RoleProfile } from '@/types/database'
 
 const PRESET_COLORS = [
   '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b',
@@ -49,6 +56,13 @@ export default function SkillsPage() {
 
   const isAdmin = hasMinimumRole(role, 'admin')
   const canManage = canManageSkillDomains(role)
+  const canManageRoles = canManageRoleProfiles(role)
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'domains' | 'roles'>('domains')
+
+  // Role profiles state
+  const [roleProfiles, setRoleProfiles] = useState<RoleProfile[]>([])
 
   // Heatmap state (admin only)
   const [heatmapData, setHeatmapData] = useState<{
@@ -56,9 +70,10 @@ export default function SkillsPage() {
     employees: { userId: string; email: string; scores: Record<string, number | null> }[]
   } | null>(null)
 
-  // Create/Edit form state
+  // Create/Edit form state (shared for domains and roles)
   const [showForm, setShowForm] = useState(false)
   const [editingDomain, setEditingDomain] = useState<SkillDomain | null>(null)
+  const [editingRole, setEditingRole] = useState<RoleProfile | null>(null)
   const [form, setForm] = useState<SkillFormState>({ name: '', description: '', color: '#6366f1' })
 
   useEffect(() => {
@@ -67,69 +82,37 @@ export default function SkillsPage() {
 
   async function loadData() {
     setLoading(true)
-    const [domainsResult, heatmapResult] = await Promise.all([
+    const [domainsResult, rolesResult, heatmapResult] = await Promise.all([
       getOrgSkillDomains(),
+      getOrgRoleProfiles(),
       isAdmin ? getOrgSkillHeatmap() : Promise.resolve(null),
     ])
 
     if (domainsResult.ok) setDomains(domainsResult.data ?? [])
+    if (rolesResult.ok) setRoleProfiles(rolesResult.data ?? [])
     if (heatmapResult && 'ok' in heatmapResult && heatmapResult.ok) {
       setHeatmapData(heatmapResult.data ?? null)
     }
     setLoading(false)
   }
 
+  // --- Skill Domain handlers ---
   function openCreateForm() {
     setEditingDomain(null)
+    setEditingRole(null)
     setForm({ name: '', description: '', color: PRESET_COLORS[domains.length % PRESET_COLORS.length] })
     setShowForm(true)
   }
 
   function openEditForm(domain: SkillDomain) {
     setEditingDomain(domain)
+    setEditingRole(null)
     setForm({
       name: domain.name,
       description: domain.description || '',
       color: domain.color,
     })
     setShowForm(true)
-  }
-
-  function handleSubmit() {
-    if (!form.name.trim()) {
-      showToast('Skill name is required', 'error')
-      return
-    }
-
-    startTransition(async () => {
-      if (editingDomain) {
-        const result = await updateSkillDomain(editingDomain.id, {
-          name: form.name,
-          description: form.description,
-          color: form.color,
-        })
-        if (result.ok) {
-          showToast('Skill domain updated', 'success')
-          setShowForm(false)
-          await loadData()
-        } else {
-          showToast(result.error, 'error')
-        }
-      } else {
-        const result = await createSkillDomain({
-          name: form.name,
-          description: form.description || undefined,
-          color: form.color,
-        })
-        if (result.ok) {
-          showToast('Skill domain created', 'success')
-          setShowForm(false)
-          await loadData()
-        } else {
-          showToast(result.error, 'error')
-        }
-      }
-    })
   }
 
   function handleDelete(domain: SkillDomain) {
@@ -141,6 +124,108 @@ export default function SkillsPage() {
         await loadData()
       } else {
         showToast(result.error, 'error')
+      }
+    })
+  }
+
+  // --- Role Profile handlers ---
+  function openCreateRoleForm() {
+    setEditingRole(null)
+    setEditingDomain(null)
+    setForm({ name: '', description: '', color: PRESET_COLORS[roleProfiles.length % PRESET_COLORS.length] })
+    setShowForm(true)
+  }
+
+  function openEditRoleForm(profile: RoleProfile) {
+    setEditingRole(profile)
+    setEditingDomain(null)
+    setForm({
+      name: profile.name,
+      description: profile.description || '',
+      color: profile.color,
+    })
+    setShowForm(true)
+  }
+
+  function handleDeleteRole(profile: RoleProfile) {
+    if (!confirm(`Delete "${profile.name}"? This will remove all skill requirements and assignments.`)) return
+    startTransition(async () => {
+      const result = await deleteRoleProfile(profile.id)
+      if (result.ok) {
+        showToast('Role profile deleted', 'success')
+        await loadData()
+      } else {
+        showToast(result.error, 'error')
+      }
+    })
+  }
+
+  // --- Shared form submit ---
+  function handleSubmit() {
+    if (!form.name.trim()) {
+      showToast('Name is required', 'error')
+      return
+    }
+
+    startTransition(async () => {
+      if (activeTab === 'roles' || editingRole) {
+        // Role profile create/edit
+        if (editingRole) {
+          const result = await updateRoleProfile(editingRole.id, {
+            name: form.name,
+            description: form.description,
+            color: form.color,
+          })
+          if (result.ok) {
+            showToast('Role profile updated', 'success')
+            setShowForm(false)
+            await loadData()
+          } else {
+            showToast(result.error, 'error')
+          }
+        } else {
+          const result = await createRoleProfile({
+            name: form.name,
+            description: form.description || undefined,
+            color: form.color,
+          })
+          if (result.ok) {
+            showToast('Role profile created', 'success')
+            setShowForm(false)
+            await loadData()
+          } else {
+            showToast(result.error, 'error')
+          }
+        }
+      } else {
+        // Skill domain create/edit
+        if (editingDomain) {
+          const result = await updateSkillDomain(editingDomain.id, {
+            name: form.name,
+            description: form.description,
+            color: form.color,
+          })
+          if (result.ok) {
+            showToast('Skill domain updated', 'success')
+            setShowForm(false)
+            await loadData()
+          } else {
+            showToast(result.error, 'error')
+          }
+        } else {
+          const result = await createSkillDomain({
+            name: form.name,
+            description: form.description || undefined,
+            color: form.color,
+          })
+          if (result.ok) {
+            showToast('Skill domain created', 'success')
+            setShowForm(false)
+            await loadData()
+          } else {
+            showToast(result.error, 'error')
+          }
+        }
       }
     })
   }
@@ -181,6 +266,18 @@ export default function SkillsPage() {
     )
   }
 
+  const formTitle = editingDomain
+    ? 'Edit Skill Domain'
+    : editingRole
+      ? 'Edit Role Profile'
+      : activeTab === 'roles'
+        ? 'New Role Profile'
+        : 'New Skill Domain'
+
+  const formPlaceholder = activeTab === 'roles'
+    ? 'e.g., Operator Forklift'
+    : 'e.g., Keselamatan Kerja'
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -189,20 +286,47 @@ export default function SkillsPage() {
           <p className="text-sm text-slate-600 dark:text-slate-400">{org.name}</p>
         </div>
         {canManage && (
-          <Button size="sm" onClick={openCreateForm}>
+          <Button
+            size="sm"
+            onClick={activeTab === 'roles' ? openCreateRoleForm : openCreateForm}
+          >
             <Plus className="h-4 w-4 mr-2" />
-            Add Skill Domain
+            {activeTab === 'roles' ? 'Add Role Profile' : 'Add Skill Domain'}
           </Button>
         )}
       </div>
 
-      {/* Create/Edit Form Inline */}
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-slate-200 dark:border-slate-700">
+        <button
+          onClick={() => { setActiveTab('domains'); setShowForm(false) }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'domains'
+              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Target className="h-4 w-4 inline mr-1.5 -mt-0.5" />
+          Skill Domains ({domains.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab('roles'); setShowForm(false) }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'roles'
+              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Users className="h-4 w-4 inline mr-1.5 -mt-0.5" />
+          Role Profiles ({roleProfiles.length})
+        </button>
+      </div>
+
+      {/* Create/Edit Form Inline (shared for domains and roles) */}
       {showForm && (
         <div className="mb-6 p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-900/10">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-              {editingDomain ? 'Edit Skill Domain' : 'New Skill Domain'}
-            </h3>
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100">{formTitle}</h3>
             <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
               <X className="h-4 w-4" />
             </button>
@@ -216,7 +340,7 @@ export default function SkillsPage() {
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g., Heavy Equipment Safety"
+                placeholder={formPlaceholder}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -228,7 +352,7 @@ export default function SkillsPage() {
                 type="text"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Brief description of this skill area"
+                placeholder={activeTab === 'roles' ? 'Brief description of this role' : 'Brief description of this skill area'}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -252,7 +376,7 @@ export default function SkillsPage() {
             </div>
             <div className="flex items-center gap-2 pt-2">
               <Button size="sm" onClick={handleSubmit} disabled={isPending}>
-                {editingDomain ? 'Save Changes' : 'Create'}
+                {(editingDomain || editingRole) ? 'Save Changes' : 'Create'}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>
                 Cancel
@@ -262,45 +386,77 @@ export default function SkillsPage() {
         </div>
       )}
 
-      {/* Skill Domains Grid */}
-      {domains.length === 0 ? (
-        <div className="text-center py-16 text-slate-500 dark:text-slate-400">
-          <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p className="text-lg font-medium">No skill domains yet</p>
-          {canManage && (
-            <p className="mt-1">Create your first skill domain to start mapping employee competencies.</p>
+      {/* Skill Domains Tab */}
+      {activeTab === 'domains' && (
+        <>
+          {domains.length === 0 ? (
+            <div className="text-center py-16 text-slate-500 dark:text-slate-400">
+              <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">No skill domains yet</p>
+              {canManage && (
+                <p className="mt-1">Create your first skill domain to start mapping employee competencies.</p>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {domains.map((domain) => (
+                <SkillDomainCard
+                  key={domain.id}
+                  domain={domain}
+                  avgScore={getAvgScore(domain.id)}
+                  employeeCount={getEmployeeCount(domain.id)}
+                  canManage={canManage}
+                  onEdit={openEditForm}
+                  onDelete={handleDelete}
+                  onClick={(d) => router.push(`/skills/${d.id}`)}
+                />
+              ))}
+            </div>
           )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-          {domains.map((domain) => (
-            <SkillDomainCard
-              key={domain.id}
-              domain={domain}
-              avgScore={getAvgScore(domain.id)}
-              employeeCount={getEmployeeCount(domain.id)}
-              canManage={canManage}
-              onEdit={openEditForm}
-              onDelete={handleDelete}
-              onClick={(d) => router.push(`/skills/${d.id}`)}
-            />
-          ))}
-        </div>
+
+          {/* Heatmap (Admin only) */}
+          {isAdmin && heatmapData && heatmapData.employees.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                Employee Skill Heatmap
+              </h2>
+              <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <SkillHeatmap
+                  domains={heatmapData.domains}
+                  employees={heatmapData.employees}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Heatmap (Admin only) */}
-      {isAdmin && heatmapData && heatmapData.employees.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-            Employee Skill Heatmap
-          </h2>
-          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <SkillHeatmap
-              domains={heatmapData.domains}
-              employees={heatmapData.employees}
-            />
-          </div>
-        </div>
+      {/* Role Profiles Tab */}
+      {activeTab === 'roles' && (
+        <>
+          {roleProfiles.length === 0 ? (
+            <div className="text-center py-16 text-slate-500 dark:text-slate-400">
+              <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">No role profiles yet</p>
+              {canManageRoles && (
+                <p className="mt-1">Create role profiles to define competency requirements per position.</p>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {roleProfiles.map((profile) => (
+                <RoleProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  canManage={canManageRoles}
+                  onEdit={openEditRoleForm}
+                  onDelete={handleDeleteRole}
+                  onClick={(p) => router.push(`/skills/roles/${p.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

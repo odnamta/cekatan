@@ -688,3 +688,46 @@ export interface EmployeeSkillScore {
   last_assessed_at: string | null
   updated_at: string
 }
+
+// ============================================
+// V19.1: Role Profiles Types
+// ============================================
+
+/**
+ * Role profile defined per organization (e.g., "Operator Forklift", "Staf Gudang")
+ */
+export interface RoleProfile {
+  id: string
+  org_id: string
+  name: string
+  description: string | null
+  color: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Skill requirement for a role profile, with target score
+ */
+export type SkillPriority = 'required' | 'recommended' | 'optional'
+
+export interface RoleSkillRequirement {
+  id: string
+  role_profile_id: string
+  skill_domain_id: string
+  target_score: number
+  priority: SkillPriority
+}
+
+/**
+ * Assignment of an employee to a role profile
+ */
+export interface EmployeeRoleAssignment {
+  id: string
+  org_id: string
+  user_id: string
+  role_profile_id: string
+  assigned_at: string
+  assigned_by: string | null
+}
