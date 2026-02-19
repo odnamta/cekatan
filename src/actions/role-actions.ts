@@ -104,11 +104,11 @@ export async function deleteRoleProfile(id: string): Promise<ActionResultV2<null
 /**
  * V19.1: Get all role profiles for the org.
  */
-export async function getOrgRoleProfiles(): Promise<ActionResultV2<RoleProfile[]>> {
+export async function getOrgRoleProfiles(): Promise<ActionResultV2<(RoleProfile & { skill_count: number; employee_count: number })[]>> {
   return withOrgUser(async ({ supabase, org }) => {
     const { data, error } = await supabase
       .from('role_profiles')
-      .select('*')
+      .select('*, role_skill_requirements(count), employee_role_assignments(count)')
       .eq('org_id', org.id)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
@@ -117,7 +117,16 @@ export async function getOrgRoleProfiles(): Promise<ActionResultV2<RoleProfile[]
       return { ok: false, error: error.message }
     }
 
-    return { ok: true, data: data ?? [] }
+    const profiles = (data ?? []).map((row) => {
+      const { role_skill_requirements, employee_role_assignments, ...profile } = row
+      return {
+        ...profile,
+        skill_count: (role_skill_requirements as { count: number }[])?.[0]?.count ?? 0,
+        employee_count: (employee_role_assignments as { count: number }[])?.[0]?.count ?? 0,
+      }
+    })
+
+    return { ok: true, data: profiles }
   })
 }
 

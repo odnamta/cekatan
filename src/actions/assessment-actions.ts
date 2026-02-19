@@ -8,6 +8,7 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 import { withOrgUser } from '@/actions/_helpers'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { createAssessmentSchema, submitAnswerSchema } from '@/lib/validations'
 import { hasMinimumRole } from '@/lib/org-authorization'
@@ -786,6 +787,7 @@ export async function completeSession(
     }
 
     // V19: Update skill scores if skills_mapping is enabled
+    // Uses service role client to bypass RLS (system-level score calculation)
     try {
       const { data: assessment } = await supabase
         .from('assessments')
@@ -794,16 +796,16 @@ export async function completeSession(
         .single()
 
       if (assessment) {
-        // Look up deck → skill_domains via deck_skill_mappings
         const { data: skillMappings } = await supabase
           .from('deck_skill_mappings')
           .select('skill_domain_id')
           .eq('deck_template_id', assessment.deck_template_id)
 
         if (skillMappings && skillMappings.length > 0) {
+          const serviceClient = await createSupabaseServiceClient()
+
           for (const mapping of skillMappings) {
-            // Upsert employee_skill_scores: running average
-            const { data: existing } = await supabase
+            const { data: existing } = await serviceClient
               .from('employee_skill_scores')
               .select('score, assessments_taken')
               .eq('org_id', assessment.org_id)
@@ -815,7 +817,7 @@ export async function completeSession(
             const oldCount = existing?.assessments_taken ?? 0
             const newScore = (oldScore * oldCount + score) / (oldCount + 1)
 
-            await supabase.from('employee_skill_scores').upsert({
+            await serviceClient.from('employee_skill_scores').upsert({
               org_id: assessment.org_id,
               user_id: user.id,
               skill_domain_id: mapping.skill_domain_id,

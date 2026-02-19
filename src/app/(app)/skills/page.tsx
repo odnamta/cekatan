@@ -448,6 +448,8 @@ export default function SkillsPage() {
                 <RoleProfileCard
                   key={profile.id}
                   profile={profile}
+                  skillCount={(profile as RoleProfile & { skill_count?: number }).skill_count ?? 0}
+                  employeeCount={(profile as RoleProfile & { employee_count?: number }).employee_count ?? 0}
                   canManage={canManageRoles}
                   onEdit={openEditRoleForm}
                   onDelete={handleDeleteRole}

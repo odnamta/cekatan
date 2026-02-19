@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { User } from '@supabase/supabase-js'
 
@@ -32,6 +33,18 @@ export async function createSupabaseServerClient() {
         },
       },
     }
+  )
+}
+
+/**
+ * Creates a Supabase client with the service role key.
+ * Bypasses RLS — use only for system-level operations (e.g., score calculation).
+ * NEVER expose this client to the browser.
+ */
+export async function createSupabaseServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 }
 
