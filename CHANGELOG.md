@@ -2,6 +2,24 @@
 
 All notable changes to Cekatan will be documented in this file.
 
+## [v20.3] - State Management & Performance
+
+### Refactored
+- **CardList.tsx**: Replaced 18 `useState` calls with single `useReducer` (23 action types) — atomic state transitions for selection, filters, modals, and editor panel
+- **TagManager.tsx**: Replaced 13 `useState` calls with single `useReducer` (16 action types) — grouped dialog/merge/delete state transitions
+
+### Performance
+- **React `cache()` on `getUser()`**: Request-level deduplication eliminates redundant Supabase auth calls across server components
+- **Recharts dynamic imports**: `EmployeeSkillRadar` and `RoleGapRadar` now lazy-loaded with `ssr: false` in 3 consumer components
+- **DB composite indexes**: Added 7 indexes for hot query paths (`card_template_tags`, `card_templates`, `assessment_sessions`, `user_decks`, `org_members`, `deck_templates`)
+
+### Added
+- **Assessment timer warning**: 30-second countdown warning dialog for candidates in timed assessments
+- DB migration: `scripts/migrate-v22-composite-indexes.sql`
+
+### Fixed
+- **Property test timeout**: Increased timeout for MCQ card generator test (chained `fc.webUrl()` + `fc.array` exceeded 5s default)
+
 ## [v20.2] - Deep Code Review Hardening
 
 ### Fixed

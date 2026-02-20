@@ -220,7 +220,7 @@ describe('Property 9: Lesson Item Type Routing', () => {
       ),
       { numRuns: 100 }
     );
-  });
+  }, 15_000);
 
   /**
    * Flashcards have all required fields for flashcard rendering.
