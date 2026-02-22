@@ -83,6 +83,7 @@ export default function TakeAssessmentPage() {
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [showTabWarning, setShowTabWarning] = useState(false)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
+  const [showMobileNav, setShowMobileNav] = useState(false)
   const [fullscreenExited, setFullscreenExited] = useState(false)
   const [attemptCount, setAttemptCount] = useState(0)
   const [accessCodeInput, setAccessCodeInput] = useState('')
@@ -730,11 +731,21 @@ export default function TakeAssessmentPage() {
           disabled={currentIndex === 0}
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Previous
+          <span className="hidden sm:inline">Previous</span>
         </Button>
 
         <div className="flex items-center gap-2">
-          {/* Question dots */}
+          {/* Mobile question jump button */}
+          <button
+            onClick={() => setShowMobileNav(true)}
+            className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 active:scale-95 transition-transform"
+            aria-label="Jump to question"
+          >
+            <span>Q {currentIndex + 1}/{questions.length}</span>
+            <span className="text-[10px] text-slate-400">tap to jump</span>
+          </button>
+
+          {/* Question dots (desktop) */}
           <nav className="hidden sm:flex items-center gap-1" aria-label="Question navigation">
             {questions.map((q, idx) => (
               <button
@@ -764,7 +775,7 @@ export default function TakeAssessmentPage() {
               disabled={completing}
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />
-              Review &amp; Submit
+              <span className="hidden sm:inline">Review &amp;</span> Submit
             </Button>
           ) : (
             <Button
@@ -772,7 +783,7 @@ export default function TakeAssessmentPage() {
               size="sm"
               onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
             >
-              Next
+              <span className="hidden sm:inline">Next</span>
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}
@@ -843,6 +854,56 @@ export default function TakeAssessmentPage() {
         </div>
       )}
 
+      {/* Mobile Question Navigation */}
+      {showMobileNav && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-label="Question navigation">
+          <div className="bg-white dark:bg-slate-800 rounded-t-xl sm:rounded-xl p-4 w-full sm:max-w-sm mx-0 sm:mx-4 shadow-xl max-h-[70vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Jump to Question
+              </h3>
+              <button
+                onClick={() => setShowMobileNav(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
+                aria-label="Close navigation"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="flex items-center gap-3 mb-3 text-xs text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> answered</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> flagged</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" /> unanswered</span>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {questions.map((q, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setCurrentIndex(idx)
+                    setShowMobileNav(false)
+                  }}
+                  className={`relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
+                    idx === currentIndex
+                      ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                      : q.flagged
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400'
+                        : q.answered
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                  } active:scale-95`}
+                >
+                  {idx + 1}
+                  {q.flagged && (
+                    <Flag className="absolute -top-1 -right-1 h-2.5 w-2.5 text-amber-500" fill="currentColor" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Review Summary */}
       {showConfirmFinish && (() => {
         const flaggedCount = questions.filter((q) => q.flagged).length
@@ -875,7 +936,7 @@ export default function TakeAssessmentPage() {
               </div>
 
               {/* Question grid */}
-              <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5 mb-4">
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-4">
                 {questions.map((q, idx) => (
                   <button
                     key={idx}

@@ -13,7 +13,8 @@ import type { CourseWithProgress } from '@/components/course'
 import { getStudyLogs, getUserStats } from '@/actions/stats-actions'
 import { getGlobalStats } from '@/actions/global-study-actions'
 import { getDashboardInsights } from '@/actions/analytics-actions'
-import { isUserAdmin, ADMIN_USER_IDS } from '@/lib/onboarding-utils'
+import { resolveActiveOrg } from '@/lib/org-context'
+import { hasMinimumRole } from '@/lib/org-authorization'
 import type { DeckWithDueCount, Course, Lesson, LessonProgress, Tag } from '@/types/database'
 import { CARD_STATUS } from '@/lib/constants'
 
@@ -160,8 +161,9 @@ export default async function DashboardPage() {
   // V10.5.1: Removed redirect to library - let users stay on dashboard in Welcome Mode
   const subscribedDecksCount = userDecks?.length || 0
 
-  // V10.4: Check if user is admin
-  const userIsAdmin = isUserAdmin(user.id, ADMIN_USER_IDS)
+  // V10.4→V21: Use org role instead of hardcoded ADMIN_USER_IDS
+  const orgContext = await resolveActiveOrg()
+  const userIsAdmin = orgContext ? hasMinimumRole(orgContext.role, 'admin') : false
 
   // Get deck template IDs for due count calculation
   const deckTemplateIds = (userDecks || []).map(ud => ud.deck_template_id)

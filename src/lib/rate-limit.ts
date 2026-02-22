@@ -4,8 +4,10 @@
  * Tracks request timestamps per key (user ID) and rejects
  * when the limit is exceeded within the window.
  *
- * Note: This is per-process. In a multi-instance deployment,
- * replace with Redis-based rate limiting.
+ * WARNING: This is per-process and DOES NOT work on Vercel serverless.
+ * Each request gets a fresh process, so the in-memory store is always empty.
+ * This only provides protection during local dev and sustained connections.
+ * TODO: Replace with Upstash Redis or Vercel KV for production rate limiting.
  */
 
 type RateLimitEntry = {
