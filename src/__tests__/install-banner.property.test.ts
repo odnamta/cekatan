@@ -4,19 +4,20 @@ import { isIOSDevice, shouldShowBanner } from '../components/pwa/InstallBanner';
 
 /**
  * **Feature: v10, Property 1: Install Banner Visibility Logic**
- * *For any* combination of (isStandalone, isDismissed) states, the InstallBanner 
- * should be visible if and only if `!isStandalone && !isDismissed`.
+ * *For any* combination of (isStandalone, isDismissed, visitCount) states, the InstallBanner
+ * should be visible if and only if `!isStandalone && !isDismissed && visitCount >= 2`.
  * **Validates: Requirements 2.1, 2.2, 2.3**
  */
 describe('Property 1: Install Banner Visibility Logic', () => {
-  it('banner is visible only when not standalone AND not dismissed', () => {
+  it('banner is visible only when not standalone AND not dismissed AND visitCount >= 2', () => {
     fc.assert(
       fc.property(
         fc.boolean(), // isStandalone
         fc.boolean(), // isDismissed
-        (isStandalone, isDismissed) => {
-          const result = shouldShowBanner(isStandalone, isDismissed);
-          const expected = !isStandalone && !isDismissed;
+        fc.integer({ min: 0, max: 100 }), // visitCount
+        (isStandalone, isDismissed, visitCount) => {
+          const result = shouldShowBanner(isStandalone, isDismissed, visitCount);
+          const expected = !isStandalone && !isDismissed && visitCount >= 2;
           expect(result).toBe(expected);
         }
       ),
@@ -24,12 +25,13 @@ describe('Property 1: Install Banner Visibility Logic', () => {
     );
   });
 
-  it('banner is hidden when in standalone mode regardless of dismissal', () => {
+  it('banner is hidden when in standalone mode regardless of dismissal or visit count', () => {
     fc.assert(
       fc.property(
         fc.boolean(), // isDismissed
-        (isDismissed) => {
-          const result = shouldShowBanner(true, isDismissed);
+        fc.integer({ min: 0, max: 100 }), // visitCount
+        (isDismissed, visitCount) => {
+          const result = shouldShowBanner(true, isDismissed, visitCount);
           expect(result).toBe(false);
         }
       ),
@@ -37,13 +39,40 @@ describe('Property 1: Install Banner Visibility Logic', () => {
     );
   });
 
-  it('banner is hidden when dismissed regardless of standalone mode', () => {
+  it('banner is hidden when dismissed regardless of standalone mode or visit count', () => {
     fc.assert(
       fc.property(
         fc.boolean(), // isStandalone
-        (isStandalone) => {
-          const result = shouldShowBanner(isStandalone, true);
+        fc.integer({ min: 0, max: 100 }), // visitCount
+        (isStandalone, visitCount) => {
+          const result = shouldShowBanner(isStandalone, true, visitCount);
           expect(result).toBe(false);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('banner is hidden on first visit (visitCount < 2) even when not standalone and not dismissed', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 1 }), // visitCount below threshold
+        (visitCount) => {
+          const result = shouldShowBanner(false, false, visitCount);
+          expect(result).toBe(false);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('banner is shown from 2nd visit onwards when not standalone and not dismissed', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 100 }), // visitCount at or above threshold
+        (visitCount) => {
+          const result = shouldShowBanner(false, false, visitCount);
+          expect(result).toBe(true);
         }
       ),
       { numRuns: 100 }
@@ -58,14 +87,15 @@ describe('Property 1: Install Banner Visibility Logic', () => {
  * **Validates: Requirements 2.3**
  */
 describe('Property 2: Install Banner Dismissal Persistence', () => {
-  it('after dismissal, visibility should always be false', () => {
+  it('after dismissal, visibility should always be false regardless of visit count', () => {
     fc.assert(
       fc.property(
         fc.boolean(), // isStandalone
-        (isStandalone) => {
+        fc.integer({ min: 0, max: 100 }), // visitCount
+        (isStandalone, visitCount) => {
           // After dismissal, isDismissed is always true
           const isDismissed = true;
-          const result = shouldShowBanner(isStandalone, isDismissed);
+          const result = shouldShowBanner(isStandalone, isDismissed, visitCount);
           expect(result).toBe(false);
         }
       ),

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Share, Download } from 'lucide-react';
 
 const STORAGE_KEY = 'cekatan-install-banner-dismissed';
+const VISIT_COUNT_KEY = 'cekatan_visit_count';
 
 interface InstallBannerProps {
   className?: string;
@@ -19,8 +20,8 @@ export function isIOSDevice(userAgent: string): boolean {
 /**
  * Determines if the banner should be visible based on state
  */
-export function shouldShowBanner(isStandalone: boolean, isDismissed: boolean): boolean {
-  return !isStandalone && !isDismissed;
+export function shouldShowBanner(isStandalone: boolean, isDismissed: boolean, visitCount: number): boolean {
+  return !isStandalone && !isDismissed && visitCount >= 2;
 }
 
 export function InstallBanner({ className = '' }: InstallBannerProps) {
@@ -31,15 +32,20 @@ export function InstallBanner({ className = '' }: InstallBannerProps) {
     // Check if running in standalone mode (PWA)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    
+
     // Check if previously dismissed
     const isDismissed = localStorage.getItem(STORAGE_KEY) === 'true';
-    
+
+    // Increment visit count
+    const currentCount = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
+    const newCount = currentCount + 1;
+    localStorage.setItem(VISIT_COUNT_KEY, String(newCount));
+
     // Detect iOS
     setIsIOS(isIOSDevice(navigator.userAgent));
-    
-    // Show banner only if not standalone and not dismissed
-    setIsVisible(shouldShowBanner(isStandalone, isDismissed));
+
+    // Show banner only if not standalone, not dismissed, and visited at least twice
+    setIsVisible(shouldShowBanner(isStandalone, isDismissed, newCount));
   }, []);
 
   const handleDismiss = () => {
