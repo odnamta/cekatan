@@ -2,9 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Library, Search, ArrowUpDown } from 'lucide-react'
+import Link from 'next/link'
+import { Library, Search, ArrowUpDown, Plus } from 'lucide-react'
 import { DeckBrowseCard } from './DeckBrowseCard'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Button } from '@/components/ui/Button'
+import { useOrg } from '@/components/providers/OrgProvider'
+import { hasMinimumRole } from '@/lib/org-authorization'
 import type { BrowseDeckItem } from '@/types/database'
 
 interface LibraryGridProps {
@@ -15,6 +19,8 @@ type SortKey = 'newest' | 'oldest' | 'cards' | 'title'
 
 export function LibraryGrid({ decks }: LibraryGridProps) {
   const router = useRouter()
+  const { role } = useOrg()
+  const isCreator = hasMinimumRole(role, 'creator')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortKey>('newest')
 
@@ -96,6 +102,14 @@ export function LibraryGrid({ decks }: LibraryGridProps) {
             icon={<Library className="h-12 w-12" />}
             title="Belum ada deck"
             description="Belum ada materi belajar yang tersedia."
+            action={isCreator ? (
+              <Link href="/dashboard#add-deck-form">
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Buat Deck
+                </Button>
+              </Link>
+            ) : undefined}
           />
         )
       ) : (
