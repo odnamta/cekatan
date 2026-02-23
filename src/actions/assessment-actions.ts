@@ -2811,3 +2811,149 @@ export async function getAssessmentPreviewQuestions(
     return { ok: true, data: questions }
   })
 }
+
+// ============================================
+// Candidate Full Profile & Score Progression
+// ============================================
+
+/**
+ * Get a candidate's full profile with roles, aggregate stats, and join date.
+ * Creator+ only. Used for the redesigned candidate profile page.
+ */
+export async function getCandidateFullProfile(
+  userId: string
+): Promise<ActionResultV2<{
+  profile: { id: string; email: string; fullName: string | null; avatarUrl: string | null }
+  roles: string[]
+  totalAssessments: number
+  avgScore: number
+  passRate: number
+  joinedAt: string
+}>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Verify user is in org and get join date
+    const { data: member } = await supabase
+      .from('organization_members')
+      .select('created_at')
+      .eq('org_id', org.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!member) {
+      return { ok: false, error: 'Candidate not found in this organization' }
+    }
+
+    // Fetch profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, avatar_url')
+      .eq('id', userId)
+      .single()
+
+    if (!profile) return { ok: false, error: 'Profile not found' }
+
+    // Fetch role assignments via employee_role_assignments + role_profiles
+    const { data: roleAssignments } = await supabase
+      .from('employee_role_assignments')
+      .select('role_profile_id, role_profiles(name)')
+      .eq('org_id', org.id)
+      .eq('user_id', userId)
+
+    const roles = (roleAssignments ?? [])
+      .map((ra) => (ra.role_profiles as unknown as { name: string })?.name)
+      .filter(Boolean) as string[]
+
+    // Fetch completed assessment sessions scoped to org
+    const { data: sessionsData } = await supabase
+      .from('assessment_sessions')
+      .select('score, passed, status, assessments!inner(org_id)')
+      .eq('user_id', userId)
+      .in('status', ['completed', 'timed_out'])
+
+    const completedSessions = (sessionsData ?? []).filter((s) => {
+      const a = s.assessments as unknown as { org_id: string }
+      return a.org_id === org.id
+    })
+
+    const totalAssessments = completedSessions.length
+    const avgScore = totalAssessments > 0
+      ? Math.round(completedSessions.reduce((sum, s) => sum + (s.score ?? 0), 0) / totalAssessments)
+      : 0
+    const passedCount = completedSessions.filter((s) => s.passed).length
+    const passRate = totalAssessments > 0 ? Math.round((passedCount / totalAssessments) * 100) : 0
+
+    return {
+      ok: true,
+      data: {
+        profile: {
+          id: profile.id,
+          email: profile.email,
+          fullName: profile.full_name,
+          avatarUrl: profile.avatar_url,
+        },
+        roles,
+        totalAssessments,
+        avgScore,
+        passRate,
+        joinedAt: member.created_at,
+      },
+    }
+  })
+}
+
+/**
+ * Get a candidate's score progression over time for charting.
+ * Returns chronologically ordered sessions with scores and assessment titles.
+ * Creator+ only.
+ */
+export async function getCandidateScoreProgression(
+  userId: string
+): Promise<ActionResultV2<Array<{
+  date: string
+  score: number
+  assessmentTitle: string
+  passed: boolean
+}>>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Verify user is in org
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('org_id', org.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!membership) {
+      return { ok: false, error: 'Candidate not found in this organization' }
+    }
+
+    const { data: sessions } = await supabase
+      .from('assessment_sessions')
+      .select('score, passed, completed_at, assessments!inner(org_id, title)')
+      .eq('user_id', userId)
+      .in('status', ['completed', 'timed_out'])
+      .order('completed_at', { ascending: true })
+
+    const orgSessions = (sessions ?? []).filter((s) => {
+      const a = s.assessments as unknown as { org_id: string }
+      return a.org_id === org.id
+    })
+
+    const progression = orgSessions.map((s) => ({
+      date: s.completed_at ?? '',
+      score: s.score ?? 0,
+      assessmentTitle: (s.assessments as unknown as { title: string })?.title ?? 'Unknown',
+      passed: s.passed ?? false,
+    }))
+
+    return { ok: true, data: progression }
+  })
+}
