@@ -67,10 +67,6 @@ export default function OrgMembersPage() {
   const [copiedJoinLink, setCopiedJoinLink] = useState(false)
   const [activity, setActivity] = useState<Record<string, { completedSessions: number; lastActive: string | null }>>({})
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   async function loadData() {
     setLoading(true)
     const [mResult, iResult, aResult] = await Promise.all([
@@ -83,6 +79,11 @@ export default function OrgMembersPage() {
     if (aResult.ok && aResult.data) setActivity(aResult.data)
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadData()
+  }, [])
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()

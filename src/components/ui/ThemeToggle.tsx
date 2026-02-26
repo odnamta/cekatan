@@ -1,9 +1,13 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { Sun, Moon } from 'lucide-react'
 import { Button } from './Button'
+
+const subscribe = () => () => {}
+const getSnapshot = () => true
+const getServerSnapshot = () => false
 
 /**
  * Theme toggle component for switching between dark and light modes.
@@ -11,13 +15,8 @@ import { Button } from './Button'
  * Requirements: 4.2, 4.3
  */
 export function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  // Avoid hydration mismatch by only rendering after mount
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const { setTheme, resolvedTheme } = useTheme()
+  const mounted = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   if (!mounted) {
     // Return a placeholder with same dimensions to avoid layout shift

@@ -24,29 +24,32 @@ export function shouldShowBanner(isStandalone: boolean, isDismissed: boolean, vi
   return !isStandalone && !isDismissed && visitCount >= 2;
 }
 
+function getInitialVisibility(): { isVisible: boolean; isIOS: boolean; visitCount: number } {
+  if (typeof window === 'undefined') return { isVisible: false, isIOS: false, visitCount: 0 };
+
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const isDismissed = localStorage.getItem(STORAGE_KEY) === 'true';
+  const currentCount = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
+  // Read current count + 1 to include this visit
+  const newCount = currentCount + 1;
+
+  return {
+    isVisible: shouldShowBanner(isStandalone, isDismissed, newCount),
+    isIOS: isIOSDevice(navigator.userAgent),
+    visitCount: newCount,
+  };
+}
+
 export function InstallBanner({ className = '' }: InstallBannerProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [initialState] = useState(getInitialVisibility);
+  const [isVisible, setIsVisible] = useState(initialState.isVisible);
+  const isIOS = initialState.isIOS;
 
+  // Persist visit count increment (side effect)
   useEffect(() => {
-    // Check if running in standalone mode (PWA)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-
-    // Check if previously dismissed
-    const isDismissed = localStorage.getItem(STORAGE_KEY) === 'true';
-
-    // Increment visit count
-    const currentCount = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10);
-    const newCount = currentCount + 1;
-    localStorage.setItem(VISIT_COUNT_KEY, String(newCount));
-
-    // Detect iOS
-    setIsIOS(isIOSDevice(navigator.userAgent));
-
-    // Show banner only if not standalone, not dismissed, and visited at least twice
-    setIsVisible(shouldShowBanner(isStandalone, isDismissed, newCount));
-  }, []);
+    localStorage.setItem(VISIT_COUNT_KEY, String(initialState.visitCount));
+  }, [initialState.visitCount]);
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, 'true');

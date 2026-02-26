@@ -28,25 +28,28 @@ export function DeckDraftsPanel({ deckId, isAuthor, onRefresh }: DeckDraftsPanel
   const [expanded, setExpanded] = useState(true)
   const [confirmAction, setConfirmAction] = useState<'publish' | 'archive' | null>(null)
 
-  const fetchDrafts = useCallback(async () => {
+  const fetchDrafts = useCallback(async (showLoading = true) => {
     if (!isAuthor) return
-    
-    setLoading(true)
-    setError(null)
-    
+
+    if (showLoading) {
+      setLoading(true)
+      setError(null)
+    }
+
     const result = await getDeckDrafts(deckId)
-    
+
     if (result.ok && result.data) {
       setDrafts(result.data.drafts)
     } else if (!result.ok) {
       setError(result.error)
     }
-    
+
     setLoading(false)
   }, [deckId, isAuthor])
 
   useEffect(() => {
-    fetchDrafts()
+    // Loading is already initialized to true, so skip setting it again here
+    fetchDrafts(false)
   }, [fetchDrafts])
 
   // Don't render for non-authors or when no drafts

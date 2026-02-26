@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useEffect, useState } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { createMCQAction } from '@/actions/mcq-actions'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
@@ -62,7 +62,10 @@ export function CreateMCQForm({
   }
 
   // Reset form on successful submission
-  useEffect(() => {
+  // Track previous state to detect transitions
+  const [prevState, setPrevState] = useState(state)
+  if (prevState !== state) {
+    setPrevState(state)
     if (state.ok && formRef.current) {
       formRef.current.reset()
       setOptions(Array(DEFAULT_OPTIONS).fill(''))
@@ -72,7 +75,7 @@ export function CreateMCQForm({
       setSelectedTagIds([])
       onSuccess?.()
     }
-  }, [state, onSuccess])
+  }
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options]

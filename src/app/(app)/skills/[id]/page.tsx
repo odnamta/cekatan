@@ -56,10 +56,6 @@ export default function SkillDetailPage() {
 
   usePageTitle(domain?.name || 'Skill Detail')
 
-  useEffect(() => {
-    loadData()
-  }, [skillId])
-
   async function loadData() {
     setLoading(true)
 
@@ -104,6 +100,11 @@ export default function SkillDetailPage() {
 
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadData()
+  }, [skillId])
 
   function handleLink(deckTemplateId: string) {
     startTransition(async () => {

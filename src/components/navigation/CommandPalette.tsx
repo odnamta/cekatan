@@ -93,19 +93,28 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Focus input on open
+  // Focus input on open - track previous open state to reset on open
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open && !prevOpen) {
+    setPrevOpen(open)
+    if (query !== '') setQuery('')
+    if (selectedIndex !== 0) setSelectedIndex(0)
+  } else if (!open && prevOpen) {
+    setPrevOpen(open)
+  }
+
   useEffect(() => {
     if (open) {
-      setQuery('')
-      setSelectedIndex(0)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [open])
 
-  // Reset selection when filtered results change
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [query])
+  // Reset selection when query changes (during render)
+  const [prevQuery, setPrevQuery] = useState(query)
+  if (prevQuery !== query) {
+    setPrevQuery(query)
+    if (selectedIndex !== 0) setSelectedIndex(0)
+  }
 
   const navigate = useCallback(
     (href: string) => {
@@ -133,19 +142,21 @@ export function CommandPalette() {
       {/* Trigger button for header */}
       <button
         onClick={() => setOpen(true)}
-        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+        aria-label="Open command palette (⌘K)"
+        className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 transition-colors"
       >
         <Search className="h-3.5 w-3.5" />
         <span>Search</span>
-        <kbd className="ml-1 font-mono text-[10px] text-slate-400">⌘K</kbd>
+        <kbd className="ml-1 font-mono text-[10px] text-slate-400" aria-hidden="true">⌘K</kbd>
       </button>
 
       {/* Modal */}
       {open && (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" role="dialog" aria-modal="true" aria-label="Command palette">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        aria-hidden="true"
         onClick={() => setOpen(false)}
       />
 
@@ -153,7 +164,7 @@ export function CommandPalette() {
       <div className="relative w-full max-w-lg mx-4 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-          <Search className="h-5 w-5 text-slate-400 flex-shrink-0" />
+          <Search className="h-5 w-5 text-slate-400 flex-shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
@@ -161,6 +172,7 @@ export function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder="Search pages..."
+            aria-label="Search pages"
             className="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
           />
           <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-700 rounded">
@@ -169,7 +181,7 @@ export function CommandPalette() {
         </div>
 
         {/* Results */}
-        <div className="max-h-72 overflow-y-auto py-2">
+        <div className="max-h-72 overflow-y-auto py-2" role="listbox" aria-label="Search results">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-slate-500">
               No results found

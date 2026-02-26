@@ -88,19 +88,22 @@ export function PDFViewer({
     return () => resizeObserver.disconnect()
   }, [])
 
-  // Load saved page from localStorage on mount and when fileId changes
-  // This runs only on client to avoid hydration mismatch
-  useEffect(() => {
+  // Load saved page from localStorage when fileId changes
+  const [prevFileId, setPrevFileId] = useState(fileId)
+  if (prevFileId !== fileId) {
+    setPrevFileId(fileId)
     const savedPage = getPdfPage(fileId)
     setPageNumber(savedPage)
-  }, [fileId])
+  }
 
   // Reset state when fileUrl changes
-  useEffect(() => {
+  const [prevFileUrl, setPrevFileUrl] = useState(fileUrl)
+  if (prevFileUrl !== fileUrl) {
+    setPrevFileUrl(fileUrl)
     setIsLoading(true)
     setError(null)
     setNumPages(0)
-  }, [fileUrl])
+  }
 
   const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
     setNumPages(pdf.numPages)

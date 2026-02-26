@@ -90,10 +90,6 @@ export default function RoleProfileDetailPage({ params }: { params: Promise<{ id
     skill_name: string; skill_color: string; target_score: number; priority: SkillPriority; actual_score: number | null
   }[]>([])
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   async function loadData() {
     setLoading(true)
     const [profileResult, employeesResult, domainsResult] = await Promise.all([
@@ -111,6 +107,11 @@ export default function RoleProfileDetailPage({ params }: { params: Promise<{ id
     if (domainsResult.ok) setAllDomains(domainsResult.data ?? [])
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadData()
+  }, [])
 
   const availableDomains = allDomains.filter(
     (d) => !requirements.some((r) => r.skill_domain_id === d.id)

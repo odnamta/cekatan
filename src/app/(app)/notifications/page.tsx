@@ -51,10 +51,6 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
 
-  useEffect(() => {
-    loadNotifications()
-  }, [page, typeFilter])
-
   function loadNotifications() {
     setLoading(true)
     startTransition(async () => {
@@ -70,6 +66,11 @@ export default function NotificationsPage() {
       setLoading(false)
     })
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadNotifications()
+  }, [page, typeFilter])
 
   function handleClick(n: Notification) {
     if (!n.read_at) {

@@ -63,11 +63,6 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
 
-  useEffect(() => {
-    if (!isAdmin) return
-    loadLogs()
-  }, [page, actionFilter, isAdmin])
-
   function loadLogs() {
     setLoading(true)
     startTransition(async () => {
@@ -83,6 +78,12 @@ export default function AuditLogPage() {
       setLoading(false)
     })
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!isAdmin) return
+    loadLogs()
+  }, [page, actionFilter, isAdmin])
 
   if (!isAdmin) {
     return (

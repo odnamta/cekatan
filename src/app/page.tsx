@@ -12,7 +12,7 @@ function Hero() {
         backgroundSize: '60px 60px',
       }} />
       {/* Glow accent */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-blue-500/10 rounded-full blur-3xl" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-full max-w-[600px] h-[300px] bg-blue-500/10 rounded-full blur-3xl" />
 
       <div className="relative max-w-5xl mx-auto px-4 py-24 md:py-32 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-sm text-blue-200 mb-8">

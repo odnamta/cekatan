@@ -30,14 +30,18 @@ export function useImportSession(deckId: string) {
   // Load or create session ID on mount
   useEffect(() => {
     const storageKey = `${STORAGE_KEY_PREFIX}${deckId}`
-    let sessionId = localStorage.getItem(storageKey)
-    
-    if (!sessionId) {
-      sessionId = generateImportSessionId()
-      localStorage.setItem(storageKey, sessionId)
+    let sid = localStorage.getItem(storageKey)
+
+    if (!sid) {
+      sid = generateImportSessionId()
+      localStorage.setItem(storageKey, sid)
     }
-    
-    setState(prev => ({ ...prev, sessionId, isLoading: false }))
+
+    const loadedSessionId = sid
+    setState(prev => {
+      if (prev.sessionId === loadedSessionId && !prev.isLoading) return prev
+      return { ...prev, sessionId: loadedSessionId, isLoading: false }
+    })
   }, [deckId])
 
   // Refresh session stats

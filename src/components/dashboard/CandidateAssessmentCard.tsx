@@ -23,23 +23,23 @@ export function CandidateAssessmentCard() {
 
   const [assessments, setAssessments] = useState<AssessmentWithDeck[]>([])
   const [sessions, setSessions] = useState<SessionWithAssessment[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isCreator)
 
   useEffect(() => {
-    if (isCreator) {
-      setLoading(false)
-      return
-    }
+    if (isCreator) return
+    let cancelled = false
     async function load() {
       const [aResult, sResult] = await Promise.all([
         getOrgAssessments(),
         getMyAssessmentSessions(),
       ])
+      if (cancelled) return
       if (aResult.ok) setAssessments(aResult.data ?? [])
       if (sResult.ok) setSessions(sResult.data ?? [])
       setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   }, [isCreator])
 
   // Don't render for creators (they have OrgStatsCard)

@@ -55,6 +55,7 @@ export function OrgSwitcher() {
     <DropdownMenu onOpenChange={(open) => { if (open) loadOrgs() }}>
       <DropdownMenuTrigger asChild>
         <button
+          aria-label="Switch organization"
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           disabled={isSwitching}
         >

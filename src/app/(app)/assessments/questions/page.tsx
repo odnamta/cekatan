@@ -41,10 +41,6 @@ export default function QuestionBankPage() {
   const [difficultyFilter, setDifficultyFilter] = useState<'all' | 'hard' | 'medium' | 'easy' | 'no-data'>('all')
   const [displayLimit, setDisplayLimit] = useState(30)
 
-  useEffect(() => {
-    loadData()
-  }, [selectedDeck])
-
   async function loadData() {
     setLoading(true)
     const result = await getOrgQuestionBank(selectedDeck || undefined)
@@ -56,6 +52,11 @@ export default function QuestionBankPage() {
     }
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadData()
+  }, [selectedDeck])
 
   if (!isCreator) {
     return (

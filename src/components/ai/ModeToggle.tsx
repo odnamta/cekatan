@@ -1,7 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { getAIMode, setAIMode, type AIMode } from '@/lib/ai-mode-storage'
+
+const subscribeMounted = () => () => {}
+const getMountedSnapshot = () => true
+const getServerMountedSnapshot = () => false
 
 interface ModeToggleProps {
   value?: AIMode
@@ -10,27 +14,32 @@ interface ModeToggleProps {
 
 /**
  * ModeToggle - Segmented control for AI mode selection
- * 
+ *
  * V6.2: Brain Toggle feature - Extract (Q&A) vs Generate (Textbook)
  * Persists selection to localStorage
  */
 export function ModeToggle({ value, onChange }: ModeToggleProps) {
+  const mounted = useSyncExternalStore(subscribeMounted, getMountedSnapshot, getServerMountedSnapshot)
   const [mode, setMode] = useState<AIMode>('extract')
-  const [mounted, setMounted] = useState(false)
+  const [hasMountLoaded, setHasMountLoaded] = useState(false)
 
-  // Load saved mode on mount
-  useEffect(() => {
-    setMounted(true)
+  // Load saved mode after mount using React 19 pattern
+  if (mounted && !hasMountLoaded) {
+    setHasMountLoaded(true)
     const savedMode = getAIMode()
-    setMode(savedMode)
-  }, [])
+    if (savedMode !== mode) {
+      setMode(savedMode)
+    }
+  }
 
-  // Sync with controlled value
-  useEffect(() => {
-    if (value !== undefined) {
+  // Sync with controlled value during render
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== undefined && value !== prevValue) {
+    setPrevValue(value)
+    if (mode !== value) {
       setMode(value)
     }
-  }, [value])
+  }
 
   const handleModeChange = (newMode: AIMode) => {
     setMode(newMode)

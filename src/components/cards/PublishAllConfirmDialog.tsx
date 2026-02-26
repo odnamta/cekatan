@@ -26,19 +26,21 @@ export function PublishAllConfirmDialog({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="publish-dialog-title" aria-describedby="publish-dialog-description">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        aria-hidden="true"
         onClick={onClose}
       />
-      
+
       {/* Dialog */}
       <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          aria-label="Close dialog"
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-400 rounded"
         >
           <X className="w-5 h-5" />
         </button>
@@ -51,12 +53,12 @@ export function PublishAllConfirmDialog({
         </div>
 
         {/* Title */}
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 text-center mb-2">
+        <h2 id="publish-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 text-center mb-2">
           Publish All Draft Cards?
         </h2>
 
         {/* Description */}
-        <p className="text-slate-600 dark:text-slate-400 text-center mb-6">
+        <p id="publish-dialog-description" className="text-slate-600 dark:text-slate-400 text-center mb-6">
           This will publish all <span className="font-semibold text-blue-600 dark:text-blue-400">{draftCount}</span> draft card{draftCount !== 1 ? 's' : ''} in this deck. 
           Published cards will be visible in study sessions.
         </p>

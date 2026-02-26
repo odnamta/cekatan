@@ -89,47 +89,10 @@ export default function TakeAssessmentPage() {
   const [accessCodeInput, setAccessCodeInput] = useState('')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const completingRef = useRef(false)
-  const questionStartRef = useRef<number>(Date.now())
+  const questionStartRef = useRef<number>(0)
 
-  // Load assessment info (not session yet) for instructions
-  useEffect(() => {
-    async function init() {
-      const aResult = await getAssessment(assessmentId)
-      if (!aResult.ok) {
-        setError(aResult.error)
-        setLoading(false)
-        return
-      }
-      if (!aResult.data) {
-        setError('Assessment not found')
-        setLoading(false)
-        return
-      }
-      setAssessment(aResult.data)
-
-      // Auto-expire any stale sessions before checking for resumable ones
-      await expireStaleSessions()
-
-      // Check if there's an existing in-progress session to resume
-      const sessionsResult = await getMyAssessmentSessions()
-      if (sessionsResult.ok && sessionsResult.data) {
-        const mySessions = sessionsResult.data.filter((s) => s.assessment_id === assessmentId)
-        setAttemptCount(mySessions.length)
-        const inProgress = mySessions.find((s) => s.status === 'in_progress')
-        if (inProgress) {
-          // Resume existing session directly
-          await startExam(aResult.data, inProgress as AssessmentSession)
-          return
-        }
-      }
-
-      setLoading(false)
-      setPhase('instructions')
-    }
-    init()
-  }, [assessmentId])
-
-  async function startExam(assessmentData?: Assessment, existingSession?: AssessmentSession) {
+  // startExam logic — used by both init effect and onClick handler
+  async function startExamImpl(assessmentData?: Assessment, existingSession?: AssessmentSession) {
     setStarting(true)
     const a = assessmentData ?? assessment
     if (!a) return
@@ -234,6 +197,98 @@ export default function TakeAssessmentPage() {
     }
   }
 
+  // Wrapper function for startExam (used by JSX onClick)
+  async function startExam(assessmentData?: Assessment, existingSession?: AssessmentSession) {
+    return startExamImpl(assessmentData, existingSession)
+  }
+
+  const formatTime = useCallback((seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }, [])
+
+  function toggleFlag() {
+    const updated = [...questions]
+    const q = updated[currentIndex]
+    if (!q) return
+    updated[currentIndex] = { ...q, flagged: !q.flagged }
+    setQuestions(updated)
+  }
+
+  async function handleSelectAnswer(displayIndex: number) {
+    if (!session || completing) return
+
+    const q = questions[currentIndex]
+    if (!q) return
+
+    // Optimistic update (store display index locally)
+    const updated = [...questions]
+    updated[currentIndex] = { ...q, selectedIndex: displayIndex, answered: true }
+    setQuestions(updated)
+
+    // Map display index → original index for server submission
+    const originalIndex = q.optionMap[displayIndex] ?? displayIndex
+    const timeSpent = Math.round((Date.now() - questionStartRef.current) / 1000)
+
+    // Submit with retry on failure
+    try {
+      const result = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+      if (!result.ok) {
+        // Retry once
+        const retry = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+        if (!retry.ok) {
+          console.error('[submitAnswer] Failed after retry:', retry.error)
+        }
+      }
+    } catch (err) {
+      // Network error — retry once
+      try {
+        await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+      } catch {
+        console.error('[submitAnswer] Network error after retry:', err)
+      }
+    }
+  }
+
+  // Load assessment info (not session yet) for instructions
+  useEffect(() => {
+    async function init() {
+      const aResult = await getAssessment(assessmentId)
+      if (!aResult.ok) {
+        setError(aResult.error)
+        setLoading(false)
+        return
+      }
+      if (!aResult.data) {
+        setError('Assessment not found')
+        setLoading(false)
+        return
+      }
+      setAssessment(aResult.data)
+
+      // Auto-expire any stale sessions before checking for resumable ones
+      await expireStaleSessions()
+
+      // Check if there's an existing in-progress session to resume
+      const sessionsResult = await getMyAssessmentSessions()
+      if (sessionsResult.ok && sessionsResult.data) {
+        const mySessions = sessionsResult.data.filter((s) => s.assessment_id === assessmentId)
+        setAttemptCount(mySessions.length)
+        const inProgress = mySessions.find((s) => s.status === 'in_progress')
+        if (inProgress) {
+          // Resume existing session directly
+          await startExamImpl(aResult.data, inProgress as AssessmentSession)
+          return
+        }
+      }
+
+      setLoading(false)
+      setPhase('instructions')
+    }
+    init()
+  }, [assessmentId])
+
   // Auto-complete handler (stable ref to avoid stale closures in timer)
   const handleCompleteRef = useCallback(async () => {
     if (completingRef.current) return
@@ -302,7 +357,7 @@ export default function TakeAssessmentPage() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [session, completing])
+  }, [proctoringEnabled, session, completing])
 
   // Fullscreen exit detection (only when proctoring is enabled)
   useEffect(() => {
@@ -319,7 +374,7 @@ export default function TakeAssessmentPage() {
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [phase, session, completing])
+  }, [proctoringEnabled, phase, session, completing])
 
   // Warn before closing/navigating away from in-progress exam
   useEffect(() => {
@@ -397,55 +452,6 @@ export default function TakeAssessmentPage() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [phase, session, completing, currentIndex, questions, showConfirmFinish, showTabWarning])
-
-  const formatTime = useCallback((seconds: number) => {
-    const m = Math.floor(seconds / 60)
-    const s = seconds % 60
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }, [])
-
-  function toggleFlag() {
-    const updated = [...questions]
-    const q = updated[currentIndex]
-    if (!q) return
-    updated[currentIndex] = { ...q, flagged: !q.flagged }
-    setQuestions(updated)
-  }
-
-  async function handleSelectAnswer(displayIndex: number) {
-    if (!session || completing) return
-
-    const q = questions[currentIndex]
-    if (!q) return
-
-    // Optimistic update (store display index locally)
-    const updated = [...questions]
-    updated[currentIndex] = { ...q, selectedIndex: displayIndex, answered: true }
-    setQuestions(updated)
-
-    // Map display index → original index for server submission
-    const originalIndex = q.optionMap[displayIndex] ?? displayIndex
-    const timeSpent = Math.round((Date.now() - questionStartRef.current) / 1000)
-
-    // Submit with retry on failure
-    try {
-      const result = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
-      if (!result.ok) {
-        // Retry once
-        const retry = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
-        if (!retry.ok) {
-          console.error('[submitAnswer] Failed after retry:', retry.error)
-        }
-      }
-    } catch (err) {
-      // Network error — retry once
-      try {
-        await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
-      } catch {
-        console.error('[submitAnswer] Network error after retry:', err)
-      }
-    }
-  }
 
   async function handleComplete() {
     if (!session || completing) return

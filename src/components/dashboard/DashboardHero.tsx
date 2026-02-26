@@ -132,7 +132,8 @@ export function DashboardHero({
   tags = [],
 }: DashboardHeroProps) {
   const router = useRouter()
-  const [hasUnfinishedSession, setHasUnfinishedSession] = useState(false)
+  // Check for unfinished session (computed once on client, avoids setState in effect)
+  const [hasUnfinishedSession] = useState(() => getValidCachedSession() !== null)
   // V6.3: Custom session modal state
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false)
   // V10.6: Search preview modal state
@@ -140,11 +141,6 @@ export function DashboardHero({
   // V11.7: Selected tag IDs for filtered study
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
-  // Check for unfinished session on mount (client-side only)
-  useEffect(() => {
-    const cachedSession = getValidCachedSession()
-    setHasUnfinishedSession(cachedSession !== null)
-  }, [])
 
   // V11.7: Handle tag selection change
   const handleTagSelectionChange = useCallback((tagIds: string[]) => {

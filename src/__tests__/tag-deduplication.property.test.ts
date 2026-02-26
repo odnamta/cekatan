@@ -132,8 +132,8 @@ describe('Property 6: Tag Deduplication is Case-Insensitive', () => {
         fc.string({ minLength: 1, maxLength: 10 }),
         fc.string({ minLength: 1, maxLength: 10 }),
         (tag1, tag2) => {
-          // Only test when tags are actually different
-          if (tag1.toLowerCase() !== tag2.toLowerCase()) {
+          // Compare using the same normalization as hasTagDuplicates (trim + lowercase)
+          if (tag1.trim().toLowerCase() !== tag2.trim().toLowerCase()) {
             expect(hasTagDuplicates([tag1], [tag2])).toBe(false);
           }
         }

@@ -107,10 +107,6 @@ export default function AssessmentsPage() {
     })
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   async function loadData() {
     setLoading(true)
     const [aResult, sResult] = await Promise.all([
@@ -121,6 +117,10 @@ export default function AssessmentsPage() {
     if (sResult.ok) setSessions(sResult.data ?? [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    loadData()
+  }, [])
 
   function handlePublish(assessmentId: string) {
     startTransition(async () => {

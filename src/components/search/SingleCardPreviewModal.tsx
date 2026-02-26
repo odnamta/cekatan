@@ -32,12 +32,20 @@ export function SingleCardPreviewModal({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch card data when modal opens
-  useEffect(() => {
+  // Clear card when modal closes - state-based tracking
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  const [prevCardTemplateId, setPrevCardTemplateId] = useState(cardTemplateId)
+  if (prevIsOpen !== isOpen || prevCardTemplateId !== cardTemplateId) {
+    setPrevIsOpen(isOpen)
+    setPrevCardTemplateId(cardTemplateId)
     if (!isOpen || !cardTemplateId) {
       setCard(null)
-      return
     }
+  }
+
+  // Fetch card data when modal opens
+  useEffect(() => {
+    if (!isOpen || !cardTemplateId) return
 
     async function fetchCard() {
       setIsLoading(true)

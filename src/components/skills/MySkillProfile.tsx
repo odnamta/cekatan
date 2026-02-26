@@ -39,18 +39,16 @@ export function MySkillProfile() {
   const { org, role } = useOrg()
   const [scores, setScores] = useState<SkillScore[]>([])
   const [roleGaps, setRoleGaps] = useState<RoleGap[]>([])
-  const [loading, setLoading] = useState(true)
   const [expandedRole, setExpandedRole] = useState<string | null>(null)
 
   const skillsEnabled = org.settings?.features?.skills_mapping ?? false
   const skillsVisible = org.settings?.skills_visible_to_candidates ?? true
   const canView = canViewOwnSkillScores(role, skillsVisible)
 
+  const [loading, setLoading] = useState(skillsEnabled && canView)
+
   useEffect(() => {
-    if (!skillsEnabled || !canView) {
-      setLoading(false)
-      return
-    }
+    if (!skillsEnabled || !canView) return
 
     Promise.all([
       getEmployeeSkillScores(),

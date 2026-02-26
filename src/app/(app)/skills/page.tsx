@@ -77,10 +77,6 @@ export default function SkillsPage() {
   const [editingRole, setEditingRole] = useState<RoleProfile | null>(null)
   const [form, setForm] = useState<SkillFormState>({ name: '', description: '', color: '#6366f1' })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
   async function loadData() {
     setLoading(true)
     const [domainsResult, rolesResult, heatmapResult] = await Promise.all([
@@ -96,6 +92,11 @@ export default function SkillsPage() {
     }
     setLoading(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadData()
+  }, [])
 
   // --- Skill Domain handlers ---
   function openCreateForm() {

@@ -39,7 +39,8 @@ export function StatusFilterChips({
         <button
           key={filter}
           onClick={() => onFilterChange(filter)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors active:scale-95 ${
+          aria-pressed={activeFilter === filter}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${
             activeFilter === filter
               ? filter === 'draft'
                 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-300 dark:border-blue-700'

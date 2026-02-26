@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
@@ -121,13 +121,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  useEffect(() => {
+  // Check for OAuth errors — initialize error state from URL if present
+  const [oauthChecked, setOauthChecked] = useState(false)
+  if (!oauthChecked && typeof window !== 'undefined') {
+    setOauthChecked(true)
     const oauthError = extractOAuthError()
     if (oauthError) {
-      setError(oauthError.description)
       clearErrorFromUrl()
+      setError(oauthError.description)
     }
-  }, [])
+  }
 
   async function handleGoogleSignIn() {
     setError(null)

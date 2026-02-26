@@ -12,6 +12,8 @@ const withPWA = require("next-pwa")({
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Next.js 16 defaults to Turbopack — empty config silences the webpack conflict from next-pwa
+  turbopack: {},
   images: {
     remotePatterns: [
       {

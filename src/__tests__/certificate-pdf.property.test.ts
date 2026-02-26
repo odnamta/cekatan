@@ -20,7 +20,7 @@ describe('Certificate PDF', () => {
     assessmentTitle: fc.string({ minLength: 1, maxLength: 200 }),
     score: fc.integer({ min: 0, max: 100 }),
     passScore: fc.integer({ min: 0, max: 100 }),
-    completedAt: fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }).map((d) => d.toISOString()),
+    completedAt: fc.integer({ min: new Date('2020-01-01').getTime(), max: new Date('2030-12-31').getTime() }).map((ts) => new Date(ts).toISOString()),
     sessionId: fc.uuid(),
     orgName: fc.string({ minLength: 1, maxLength: 100 }),
     primaryColor: fc.stringMatching(/^[0-9a-f]{6}$/).map((s) => `#${s}`),

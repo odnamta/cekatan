@@ -328,11 +328,6 @@ export function TagManager() {
     editingTag, showDeleteConfirm, deletingTag, isDeleting,
   } = state
 
-  // Load tags on mount
-  useEffect(() => {
-    loadTags()
-  }, [])
-
   // V9.2: Get all tags as flat array
   const allTags = useMemo(() => {
     return [...tags.source, ...tags.topic, ...tags.concept]
@@ -352,6 +347,12 @@ export function TagManager() {
     dispatch({ type: 'SET_TAGS', tags: result })
     dispatch({ type: 'SET_LOADING', loading: false })
   }
+
+  // Load tags on mount (must be after loadTags declaration)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadTags()
+  }, [])
 
   async function handleCategoryChange(tagId: string, newCategory: TagCategory) {
     dispatch({ type: 'SET_UPDATING_TAG_ID', tagId })

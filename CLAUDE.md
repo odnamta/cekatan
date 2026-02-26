@@ -18,10 +18,11 @@
 - **Validation:** Zod
 - **Testing:** Vitest + fast-check (property-based testing)
 - **Charts:** Recharts
-- **PDF:** react-pdf
+- **PDF:** @react-pdf/renderer (generation) + react-pdf (viewing)
+- **Email:** Resend + @react-email/components
 - **AI:** OpenAI SDK (GPT-4 Vision for MCQ generation)
 - **Icons:** lucide-react
-- **PWA:** next-pwa (to be replaced with serwist)
+- **PWA:** next-pwa
 
 ## Architecture
 
@@ -36,7 +37,7 @@ organizations (tenant root)
 │   └── card_templates (inherits org scope from deck)
 ├── tags (org_id)
 ├── book_sources (org_id)
-└── assessments (org_id) [PLANNED]
+└── assessments (org_id)
 ```
 
 ### Feature Flags
@@ -98,7 +99,7 @@ Use `withUser` (without org context) only for user-level actions (profile, org s
 ### Return Types
 
 - **All actions:** Use `ActionResultV2<T>` with `{ ok: true/false }` pattern
-- Legacy `ActionResult` with `{ success: true/false }` is deprecated — migrate on touch
+- Legacy `ActionResult` with `{ success: true/false }` is fully migrated — all actions use `ActionResultV2`
 
 ### Validation
 
@@ -110,13 +111,24 @@ Pure function authorization modules in `src/lib/*-authorization.ts`. These are i
 
 ### Testing
 
-Property-based tests with fast-check in `src/__tests__/*.property.test.ts`.
+Property-based tests with fast-check in `src/__tests__/*.property.test.ts`. E2E tests with Playwright in `e2e/`.
 
 ```bash
-npm run test         # Run all tests
-npm run test:watch   # Watch mode
+npm run test              # Run all unit tests (Vitest)
+npm run test:watch        # Watch mode
+npm run test:e2e          # Run E2E tests (Playwright)
 npx vitest run src/__tests__/sm2.property.test.ts  # Single file
 ```
+
+### Email Notifications
+
+Templates in `src/components/email/` using @react-email. Dispatch helpers in `src/lib/email-dispatch.tsx`.
+HMAC-signed unsubscribe tokens. Resend for delivery with 3-attempt exponential backoff.
+
+### PDF Generation
+
+PDF components in `src/lib/*-pdf.tsx` using @react-pdf/renderer. Server actions render via `renderToBuffer()`,
+upload to Supabase Storage `certificates` bucket, return signed URLs (7-day expiry).
 
 ## Styling
 
@@ -131,18 +143,20 @@ npx vitest run src/__tests__/sm2.property.test.ts  # Single file
 
 ```
 src/
-├── actions/          # Server Actions (mutations, 'use server')
+├── actions/          # Server Actions ('use server'), split by domain
 ├── app/              # Next.js App Router pages
 │   ├── (app)/        # Authenticated routes
 │   ├── (auth)/       # Auth routes
 │   └── api/          # REST API routes
 ├── components/       # React components (by feature domain)
+│   ├── email/        # React Email templates (Resend)
 │   └── ui/           # Reusable UI primitives
 ├── hooks/            # Custom React hooks
 ├── lib/              # Pure functions & utilities
 │   └── supabase/     # Supabase client setup
 ├── types/            # TypeScript type definitions
-└── __tests__/        # Property-based tests
+├── __tests__/        # Property-based tests (Vitest + fast-check)
+e2e/                  # E2E tests (Playwright)
 ```
 
 ## Common Commands
@@ -164,6 +178,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 OPENAI_API_KEY=your-openai-api-key
+RESEND_API_KEY=your-resend-api-key
+NEXT_PUBLIC_APP_URL=https://cekatan.com
 ```
 
 ## Rules

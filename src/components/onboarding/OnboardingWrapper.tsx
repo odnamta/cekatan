@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { OnboardingModal, shouldShowOnboardingModal } from './OnboardingModal';
 
 export interface OnboardingWrapperProps {
@@ -14,13 +14,8 @@ export interface OnboardingWrapperProps {
  * Requirements: 3.1 - Show modal if onboarded is false or undefined
  */
 export function OnboardingWrapper({ userMetadata, userName }: OnboardingWrapperProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    // Check if we should show the onboarding modal
-    const shouldShow = shouldShowOnboardingModal(userMetadata);
-    setIsOpen(shouldShow);
-  }, [userMetadata]);
+  // Compute initial open state from props (avoids useEffect + setState)
+  const [isOpen, setIsOpen] = useState(() => shouldShowOnboardingModal(userMetadata));
 
   function handleComplete() {
     setIsOpen(false);

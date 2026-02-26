@@ -113,6 +113,7 @@ export function BulkActionsBar({
         </button>
         <button
           onClick={onClearSelection}
+          aria-label="Clear selection"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           title="Clear selection"
         >

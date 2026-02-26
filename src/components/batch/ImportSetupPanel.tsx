@@ -28,45 +28,40 @@ export function ImportSetupPanel({
   deckId,
 }: ImportSetupPanelProps) {
   // V11.1: Load initial state from localStorage if deckId provided
-  const [bookSourceId, setBookSourceId] = useState<string | null>(
-    initialContext?.bookSourceId ?? null
-  )
-  const [chapterId, setChapterId] = useState<string | null>(
-    initialContext?.chapterId ?? null
-  )
+  const [bookSourceId, setBookSourceId] = useState<string | null>(() => {
+    if (initialContext?.bookSourceId) return initialContext.bookSourceId
+    if (deckId) {
+      const storedContext = getImportContext(deckId)
+      if (storedContext.bookSourceId) return storedContext.bookSourceId
+    }
+    return null
+  })
+  const [chapterId, setChapterId] = useState<string | null>(() => {
+    if (initialContext?.chapterId) return initialContext.chapterId
+    if (deckId) {
+      const storedContext = getImportContext(deckId)
+      if (storedContext.chapterId) return storedContext.chapterId
+    }
+    return null
+  })
   const [expectedQuestionCount, setExpectedQuestionCount] = useState<number | null>(
     initialContext?.expectedQuestionCount ?? null
   )
   const [chapterExpectedCount, setChapterExpectedCount] = useState<number | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
-
-  // V11.1: Load sticky context from localStorage on mount
-  useEffect(() => {
-    if (deckId && !isInitialized) {
-      const storedContext = getImportContext(deckId)
-      if (storedContext.bookSourceId) {
-        setBookSourceId(storedContext.bookSourceId)
-      }
-      if (storedContext.chapterId) {
-        setChapterId(storedContext.chapterId)
-      }
-      setIsInitialized(true)
-    }
-  }, [deckId, isInitialized])
 
   // V11.1: Persist bookSourceId changes to localStorage
   useEffect(() => {
-    if (deckId && isInitialized) {
+    if (deckId) {
       updateImportContext(deckId, { bookSourceId })
     }
-  }, [deckId, bookSourceId, isInitialized])
+  }, [deckId, bookSourceId])
 
   // V11.1: Persist chapterId changes to localStorage
   useEffect(() => {
-    if (deckId && isInitialized) {
+    if (deckId) {
       updateImportContext(deckId, { chapterId })
     }
-  }, [deckId, chapterId, isInitialized])
+  }, [deckId, chapterId])
 
   // Notify parent of context changes
   useEffect(() => {

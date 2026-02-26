@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { type HeatmapIntensity, getHeatmapIntensity } from '@/lib/heatmap'
 
 interface StudyHeatmapProps {
@@ -70,15 +70,13 @@ function getMonthLabels(weeks: DayData[][]) {
   return labels
 }
 
+const subscribeMounted = () => () => {}
+const getMountedSnapshot = () => true
+const getServerMountedSnapshot = () => false
+
 export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  // Hydration-safe: only set state after mount
-  useEffect(() => {
-    setSelectedYear(currentYear)
-    setIsClient(true)
-  }, [currentYear])
+  const isClient = useSyncExternalStore(subscribeMounted, getMountedSnapshot, getServerMountedSnapshot)
 
   const displayYear = selectedYear ?? currentYear
   const availableYears = [currentYear, currentYear - 1, currentYear - 2]

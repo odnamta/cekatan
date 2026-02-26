@@ -13,16 +13,16 @@ interface TagBadgeProps {
 }
 
 /**
- * V11.3: Get the icon component for a category
+ * V11.3: Render the icon for a category
  */
-function getCategoryIcon(category: TagCategory) {
+function CategoryIconRenderer({ category, className }: { category: TagCategory; className: string }) {
   switch (category) {
     case 'source':
-      return BookOpen
+      return <BookOpen className={className} />
     case 'topic':
-      return FolderTree
+      return <FolderTree className={className} />
     case 'concept':
-      return Lightbulb
+      return <Lightbulb className={className} />
   }
 }
 
@@ -42,14 +42,14 @@ export function TagBadge({ tag, onRemove, size = 'sm', showCategoryIcon = false 
     ? 'px-2 py-0.5 text-xs' 
     : 'px-2.5 py-1 text-sm'
 
-  // V11.3: Get category icon if enabled
-  const CategoryIcon = showCategoryIcon && tag.category ? getCategoryIcon(tag.category) : null
+  // V11.3: Show category icon if enabled
+  const shouldShowIcon = showCategoryIcon && !!tag.category
 
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full ${bgClass} ${textClass} ${sizeClasses} font-medium`}
     >
-      {CategoryIcon && <CategoryIcon className="w-3 h-3 opacity-70" />}
+      {shouldShowIcon && <CategoryIconRenderer category={tag.category} className="w-3 h-3 opacity-70" />}
       {tag.name}
       {onRemove && (
         <button

@@ -97,9 +97,14 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
   const totalItems = (shouldShowCreateOption ? 1 : 0) + filteredTags.length
 
   // Reset highlighted index when filtered results change
-  useEffect(() => {
+  // Using React 19 pattern: track previous values in state to compute during render
+  const [prevFilteredLength, setPrevFilteredLength] = useState(filteredTags.length)
+  const [prevShowCreate, setPrevShowCreate] = useState(shouldShowCreateOption)
+  if (prevFilteredLength !== filteredTags.length || prevShowCreate !== shouldShowCreateOption) {
+    setPrevFilteredLength(filteredTags.length)
+    setPrevShowCreate(shouldShowCreateOption)
     setHighlightedIndex(shouldShowCreateOption ? 0 : (filteredTags.length > 0 ? 0 : -1))
-  }, [shouldShowCreateOption, filteredTags.length])
+  }
 
   const toggleTag = (tagId: string) => {
     if (selectedTagIds.includes(tagId)) {

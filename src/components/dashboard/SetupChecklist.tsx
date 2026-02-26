@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Circle, X } from 'lucide-react'
 import type { ChecklistItem } from '@/lib/setup-checklist'
 
 const DISMISSED_KEY = 'cekatan_checklist_dismissed'
+
+const subscribeMounted = () => () => {}
+const getMountedSnapshot = () => true
+const getServerMountedSnapshot = () => false
 
 interface SetupChecklistProps {
   items: ChecklistItem[]
@@ -13,18 +17,11 @@ interface SetupChecklistProps {
 }
 
 export function SetupChecklist({ items, onDismiss }: SetupChecklistProps) {
-  const [dismissed, setDismissed] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(DISMISSED_KEY)
-      if (stored === 'true') {
-        setDismissed(true)
-      }
-    }
-  }, [])
+  const mounted = useSyncExternalStore(subscribeMounted, getMountedSnapshot, getServerMountedSnapshot)
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(DISMISSED_KEY) === 'true'
+  })
 
   // Don't render until mounted (avoids hydration mismatch with localStorage)
   if (!mounted) return null

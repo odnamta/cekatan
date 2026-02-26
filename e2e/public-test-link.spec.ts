@@ -1,27 +1,27 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Public Test Link Flow', () => {
-  test('public test link page loads for valid code', async ({ page }) => {
-    // TODO: Replace with a seeded public assessment code
-    // Public links don't require auth — use a fresh context
-    test.skip()
+  test('invalid public code shows error or empty state', async ({ page }) => {
+    await page.goto('/t/INVALIDCODE')
+    await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
+    // Should show error message, not found, or redirect
+    const hasError = await page.getByText(/not found|invalid|error|expired/i).first().isVisible({ timeout: 5000 }).catch(() => false)
+    const redirected = page.url() !== '/t/INVALIDCODE'
+    expect(hasError || redirected).toBeTruthy()
   })
 
-  test('invalid public code shows error', async ({ page }) => {
-    await page.goto('/t/INVALIDCODE')
-    // Should show error message or redirect
+  test('public test results page handles invalid code', async ({ page }) => {
+    await page.goto('/t/INVALIDCODE/results')
     await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
   })
 
-  test('candidate can fill info and start public assessment', async ({ page }) => {
-    // TODO: Navigate to valid public link
-    // Verify: Name/email form is shown, can submit and start assessment
-    test.skip()
+  test('verify page loads', async ({ page }) => {
+    await page.goto('/verify')
+    await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
   })
 
-  test('public results page shows score after completion', async ({ page }) => {
-    // TODO: Complete a public assessment
-    // Verify: Results page shows score
-    test.skip()
+  test('unsubscribe page loads', async ({ page }) => {
+    await page.goto('/unsubscribe')
+    await expect(page.locator('body')).toBeVisible({ timeout: 10000 })
   })
 })

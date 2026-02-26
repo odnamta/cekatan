@@ -24,23 +24,23 @@ export default async function UnsubscribePage({
     const userId = verifyUnsubscribeToken(token)
 
     if (!userId || userId.length !== 36) {
-      return <UnsubscribeResult success={false} />
+      success = false
+    } else {
+      const supabase = await createSupabaseServiceClient()
+
+      // Update profiles table — service client bypasses RLS
+      const { error } = await supabase
+        .from('profiles')
+        .update({ email_notifications: false })
+        .eq('id', userId)
+
+      // Also update user_metadata for consistency
+      const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: { email_notifications: false },
+      })
+
+      success = !error && !authError
     }
-
-    const supabase = await createSupabaseServiceClient()
-
-    // Update profiles table — service client bypasses RLS
-    const { error } = await supabase
-      .from('profiles')
-      .update({ email_notifications: false })
-      .eq('id', userId)
-
-    // Also update user_metadata for consistency
-    const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { email_notifications: false },
-    })
-
-    success = !error && !authError
   } catch {
     success = false
   }
