@@ -202,27 +202,28 @@ export async function getOrgMemberActivity(): Promise<ActionResultV2<Record<stri
       return { ok: false, error: 'Insufficient permissions' }
     }
 
-    // Fetch completed assessment sessions for org members (capped at 5000)
+    // Fetch completed sessions for this org — only the 2 columns needed for aggregation
     const { data: sessions } = await supabase
       .from('assessment_sessions')
-      .select('user_id, status, completed_at')
+      .select('user_id, completed_at')
       .eq('org_id', org.id)
       .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
       .limit(5000)
 
     const activity: Record<string, { completedSessions: number; lastActive: string | null }> = {}
     for (const s of sessions || []) {
-      if (!activity[s.user_id]) {
-        activity[s.user_id] = { completedSessions: 0, lastActive: null }
-      }
-      activity[s.user_id].completedSessions++
-      if (!activity[s.user_id].lastActive || (s.completed_at && s.completed_at > activity[s.user_id].lastActive!)) {
-        activity[s.user_id].lastActive = s.completed_at
+      const entry = activity[s.user_id]
+      if (!entry) {
+        // First row per user is their most recent (ordered by completed_at desc)
+        activity[s.user_id] = { completedSessions: 1, lastActive: s.completed_at }
+      } else {
+        entry.completedSessions++
       }
     }
 
     return { ok: true, data: activity }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**

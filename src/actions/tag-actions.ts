@@ -495,6 +495,7 @@ export async function bulkAddTagToCards(
 
 import { openai } from '@/lib/openai-client'
 import { GOLDEN_TOPIC_TAGS, getCanonicalTopicTag } from '@/lib/golden-list'
+import { buildAutoTagSystemPrompt } from '@/lib/ai-prompts'
 
 /**
  * V9.2: Result type for auto-tag operations
@@ -592,20 +593,8 @@ export async function autoTagCards(
       try {
         const cardForPrompt = { id: ct.id, stem: ct.stem }
 
-        // V9.3: Subject-aware system prompt
-        const systemPrompt = `You are an expert in ${effectiveSubject}. You are an assessment content classifier for ${effectiveSubject} exam preparation.
-Classify this question into:
-1. ONE Topic from this Golden List: ${GOLDEN_TOPIC_TAGS.join(', ')}
-2. ONE or TWO specific Concepts (key terms, topics, or procedures mentioned)
-
-Rules:
-- Topic MUST be from the Golden List exactly as written
-- Concepts should be specific domain terms from the question
-- Extract verbatim. Do not invent missing values.
-- Use ${effectiveSubject}-appropriate interpretation of domain terms
-
-Respond with JSON only, no markdown:
-{"cardId":"uuid","topic":"Topic","concepts":["Concept1","Concept2"]}`
+        // V9.3: Subject-aware system prompt (extracted to ai-prompts.ts)
+        const systemPrompt = buildAutoTagSystemPrompt(effectiveSubject)
 
         const userPrompt = `Classify this ${effectiveSubject} question:\n${JSON.stringify(cardForPrompt, null, 2)}`
 

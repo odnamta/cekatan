@@ -10,8 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
-  Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle,
-  Target, Shuffle, RotateCcw, Eye, EyeOff, Shield, Flag,
+  Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Flag,
 } from 'lucide-react'
 import {
   startAssessmentSession,
@@ -28,6 +27,8 @@ import { useOrg } from '@/components/providers/OrgProvider'
 import { Button } from '@/components/ui/Button'
 import type { Assessment, AssessmentSession } from '@/types/database'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { ExamInstructions } from './ExamInstructions'
+import { TabWarningDialog, TimeWarningDialog, MobileNavDialog, ReviewSummaryDialog } from './ExamDialogs'
 
 type QuestionData = {
   cardTemplateId: string
@@ -46,16 +47,23 @@ type QuestionData = {
  */
 function seededShuffle(seed: string, length: number): number[] {
   const indices = Array.from({ length }, (_, i) => i)
-  // Simple hash-based seed
+  // Hash seed string to 32-bit integer
   let h = 0
   for (let i = 0; i < seed.length; i++) {
     h = ((h << 5) - h + seed.charCodeAt(i)) | 0
   }
-  // Fisher-Yates with seeded random
+  h = h >>> 0 // Convert to unsigned
+  // Mulberry32 PRNG — uniform [0, 1) distribution, no modulo bias
+  function mulberry32(): number {
+    h |= 0; h = h + 0x6D2B79F5 | 0
+    let t = Math.imul(h ^ h >>> 15, 1 | h)
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+  }
+  // Fisher-Yates with unbiased seeded random
   for (let i = length - 1; i > 0; i--) {
-    h = ((h << 5) - h + i) | 0
-    const j = Math.abs(h) % (i + 1)
-    ;[indices[i], indices[j]] = [indices[j], indices[i]]
+    const j = Math.floor(mulberry32() * (i + 1))
+    ;[indices[i], indices[j]] = [indices[j]!, indices[i]!]
   }
   return indices
 }
@@ -495,116 +503,16 @@ export default function TakeAssessmentPage() {
   // Pre-assessment instructions screen
   if (phase === 'instructions' && assessment) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-          {assessment.title}
-        </h1>
-        {assessment.description && (
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            {assessment.description}
-          </p>
-        )}
-
-        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">
-            Assessment Rules
-          </h2>
-          <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-            <div className="flex items-center gap-3">
-              <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
-              <span>Time limit: <strong>{assessment.time_limit_minutes} minutes</strong></span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Target className="h-4 w-4 text-green-500 flex-shrink-0" />
-              <span>Pass score: <strong>{assessment.pass_score}%</strong> ({assessment.question_count} questions)</span>
-            </div>
-            {assessment.shuffle_questions && (
-              <div className="flex items-center gap-3">
-                <Shuffle className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                <span>Questions are presented in random order</span>
-              </div>
-            )}
-            {assessment.max_attempts && (
-              <div className="flex items-center gap-3">
-                <RotateCcw className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                <span>
-                  {assessment.max_attempts - attemptCount} of {assessment.max_attempts} attempt{assessment.max_attempts !== 1 ? 's' : ''} remaining
-                </span>
-              </div>
-            )}
-            {assessment.cooldown_minutes && (
-              <div className="flex items-center gap-3">
-                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                <span>{assessment.cooldown_minutes} minute cooldown between attempts</span>
-              </div>
-            )}
-            {assessment.allow_review ? (
-              <div className="flex items-center gap-3">
-                <Eye className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                <span>You can review your answers after completion</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <EyeOff className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                <span>Answer review is not available for this assessment</span>
-              </div>
-            )}
-            {proctoringEnabled && (
-              <div className="flex items-center gap-3">
-                <Shield className="h-4 w-4 text-red-500 flex-shrink-0" />
-                <span>Fullscreen mode is required — tab switches and exits are monitored</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
-          <p className="text-sm text-amber-800 dark:text-amber-300">
-            The timer starts as soon as you click &quot;Begin Assessment&quot;. Make sure you have a stable connection and are ready to complete the exam.
-          </p>
-        </div>
-
-        {assessment.access_code && (
-          <div className="mb-4">
-            <label htmlFor="access-code" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Access Code
-            </label>
-            <input
-              id="access-code"
-              type="text"
-              placeholder="Enter access code..."
-              value={accessCodeInput}
-              onChange={(e) => setAccessCodeInput(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoComplete="off"
-            />
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm" role="alert">
-            {error}
-          </div>
-        )}
-
-        <div className="flex items-center gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => router.push('/assessments')}
-            className="flex-1"
-          >
-            Back
-          </Button>
-          <Button
-            onClick={() => startExam()}
-            loading={starting}
-            disabled={starting || (!!assessment.access_code && !accessCodeInput)}
-            className="flex-1"
-          >
-            Begin Assessment
-          </Button>
-        </div>
-      </div>
+      <ExamInstructions
+        assessment={assessment}
+        attemptCount={attemptCount}
+        proctoringEnabled={proctoringEnabled}
+        accessCodeInput={accessCodeInput}
+        onAccessCodeChange={setAccessCodeInput}
+        onStart={() => startExam()}
+        starting={starting}
+        error={error}
+      />
     )
   }
 
@@ -808,194 +716,44 @@ export default function TakeAssessmentPage() {
 
       {/* Tab Switch Warning */}
       {showTabWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="tab-warning-title">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center">
-            <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-amber-500" aria-hidden="true" />
-            <h3 id="tab-warning-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              Tab Switch Detected
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-              Leaving the exam window has been recorded.
-            </p>
-            <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-              Violations: {tabSwitchCount}
-            </p>
-            <div className="flex items-center gap-2 justify-center">
-              <Button size="sm" onClick={() => setShowTabWarning(false)}>
-                Return to Exam
-              </Button>
-              {fullscreenExited && !document.fullscreenElement && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    document.documentElement.requestFullscreen().catch(() => {})
-                    setFullscreenExited(false)
-                    setShowTabWarning(false)
-                  }}
-                >
-                  Re-enter Fullscreen
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <TabWarningDialog
+          tabSwitchCount={tabSwitchCount}
+          fullscreenExited={fullscreenExited}
+          onClose={() => setShowTabWarning(false)}
+          onReenterFullscreen={() => {
+            document.documentElement.requestFullscreen().catch(() => {})
+            setFullscreenExited(false)
+            setShowTabWarning(false)
+          }}
+        />
       )}
 
       {/* Time Warning (30 seconds remaining) */}
       {showTimeWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="time-warning-title">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center">
-            <Clock className="h-10 w-10 mx-auto mb-3 text-red-500" aria-hidden="true" />
-            <h3 id="time-warning-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              Time Almost Up!
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Less than 30 seconds remaining. Your exam will be auto-submitted when time runs out.
-            </p>
-            <Button size="sm" onClick={() => setShowTimeWarning(false)}>
-              Continue
-            </Button>
-          </div>
-        </div>
+        <TimeWarningDialog onClose={() => setShowTimeWarning(false)} />
       )}
 
       {/* Mobile Question Navigation */}
       {showMobileNav && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-label="Question navigation">
-          <div className="bg-white dark:bg-slate-800 rounded-t-xl sm:rounded-xl p-4 w-full sm:max-w-sm mx-0 sm:mx-4 shadow-xl max-h-[70vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Jump to Question
-              </h3>
-              <button
-                onClick={() => setShowMobileNav(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
-                aria-label="Close navigation"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="flex items-center gap-3 mb-3 text-xs text-slate-500 dark:text-slate-400">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> answered</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> flagged</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" /> unanswered</span>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {questions.map((q, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setCurrentIndex(idx)
-                    setShowMobileNav(false)
-                  }}
-                  className={`relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
-                    idx === currentIndex
-                      ? 'bg-blue-600 text-white ring-2 ring-blue-400'
-                      : q.flagged
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400'
-                        : q.answered
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                  } active:scale-95`}
-                >
-                  {idx + 1}
-                  {q.flagged && (
-                    <Flag className="absolute -top-1 -right-1 h-2.5 w-2.5 text-amber-500" fill="currentColor" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <MobileNavDialog
+          questions={questions}
+          currentIndex={currentIndex}
+          onSelectQuestion={setCurrentIndex}
+          onClose={() => setShowMobileNav(false)}
+        />
       )}
 
       {/* Review Summary */}
-      {showConfirmFinish && (() => {
-        const flaggedCount = questions.filter((q) => q.flagged).length
-        const unansweredCount = questions.length - answeredCount
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="review-title">
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-lg mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
-              <h3 id="review-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                Review Before Submitting
-              </h3>
-
-              {/* Stats */}
-              <div className="flex items-center gap-4 mb-4 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                  <span className="text-slate-600 dark:text-slate-400">{answeredCount} answered</span>
-                </div>
-                {unansweredCount > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                    <span className="text-slate-600 dark:text-slate-400">{unansweredCount} unanswered</span>
-                  </div>
-                )}
-                {flaggedCount > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                    <span className="text-slate-600 dark:text-slate-400">{flaggedCount} flagged</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Question grid */}
-              <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-4">
-                {questions.map((q, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setCurrentIndex(idx)
-                      setShowConfirmFinish(false)
-                    }}
-                    className={`relative w-full aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-colors ${
-                      q.flagged
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400'
-                        : q.answered
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                    } hover:ring-2 hover:ring-blue-400`}
-                    aria-label={`Question ${idx + 1}: ${q.answered ? 'answered' : 'unanswered'}${q.flagged ? ', flagged' : ''}`}
-                  >
-                    {idx + 1}
-                    {q.flagged && (
-                      <Flag className="absolute -top-1 -right-1 h-2.5 w-2.5 text-amber-500" fill="currentColor" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {unansweredCount > 0 && (
-                <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-                  {unansweredCount} unanswered question{unansweredCount !== 1 ? 's' : ''} will be marked incorrect.
-                </p>
-              )}
-
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowConfirmFinish(false)}
-                  className="flex-1"
-                >
-                  Back to Exam
-                </Button>
-                <Button
-                  size="sm"
-                  loading={completing}
-                  onClick={handleComplete}
-                  className="flex-1"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Submit
-                </Button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {showConfirmFinish && (
+        <ReviewSummaryDialog
+          questions={questions}
+          answeredCount={answeredCount}
+          completing={completing}
+          onSelectQuestion={setCurrentIndex}
+          onClose={() => setShowConfirmFinish(false)}
+          onSubmit={handleComplete}
+        />
+      )}
     </div>
   )
 }

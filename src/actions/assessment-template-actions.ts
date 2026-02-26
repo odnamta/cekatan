@@ -180,8 +180,8 @@ export async function getAssessmentPreviewQuestions(
   assessmentId: string,
   limit = 10,
 ): Promise<ActionResultV2<PreviewQuestion[]>> {
-  return withOrgUser(async ({ supabase, org }) => {
-    if (!hasMinimumRole('creator', 'creator')) {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
       return { ok: false, error: 'Creator role required' }
     }
 

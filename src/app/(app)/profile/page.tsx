@@ -145,13 +145,13 @@ export default function ProfilePage() {
 
       <Card variant="elevated" padding="lg" className="mb-6">
         {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
+          <div role="alert" className="mb-4 p-3 bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded-lg text-green-700 dark:text-green-300 text-sm">
+          <div role="alert" className="mb-4 p-3 bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded-lg text-green-700 dark:text-green-300 text-sm">
             {success}
           </div>
         )}
@@ -384,7 +384,7 @@ function ChangePasswordCard() {
         Ubah Password
       </h2>
       {message && (
-        <div className={`mb-3 p-2.5 rounded-lg text-sm ${
+        <div role="alert" className={`mb-3 p-2.5 rounded-lg text-sm ${
           message.type === 'success'
             ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
             : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'

@@ -701,6 +701,7 @@ import {
   resolveTagSuggestions,
   buildTagLookup,
 } from '@/lib/tag-consolidation'
+import { TAG_CONSOLIDATION_SYSTEM_PROMPT } from '@/lib/ai-prompts'
 
 /**
  * V9.6: Analyze tags using AI to identify typos, synonyms, and casing issues.
@@ -751,25 +752,7 @@ export async function analyzeTagConsolidation(): Promise<AnalyzeTagConsolidation
         messages: [
           {
             role: 'system',
-            content: `You are a data cleanup assistant. Analyze the provided list of tags and identify groups that should be merged due to:
-- Typos (e.g., "Adrenalgland" should be "Adrenal Glands")
-- Synonyms (e.g., "OB" and "Obstetrics")
-- Casing inconsistencies (e.g., "adrenal glands" and "Adrenal Glands")
-- Spacing/punctuation issues (e.g., "Adrenal-gland" and "Adrenal Glands")
-
-For each group, choose the most correct/canonical form as the "master" tag.
-
-Return ONLY valid JSON in this exact format:
-{
-  "groups": [
-    {
-      "master": "Canonical Tag Name",
-      "variations": ["typo1", "synonym1", "casing-variant"]
-    }
-  ]
-}
-
-If no duplicates/synonyms are found, return: {"groups": []}`,
+            content: TAG_CONSOLIDATION_SYSTEM_PROMPT,
           },
           {
             role: 'user',

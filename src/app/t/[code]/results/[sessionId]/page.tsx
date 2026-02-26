@@ -7,8 +7,8 @@ interface Props {
 }
 
 export default async function PublicResultsPage({ params }: Props) {
-  const { code, sessionId } = await params
-  const result = await getPublicResults(sessionId)
+  const { code, sessionId: sessionToken } = await params
+  const result = await getPublicResults(decodeURIComponent(sessionToken))
 
   if (!result.ok || !result.data) {
     notFound()

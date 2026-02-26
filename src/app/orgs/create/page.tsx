@@ -10,7 +10,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { createOrganization } from '@/actions/org-actions'
+import { createOrganization, switchOrganization } from '@/actions/org-actions'
 
 const RESERVED_SLUGS = new Set([
   'admin', 'api', 'app', 'auth', 'callback', 'dashboard', 'decks', 'help',
@@ -66,8 +66,7 @@ export default function CreateOrgPage() {
     startTransition(async () => {
       const result = await createOrganization(name.trim(), slug)
       if (result.ok && result.data) {
-        // Set the new org as active
-        document.cookie = `cekatan_active_org_id=${result.data.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+        await switchOrganization(result.data.id)
         router.push('/dashboard')
       } else if (!result.ok) {
         setError(result.error)

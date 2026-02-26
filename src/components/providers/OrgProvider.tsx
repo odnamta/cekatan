@@ -9,6 +9,7 @@
  */
 
 import { createContext, useContext, useCallback, useTransition } from 'react'
+import { switchOrganization } from '@/actions/org-actions'
 import type { Organization, OrgRole } from '@/types/database'
 
 export interface OrgContextValue {
@@ -31,8 +32,7 @@ export function OrgProvider({ org, role, children }: OrgProviderProps) {
 
   const switchOrg = useCallback((orgId: string) => {
     startTransition(async () => {
-      // Set cookie and reload to pick up new org context server-side
-      document.cookie = `cekatan_active_org_id=${orgId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+      await switchOrganization(orgId)
       window.location.reload()
     })
   }, [startTransition])

@@ -1,47 +1,8 @@
 import type { NextConfig } from "next";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const withPWA = require("next-pwa")({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
-  buildExcludes: [/middleware-manifest\.json$/], // CRITICAL: Prevents Vercel WorkerError crash
-  publicExcludes: ["!robots.txt", "!sitemap.xml"],
-  fallbacks: {
-    document: "/offline.html",
-  },
-  runtimeCaching: [
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "supabase-api",
-        expiration: { maxEntries: 64, maxAgeSeconds: 60 * 5 },
-      },
-    },
-    {
-      urlPattern: /\.(?:js|css|woff2?)$/i,
-      handler: "CacheFirst",
-      options: {
-        cacheName: "static-assets",
-        expiration: { maxEntries: 128, maxAgeSeconds: 60 * 60 * 24 * 30 },
-      },
-    },
-    {
-      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-      handler: "CacheFirst",
-      options: {
-        cacheName: "images",
-        expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 },
-      },
-    },
-  ],
-});
+import withPWA from "@ducanh2912/next-pwa";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // Next.js 16 defaults to Turbopack — empty config silences the webpack conflict from next-pwa
   turbopack: {},
   images: {
     remotePatterns: [
@@ -63,4 +24,41 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default withPWA({
+  dest: "public",
+  register: true,
+  disable: process.env.NODE_ENV === "development",
+  publicExcludes: ["!robots.txt", "!sitemap.xml"],
+  fallbacks: {
+    document: "/offline.html",
+  },
+  workboxOptions: {
+    skipWaiting: true,
+    runtimeCaching: [
+      {
+        urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "supabase-api",
+          expiration: { maxEntries: 64, maxAgeSeconds: 60 * 5 },
+        },
+      },
+      {
+        urlPattern: /\.(?:js|css|woff2?)$/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "static-assets",
+          expiration: { maxEntries: 128, maxAgeSeconds: 60 * 60 * 24 * 30 },
+        },
+      },
+      {
+        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "images",
+          expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 },
+        },
+      },
+    ],
+  },
+})(nextConfig);

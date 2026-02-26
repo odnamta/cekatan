@@ -656,7 +656,7 @@ export async function completePublicSession(
  * Fetch results for a completed public session.
  */
 export async function getPublicResults(
-  sessionId: string
+  sessionIdOrToken: string
 ): Promise<ActionResultV2<{
   score: number
   passed: boolean
@@ -670,6 +670,11 @@ export async function getPublicResults(
   certificateUrl: string | null
 }>> {
   try {
+    const sessionId = verifySessionToken(sessionIdOrToken)
+    if (!sessionId) {
+      return { ok: false, error: 'Token sesi tidak valid' }
+    }
+
     const supabase = await createSupabaseServiceClient()
 
     // Fetch session with assessment + org

@@ -135,13 +135,12 @@ export function PublicExam({ code }: { code: string }) {
     if (timerRef.current) clearInterval(timerRef.current)
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
 
-    const sid = sessionIdRef.current
     const token = sessionTokenRef.current
-    if (!sid) return
+    if (!token) return
 
     const result = await completePublicSession(token)
     if (result.ok) {
-      router.push('/t/' + code + '/results/' + sid)
+      router.push('/t/' + code + '/results/' + encodeURIComponent(token))
     } else {
       setError(result.error ?? 'Gagal mengirim jawaban')
       setPhase('exam')
@@ -334,11 +333,10 @@ export function PublicExam({ code }: { code: string }) {
     if (timerRef.current) clearInterval(timerRef.current)
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
 
-    const sid = sessionIdRef.current
     const token = sessionTokenRef.current
     const result = await completePublicSession(token)
     if (result.ok) {
-      router.push('/t/' + code + '/results/' + sid)
+      router.push('/t/' + code + '/results/' + encodeURIComponent(token))
     } else {
       setError(result.error ?? 'Gagal mengirim jawaban')
       setPhase('review')
