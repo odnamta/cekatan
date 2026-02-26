@@ -96,6 +96,7 @@ export async function getSessionPercentile(
       .eq('assessment_id', session.assessment_id)
       .in('status', ['completed', 'timed_out'])
       .not('score', 'is', null)
+      .limit(10000)
 
     if (!allSessions || allSessions.length === 0) {
       return { ok: true, data: { percentile: 100, rank: 1, totalSessions: 1 } }
@@ -126,6 +127,7 @@ export async function getAssessmentResults(
       .select('*')
       .eq('assessment_id', assessmentId)
       .order('completed_at', { ascending: false })
+      .limit(1000)
 
     if (error) {
       return { ok: false, error: error.message }
@@ -217,6 +219,15 @@ export async function getAssessmentResultsDetailed(
 }
 
 /**
+ * Sanitize a CSV cell to prevent formula injection.
+ * Cells starting with =, +, -, @, \t, \r are prefixed with a single quote.
+ */
+function sanitizeCsvCell(val: string): string {
+  if (/^[=+\-@\t\r]/.test(val)) return "'" + val
+  return val
+}
+
+/**
  * Export assessment results as CSV string.
  */
 export async function exportResultsCsv(
@@ -257,9 +268,9 @@ export async function exportResultsCsv(
     const header = 'Nama,Email,Telepon,Status,Score,Passed,Tab Switches,Started At,Completed At'
     const rows = orgSessions.map((s) => {
       const profile = profileMap.get(s.user_id)
-      const name = (profile?.full_name ?? '').replace(/,/g, ' ')
-      const email = profile?.email ?? `user-${s.user_id.slice(0, 8)}`
-      const phone = profile?.phone ?? ''
+      const name = sanitizeCsvCell((profile?.full_name ?? '').replace(/,/g, ' '))
+      const email = sanitizeCsvCell(profile?.email ?? `user-${s.user_id.slice(0, 8)}`)
+      const phone = sanitizeCsvCell(profile?.phone ?? '')
       return [
         `"${name}"`,
         `"${email}"`,
@@ -431,6 +442,7 @@ export async function getOrgQuestionBank(
       .select('card_template_id, is_correct')
       .in('card_template_id', cardIds)
       .not('is_correct', 'is', null)
+      .limit(50000)
 
     const statsMap = new Map<string, { total: number; correct: number }>()
     if (answers) {

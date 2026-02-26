@@ -145,18 +145,19 @@ export async function getOrgAssessments(): Promise<ActionResultV2<AssessmentWith
       return { ok: false, error: error.message }
     }
 
-    // Get session counts
+    // Get session counts per assessment using grouped counting
     const assessmentIds = (data ?? []).map((a) => a.id)
-    const { data: sessionCounts } = assessmentIds.length > 0
-      ? await supabase
-          .from('assessment_sessions')
-          .select('assessment_id')
-          .in('assessment_id', assessmentIds)
-      : { data: [] }
-
     const countMap = new Map<string, number>()
-    for (const s of sessionCounts ?? []) {
-      countMap.set(s.assessment_id, (countMap.get(s.assessment_id) ?? 0) + 1)
+    if (assessmentIds.length > 0) {
+      const { data: sessionRows } = await supabase
+        .from('assessment_sessions')
+        .select('assessment_id')
+        .in('assessment_id', assessmentIds)
+        .limit(10000)
+
+      for (const s of sessionRows ?? []) {
+        countMap.set(s.assessment_id, (countMap.get(s.assessment_id) ?? 0) + 1)
+      }
     }
 
     const assessments: AssessmentWithDeck[] = (data ?? []).map((a) => ({

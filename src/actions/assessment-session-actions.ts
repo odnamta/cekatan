@@ -118,7 +118,10 @@ export async function startAssessmentSession(
     // Shuffle and pick
     let questionIds = cards.map((c) => c.id)
     if (assessment.shuffle_questions) {
-      questionIds = questionIds.sort(() => Math.random() - 0.5)
+      for (let i = questionIds.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(0, i + 1)
+        ;[questionIds[i], questionIds[j]] = [questionIds[j]!, questionIds[i]!]
+      }
     }
     questionIds = questionIds.slice(0, assessment.question_count)
 
@@ -279,14 +282,7 @@ export async function completeSession(
       return { ok: false, error: error.message }
     }
 
-    // Auto-generate certificate if passed
-    if (passed) {
-      generateCertificate(sessionId).catch((err) => {
-        console.warn('[completeSession] Certificate generation failed:', err)
-      })
-    }
-
-    // Fire-and-forget email dispatch for pass/fail result
+    // Email dispatch for pass/fail result (certificate generated inline for passed)
     try {
       const serviceClient = await createSupabaseServiceClient()
       const [{ data: profile }, { data: assessmentInfo }] = await Promise.all([
@@ -308,47 +304,46 @@ export async function completeSession(
         const unsubUrl = buildUnsubscribeUrl(user.id)
 
         if (passed) {
-          // For passed candidates, send CertificateDelivery (includes score)
-          // Delay slightly to let certificate generation complete
-          setTimeout(async () => {
-            try {
-              // Re-fetch session to get certificate_url
-              const { data: updatedSession } = await supabase
-                .from('assessment_sessions')
-                .select('certificate_url')
-                .eq('id', sessionId)
-                .single()
+          // For passed candidates: await certificate generation, then send email
+          try {
+            await generateCertificate(sessionId)
+          } catch {
+            // Non-fatal: certificate generation may fail
+          }
 
-              const certUrl = updatedSession?.certificate_url
-              if (certUrl) {
-                await dispatchCertificateEmail({
-                  to: profile.email,
-                  subject: `Sertifikat: ${assessmentInfo.title}`,
-                  orgName,
-                  candidateName,
-                  assessmentTitle: assessmentInfo.title,
-                  score,
-                  certificateUrl: buildFullUrl(certUrl),
-                  unsubscribeUrl: unsubUrl,
-                })
-              } else {
-                // Fallback: send result notification if certificate not ready
-                await dispatchResultEmail({
-                  to: profile.email,
-                  subject: `Hasil Asesmen: ${assessmentInfo.title} — LULUS`,
-                  orgName,
-                  candidateName,
-                  assessmentTitle: assessmentInfo.title,
-                  score,
-                  passed: true,
-                  actionUrl: buildFullUrl(`/assessments/${session.assessment_id}/results/${sessionId}`),
-                  unsubscribeUrl: unsubUrl,
-                })
-              }
-            } catch (err) {
-              console.warn('[email] certificate/result email failed:', err)
-            }
-          }, 5000)
+          // Re-fetch session to get certificate_url
+          const { data: updatedSession } = await serviceClient
+            .from('assessment_sessions')
+            .select('certificate_url')
+            .eq('id', sessionId)
+            .single()
+
+          const certUrl = updatedSession?.certificate_url
+          if (certUrl) {
+            dispatchCertificateEmail({
+              to: profile.email,
+              subject: `Sertifikat: ${assessmentInfo.title}`,
+              orgName,
+              candidateName,
+              assessmentTitle: assessmentInfo.title,
+              score,
+              certificateUrl: buildFullUrl(certUrl),
+              unsubscribeUrl: unsubUrl,
+            }).catch((err) => console.warn('[email] certificate email failed:', err))
+          } else {
+            // Fallback: send result notification if certificate not ready
+            dispatchResultEmail({
+              to: profile.email,
+              subject: `Hasil Asesmen: ${assessmentInfo.title} — LULUS`,
+              orgName,
+              candidateName,
+              assessmentTitle: assessmentInfo.title,
+              score,
+              passed: true,
+              actionUrl: buildFullUrl(`/assessments/${session.assessment_id}/results/${sessionId}`),
+              unsubscribeUrl: unsubUrl,
+            }).catch((err) => console.warn('[email] result email failed:', err))
+          }
         } else {
           // For failed candidates, send ResultNotification with retake link
           dispatchResultEmail({
@@ -532,16 +527,17 @@ export async function expireStaleSessions(): Promise<ActionResultV2<{ expired: n
       .from('assessment_sessions')
       .select('id, started_at, user_id, assessments!inner(org_id, time_limit_minutes, pass_score)')
       .eq('status', 'in_progress')
+      .eq('assessments.org_id', org.id)
+      .limit(1000)
 
     if (!sessions || sessions.length === 0) {
       return { ok: true, data: { expired: 0 } }
     }
 
-    // Filter to this org and find genuinely expired ones
+    // Find genuinely expired ones (org already filtered at query level)
     const now = Date.now()
     const stale = sessions.filter((s) => {
       const a = s.assessments as unknown as { org_id: string; time_limit_minutes: number }
-      if (a.org_id !== org.id) return false
       const startedMs = new Date(s.started_at).getTime()
       const expiresMs = startedMs + a.time_limit_minutes * 60 * 1000
       return now > expiresMs

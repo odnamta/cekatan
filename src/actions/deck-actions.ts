@@ -1,18 +1,23 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { withUser, withOrgUser, type AuthContext, type OrgAuthContext } from './_helpers'
 import { createDeckSchema } from '@/lib/validations'
-import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { formatZodErrors } from '@/lib/zod-utils'
 import type { ActionResultV2 } from '@/types/actions'
 import { logger } from '@/lib/logger'
+import type { DeckTemplate, DeckTemplateWithDueCount, DeckVisibility } from '@/types/database'
+import { CARD_STATUS } from '@/lib/constants'
 
 /**
- * V8.0/V9.1: Server Action for creating a new deck.
+ * V8.0/V9.1/V13: Server Action for creating a new deck.
  * Creates deck_template and auto-subscribes author via user_decks.
- * V9.1: Added subject field for multi-specialty AI support.
+ * Consolidated from former createDeckAction + createDeckTemplateAction (#161).
+ * Uses withOrgUser for auth + org resolution.
+ *
+ * Accepts optional `subject` field from form data (defaults to 'General').
+ *
  * Requirements: 2.1, 9.3, V8 2.2, V9.1 3.1
  */
 export async function createDeckAction(
@@ -26,57 +31,43 @@ export async function createDeckAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  // Rate limit check
-  const rateLimitResult = await checkRateLimit(`user:${user.id}:createDeck`, RATE_LIMITS.standard)
-  if (!rateLimitResult.allowed) {
-    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
-  }
-
   const { title } = validationResult.data
   // V9.1: Get subject from form data, default to General
   const subject = (formData.get('subject') as string)?.trim() || 'General'
 
-  const supabase = await createSupabaseServerClient()
+  return withOrgUser(async ({ user, supabase, org }: OrgAuthContext) => {
+    // V8.0/V9.1/V13: Create deck_template with subject and org_id
+    const { data: deckTemplate, error: createError } = await supabase
+      .from('deck_templates')
+      .insert({ title, author_id: user.id, visibility: 'private', subject, org_id: org.id })
+      .select()
+      .single()
 
-  // V13: Resolve user's active org for content scoping
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .single()
+    if (createError) {
+      return { ok: false, error: createError.message }
+    }
 
-  if (!membership?.org_id) {
-    return { ok: false, error: 'No active organization found. Please join an organization first.' }
-  }
+    // V8.0: Auto-subscribe author via user_decks
+    const { error: subscribeError } = await supabase.from('user_decks').insert({
+      user_id: user.id,
+      deck_template_id: deckTemplate.id,
+      is_active: true,
+    })
 
-  // V8.0/V9.1/V13: Create deck_template with subject and org_id
-  const { data: deckTemplate, error: createError } = await supabase
-    .from('deck_templates')
-    .insert({ title, author_id: user.id, visibility: 'private', subject, org_id: membership.org_id })
-    .select()
-    .single()
+    if (subscribeError) {
+      logger.error('createDeckAction.autoSubscribe', subscribeError)
+      // Don't fail the whole operation, deck was created
+    }
 
-  if (createError) {
-    return { ok: false, error: createError.message }
-  }
-
-  // V8.0: Auto-subscribe author via user_decks
-  await supabase.from('user_decks').insert({
-    user_id: user.id,
-    deck_template_id: deckTemplate.id,
-    is_active: true,
-  })
-
-  revalidatePath('/dashboard')
-  return { ok: true, data: deckTemplate }
+    revalidatePath('/dashboard')
+    return { ok: true, data: deckTemplate }
+  }, undefined, RATE_LIMITS.standard)
 }
+
+/**
+ * @deprecated Use createDeckAction instead. Kept as alias for backward compatibility (#161).
+ */
+export const createDeckTemplateAction = createDeckAction
 
 /**
  * V8.0: Server Action for deleting a deck.
@@ -145,9 +136,6 @@ export async function getUserDecks(): Promise<{ id: string; title: string }[]> {
 // V6.4: Shared Library V2 Functions
 // ============================================
 
-import type { DeckTemplate, DeckTemplateWithDueCount } from '@/types/database'
-import { CARD_STATUS } from '@/lib/constants'
-
 /**
  * V11.5.1: Extended deck type with draft count for authors
  */
@@ -160,7 +148,7 @@ export interface DeckTemplateWithCounts extends DeckTemplateWithDueCount {
  * Fetches user's deck_templates (authored + subscribed via user_decks).
  * Includes due count from user_card_progress.
  * V11.5.1: Also includes draft_count for author's decks. Refactored to use withUser.
- * 
+ *
  * V6.4: Shared Library Read Path
  */
 export async function getDeckTemplates(): Promise<DeckTemplateWithCounts[]> {
@@ -188,7 +176,7 @@ export async function getDeckTemplates(): Promise<DeckTemplateWithCounts[]> {
 
     // Get due counts for each deck_template
     const deckTemplateIds = userDecks.map(ud => ud.deck_template_id)
-    
+
     // V11.5.1: Get all card_templates with status for draft counting
     const { data: cardTemplates, error: ctError } = await supabase
       .from('card_templates')
@@ -261,7 +249,7 @@ export async function getDeckTemplates(): Promise<DeckTemplateWithCounts[]> {
  * Fetches user's deck_templates for dropdown selection.
  * V11.5.1: Refactored to use withUser helper.
  * Simpler version without due counts.
- * 
+ *
  * V6.4: Used by ConfigureSessionModal for deck selection.
  */
 export async function getUserDeckTemplates(): Promise<{ id: string; title: string }[]> {
@@ -293,98 +281,18 @@ export async function getUserDeckTemplates(): Promise<{ id: string; title: strin
   return result.data ?? []
 }
 
-/**
- * Creates a new deck_template and auto-subscribes the author.
- * 
- * V6.4: Write Path
- */
-export async function createDeckTemplateAction(
-  prevState: ActionResultV2,
-  formData: FormData
-): Promise<ActionResultV2> {
-  const rawData = {
-    title: formData.get('title'),
-  }
-
-  const validationResult = createDeckSchema.safeParse(rawData)
-
-  if (!validationResult.success) {
-    return { ok: false, error: formatZodErrors(validationResult.error) }
-  }
-
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  // Rate limit check
-  const rateLimitResult = await checkRateLimit(`user:${user.id}:createDeckTemplate`, RATE_LIMITS.standard)
-  if (!rateLimitResult.allowed) {
-    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
-  }
-
-  const { title } = validationResult.data
-  const supabase = await createSupabaseServerClient()
-
-  // V13: Resolve user's active org for content scoping
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .single()
-
-  if (!membership?.org_id) {
-    return { ok: false, error: 'No active organization found' }
-  }
-
-  // V13: Create deck_template with org_id
-  const { data: deckTemplate, error: createError } = await supabase
-    .from('deck_templates')
-    .insert({
-      title,
-      author_id: user.id,
-      visibility: 'private',
-      org_id: membership.org_id,
-    })
-    .select()
-    .single()
-
-  if (createError) {
-    return { ok: false, error: createError.message }
-  }
-
-  // Auto-subscribe author via user_decks
-  const { error: subscribeError } = await supabase
-    .from('user_decks')
-    .insert({
-      user_id: user.id,
-      deck_template_id: deckTemplate.id,
-      is_active: true,
-    })
-
-  if (subscribeError) {
-    logger.error('createDeckTemplateAction.autoSubscribe', subscribeError)
-    // Don't fail the whole operation, deck was created
-  }
-
-  revalidatePath('/dashboard')
-
-  return { ok: true, data: deckTemplate }
-}
-
 
 // ============================================
-// V8.6: Deck Renaming
+// V8.6: Deck Renaming (#162: migrated to withOrgUser)
 // ============================================
 
 /**
  * V8.6: Server Action for updating a deck's title.
  * Only the author can rename their deck.
- * 
+ * #162: Migrated to withOrgUser + RATE_LIMITS.standard.
+ *
  * Requirements: 3.2, 3.3
- * 
+ *
  * @param deckId - The deck_template ID to update
  * @param newTitle - The new title (1-100 characters)
  * @returns ActionResultV2 with ok/error
@@ -407,57 +315,53 @@ export async function updateDeckTitle(
     return { ok: false, error: 'Title must be at most 100 characters' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
+    // V8.6: Fetch deck to verify author
+    const { data: deckTemplate, error: fetchError } = await supabase
+      .from('deck_templates')
+      .select('id, author_id')
+      .eq('id', deckId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (fetchError || !deckTemplate) {
+      return { ok: false, error: 'Deck not found' }
+    }
 
-  // V8.6: Fetch deck to verify author
-  const { data: deckTemplate, error: fetchError } = await supabase
-    .from('deck_templates')
-    .select('id, author_id')
-    .eq('id', deckId)
-    .single()
+    // V8.6: Check user is author
+    if (deckTemplate.author_id !== user.id) {
+      return { ok: false, error: 'Only the author can rename this deck' }
+    }
 
-  if (fetchError || !deckTemplate) {
-    return { ok: false, error: 'Deck not found' }
-  }
+    // V8.6: Update the title
+    const { error: updateError } = await supabase
+      .from('deck_templates')
+      .update({ title: trimmedTitle })
+      .eq('id', deckId)
 
-  // V8.6: Check user is author
-  if (deckTemplate.author_id !== user.id) {
-    return { ok: false, error: 'Only the author can rename this deck' }
-  }
+    if (updateError) {
+      return { ok: false, error: updateError.message }
+    }
 
-  // V8.6: Update the title
-  const { error: updateError } = await supabase
-    .from('deck_templates')
-    .update({ title: trimmedTitle })
-    .eq('id', deckId)
+    // Revalidate paths
+    revalidatePath(`/decks/${deckId}`)
+    revalidatePath('/dashboard')
 
-  if (updateError) {
-    return { ok: false, error: updateError.message }
-  }
-
-  // Revalidate paths
-  revalidatePath(`/decks/${deckId}`)
-  revalidatePath('/dashboard')
-
-  return { ok: true, data: { title: trimmedTitle } }
+    return { ok: true, data: { title: trimmedTitle } }
+  }, undefined, RATE_LIMITS.standard)
 }
 
 
 // ============================================
-// V9.1: Deck Subject Management
+// V9.1: Deck Subject Management (#162: migrated to withOrgUser)
 // ============================================
 
 /**
  * V9.1: Server Action for updating a deck's subject.
  * Only the author can change the subject.
- * 
+ * #162: Migrated to withOrgUser + RATE_LIMITS.standard.
+ *
  * Requirements: V9.1 3.2
- * 
+ *
  * @param deckId - The deck_template ID to update
  * @param newSubject - The new subject area
  * @returns ActionResultV2 with ok/error
@@ -477,162 +381,156 @@ export async function updateDeckSubject(
     return { ok: false, error: 'Subject must be at most 100 characters' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
+    // Fetch deck to verify author
+    const { data: deckTemplate, error: fetchError } = await supabase
+      .from('deck_templates')
+      .select('id, author_id')
+      .eq('id', deckId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (fetchError || !deckTemplate) {
+      return { ok: false, error: 'Deck not found' }
+    }
 
-  // Fetch deck to verify author
-  const { data: deckTemplate, error: fetchError } = await supabase
-    .from('deck_templates')
-    .select('id, author_id')
-    .eq('id', deckId)
-    .single()
+    // Check user is author
+    if (deckTemplate.author_id !== user.id) {
+      return { ok: false, error: 'Only the author can change the subject' }
+    }
 
-  if (fetchError || !deckTemplate) {
-    return { ok: false, error: 'Deck not found' }
-  }
+    // Update the subject
+    const { error: updateError } = await supabase
+      .from('deck_templates')
+      .update({ subject: trimmedSubject })
+      .eq('id', deckId)
 
-  // Check user is author
-  if (deckTemplate.author_id !== user.id) {
-    return { ok: false, error: 'Only the author can change the subject' }
-  }
+    if (updateError) {
+      return { ok: false, error: updateError.message }
+    }
 
-  // Update the subject
-  const { error: updateError } = await supabase
-    .from('deck_templates')
-    .update({ subject: trimmedSubject })
-    .eq('id', deckId)
+    // Revalidate paths
+    revalidatePath(`/decks/${deckId}`)
+    revalidatePath(`/decks/${deckId}/add-bulk`)
 
-  if (updateError) {
-    return { ok: false, error: updateError.message }
-  }
-
-  // Revalidate paths
-  revalidatePath(`/decks/${deckId}`)
-  revalidatePath(`/decks/${deckId}/add-bulk`)
-
-  return { ok: true, data: { subject: trimmedSubject } }
+    return { ok: true, data: { subject: trimmedSubject } }
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
  * V9.1: Get deck subject for AI operations.
  * Returns the subject or default if not set.
- * 
+ * #162: Migrated to withOrgUser.
+ *
  * @param deckId - The deck_template ID
  * @returns Subject string or default
  */
 export async function getDeckSubject(deckId: string): Promise<string> {
-  const supabase = await createSupabaseServerClient()
-  
-  const { data: deckTemplate } = await supabase
-    .from('deck_templates')
-    .select('subject')
-    .eq('id', deckId)
-    .single()
+  const result = await withOrgUser(async ({ supabase }: OrgAuthContext) => {
+    const { data: deckTemplate } = await supabase
+      .from('deck_templates')
+      .select('subject')
+      .eq('id', deckId)
+      .single()
 
-  return deckTemplate?.subject?.trim() || 'General'
+    return { ok: true as const, data: deckTemplate?.subject?.trim() || 'General' }
+  })
+
+  if (!result.ok) return 'General'
+  return result.data ?? 'General'
 }
 
 
 // ============================================
-// V10.6.1: Author Progress Sync
+// V10.6.1: Author Progress Sync (#162: migrated to withOrgUser)
 // ============================================
 
 /**
  * V10.6.1: Sync author progress for a deck.
  * Creates user_card_progress rows for all cards the author doesn't have progress for.
  * Uses ON CONFLICT DO NOTHING for idempotency.
- * 
+ * #162: Migrated to withOrgUser + RATE_LIMITS.standard.
+ *
  * This fixes the "0 Cards Due" issue for authors who create decks but haven't studied yet.
- * 
+ *
  * @param deckId - The deck_template ID to sync
  * @returns ActionResultV2 with ok/error
  */
 export async function syncAuthorProgress(deckId: string): Promise<ActionResultV2<{ synced: number }>> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
+    // Verify user is author
+    const { data: deck, error: deckError } = await supabase
+      .from('deck_templates')
+      .select('author_id')
+      .eq('id', deckId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (deckError || !deck) {
+      return { ok: false, error: 'Deck not found' }
+    }
 
-  // Verify user is author
-  const { data: deck, error: deckError } = await supabase
-    .from('deck_templates')
-    .select('author_id')
-    .eq('id', deckId)
-    .single()
+    if (deck.author_id !== user.id) {
+      return { ok: false, error: 'Only the author can sync progress' }
+    }
 
-  if (deckError || !deck) {
-    return { ok: false, error: 'Deck not found' }
-  }
+    // Get all card IDs in this deck
+    const { data: cards, error: cardsError } = await supabase
+      .from('card_templates')
+      .select('id')
+      .eq('deck_template_id', deckId)
 
-  if (deck.author_id !== user.id) {
-    return { ok: false, error: 'Only the author can sync progress' }
-  }
+    if (cardsError) {
+      return { ok: false, error: cardsError.message }
+    }
 
-  // Get all card IDs in this deck
-  const { data: cards, error: cardsError } = await supabase
-    .from('card_templates')
-    .select('id')
-    .eq('deck_template_id', deckId)
+    if (!cards || cards.length === 0) {
+      return { ok: true, data: { synced: 0 } }
+    }
 
-  if (cardsError) {
-    return { ok: false, error: cardsError.message }
-  }
+    // Bulk insert progress rows (ON CONFLICT DO NOTHING)
+    const progressRows = cards.map(card => ({
+      user_id: user.id,
+      card_template_id: card.id,
+      interval: 0,
+      ease_factor: 2.5,
+      repetitions: 0,
+      next_review: new Date().toISOString(),
+      suspended: false,
+      correct_count: 0,
+      total_attempts: 0,
+      is_flagged: false,
+    }))
 
-  if (!cards || cards.length === 0) {
-    return { ok: true, data: { synced: 0 } }
-  }
+    const { error: upsertError } = await supabase
+      .from('user_card_progress')
+      .upsert(progressRows, {
+        onConflict: 'user_id,card_template_id',
+        ignoreDuplicates: true,
+      })
 
-  // Bulk insert progress rows (ON CONFLICT DO NOTHING)
-  const progressRows = cards.map(card => ({
-    user_id: user.id,
-    card_template_id: card.id,
-    interval: 0,
-    ease_factor: 2.5,
-    repetitions: 0,
-    next_review: new Date().toISOString(),
-    suspended: false,
-    correct_count: 0,
-    total_attempts: 0,
-    is_flagged: false,
-  }))
+    if (upsertError) {
+      return { ok: false, error: upsertError.message }
+    }
 
-  const { error: upsertError } = await supabase
-    .from('user_card_progress')
-    .upsert(progressRows, {
-      onConflict: 'user_id,card_template_id',
-      ignoreDuplicates: true,
-    })
+    revalidatePath(`/decks/${deckId}`)
+    revalidatePath('/study')
+    revalidatePath('/dashboard')
 
-  if (upsertError) {
-    return { ok: false, error: upsertError.message }
-  }
-
-  revalidatePath(`/decks/${deckId}`)
-  revalidatePath('/study')
-  revalidatePath('/dashboard')
-
-  return { ok: true, data: { synced: cards.length } }
+    return { ok: true, data: { synced: cards.length } }
+  }, undefined, RATE_LIMITS.standard)
 }
 
 
 // ============================================
-// V10.4: Deck Visibility Management
+// V10.4: Deck Visibility Management (#162: migrated to withOrgUser)
 // ============================================
-
-import type { DeckVisibility } from '@/types/database'
 
 /**
  * V10.4: Server Action for updating a deck's visibility.
  * Only the author can change visibility settings.
- * 
+ * #162: Migrated to withOrgUser + RATE_LIMITS.standard.
+ *
  * Requirements: 5.1, 5.4, 5.5
- * 
+ *
  * @param deckId - The deck_template ID to update
  * @param visibility - The new visibility setting ('private' | 'public')
  * @returns ActionResultV2 with ok/error
@@ -651,43 +549,38 @@ export async function updateDeckVisibilityAction(
     return { ok: false, error: 'Invalid visibility value. Must be "private" or "public"' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
+    // Fetch deck to verify author
+    const { data: deckTemplate, error: fetchError } = await supabase
+      .from('deck_templates')
+      .select('id, author_id')
+      .eq('id', deckId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (fetchError || !deckTemplate) {
+      return { ok: false, error: 'Deck not found' }
+    }
 
-  // Fetch deck to verify author
-  const { data: deckTemplate, error: fetchError } = await supabase
-    .from('deck_templates')
-    .select('id, author_id')
-    .eq('id', deckId)
-    .single()
+    // Check user is author - only authors can change visibility
+    if (deckTemplate.author_id !== user.id) {
+      return { ok: false, error: 'Only the author can change deck visibility' }
+    }
 
-  if (fetchError || !deckTemplate) {
-    return { ok: false, error: 'Deck not found' }
-  }
+    // Update the visibility
+    const { error: updateError } = await supabase
+      .from('deck_templates')
+      .update({ visibility })
+      .eq('id', deckId)
 
-  // Check user is author - only authors can change visibility
-  if (deckTemplate.author_id !== user.id) {
-    return { ok: false, error: 'Only the author can change deck visibility' }
-  }
+    if (updateError) {
+      return { ok: false, error: updateError.message }
+    }
 
-  // Update the visibility
-  const { error: updateError } = await supabase
-    .from('deck_templates')
-    .update({ visibility })
-    .eq('id', deckId)
+    // Revalidate paths
+    revalidatePath(`/decks/${deckId}`)
+    revalidatePath('/library')
+    revalidatePath('/dashboard')
 
-  if (updateError) {
-    return { ok: false, error: updateError.message }
-  }
-
-  // Revalidate paths
-  revalidatePath(`/decks/${deckId}`)
-  revalidatePath('/library')
-  revalidatePath('/dashboard')
-
-  return { ok: true, data: { visibility } }
+    return { ok: true, data: { visibility } }
+  }, undefined, RATE_LIMITS.standard)
 }

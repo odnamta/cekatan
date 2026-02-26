@@ -1,6 +1,5 @@
 'use server'
 
-import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import {
   calculateAccuracy,
   isLowConfidence,
@@ -24,244 +23,234 @@ import { logger } from '@/lib/logger'
 import { getGlobalStats } from './global-study-actions'
 import { LOW_CONFIDENCE_THRESHOLD } from '@/lib/constants'
 
+/**
+ * #163: Migrated to withUser + RATE_LIMITS.standard.
+ */
 export async function getUserAnalytics(): Promise<ActionResultV2<{ topicAccuracies: TopicAccuracy[]; deckProgress: DeckProgress[]; weakestTopic: TopicAccuracy | null }>> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    try {
+      const { data: userDecks, error: userDecksError } = await supabase
+        .from('user_decks')
+        .select(`deck_template_id, deck_templates!inner(id, title)`)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
 
-  const supabase = await createSupabaseServerClient()
+      if (userDecksError) {
+        return { ok: false, error: userDecksError.message }
+      }
 
-  try {
-    const { data: userDecks, error: userDecksError } = await supabase
-      .from('user_decks')
-      .select(`deck_template_id, deck_templates!inner(id, title)`)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
+      const deckTemplateIds = userDecks?.map(d => d.deck_template_id) || []
 
-    if (userDecksError) {
-      return { ok: false, error: userDecksError.message }
-    }
+      if (deckTemplateIds.length === 0) {
+        return { ok: true, data: { topicAccuracies: [], deckProgress: [], weakestTopic: null } }
+      }
 
+      const selectQuery = `correct_count, total_attempts, card_template_id, card_templates!inner(id, deck_template_id, card_template_tags(tags!inner(id, name, color, category)))`
+      const { data: progressData, error: progressError } = await supabase
+        .from('user_card_progress')
+        .select(selectQuery)
+        .eq('user_id', user.id)
 
-    const deckTemplateIds = userDecks?.map(d => d.deck_template_id) || []
+      if (progressError) {
+        return { ok: false, error: progressError.message }
+      }
 
-    if (deckTemplateIds.length === 0) {
-      return { ok: true, data: { topicAccuracies: [], deckProgress: [], weakestTopic: null } }
-    }
+      const topicMap = new Map<string, {
+        tagId: string
+        tagName: string
+        tagColor: string
+        correctCount: number
+        totalAttempts: number
+      }>()
 
-    const selectQuery = `correct_count, total_attempts, card_template_id, card_templates!inner(id, deck_template_id, card_template_tags(tags!inner(id, name, color, category)))`
-    const { data: progressData, error: progressError } = await supabase
-      .from('user_card_progress')
-      .select(selectQuery)
-      .eq('user_id', user.id)
+      const deckProgressMap = new Map<string, {
+        deckId: string
+        deckTitle: string
+        cardsLearned: number
+        totalCards: number
+      }>()
 
-    if (progressError) {
-      return { ok: false, error: progressError.message }
-    }
+      for (const ud of userDecks || []) {
+        const deck = ud.deck_templates as unknown as { id: string; title: string }
+        deckProgressMap.set(ud.deck_template_id, {
+          deckId: ud.deck_template_id,
+          deckTitle: deck.title,
+          cardsLearned: 0,
+          totalCards: 0,
+        })
+      }
 
-    const topicMap = new Map<string, {
-      tagId: string
-      tagName: string
-      tagColor: string
-      correctCount: number
-      totalAttempts: number
-    }>()
+      // Batch count cards per deck in a single query (avoids N+1)
+      if (deckTemplateIds.length > 0) {
+        const { data: allCards } = await supabase
+          .from('card_templates')
+          .select('deck_template_id')
+          .in('deck_template_id', deckTemplateIds)
 
-    const deckProgressMap = new Map<string, {
-      deckId: string
-      deckTitle: string
-      cardsLearned: number
-      totalCards: number
-    }>()
+        const countMap = new Map<string, number>()
+        for (const card of allCards ?? []) {
+          countMap.set(card.deck_template_id, (countMap.get(card.deck_template_id) ?? 0) + 1)
+        }
+        for (const deckId of deckTemplateIds) {
+          const existing = deckProgressMap.get(deckId)
+          if (existing) {
+            existing.totalCards = countMap.get(deckId) ?? 0
+          }
+        }
+      }
 
-    for (const ud of userDecks || []) {
-      const deck = ud.deck_templates as unknown as { id: string; title: string }
-      deckProgressMap.set(ud.deck_template_id, {
-        deckId: ud.deck_template_id,
-        deckTitle: deck.title,
-        cardsLearned: 0,
-        totalCards: 0,
+      for (const progress of progressData || []) {
+        const cardTemplate = progress.card_templates as unknown as {
+          id: string
+          deck_template_id: string
+          card_template_tags: Array<{
+            tags: { id: string; name: string; color: string; category: string }
+          }>
+        }
+
+        if (!deckTemplateIds.includes(cardTemplate.deck_template_id)) {
+          continue
+        }
+
+        const deckProgress = deckProgressMap.get(cardTemplate.deck_template_id)
+        if (deckProgress && (progress.total_attempts ?? 0) > 0) {
+          deckProgress.cardsLearned++
+        }
+
+        for (const ctt of cardTemplate.card_template_tags || []) {
+          const tag = ctt.tags
+          if (tag.category !== 'topic') continue
+
+          const existing = topicMap.get(tag.id)
+          if (existing) {
+            existing.correctCount += progress.correct_count ?? 0
+            existing.totalAttempts += progress.total_attempts ?? 0
+          } else {
+            topicMap.set(tag.id, {
+              tagId: tag.id,
+              tagName: tag.name,
+              tagColor: tag.color,
+              correctCount: progress.correct_count ?? 0,
+              totalAttempts: progress.total_attempts ?? 0,
+            })
+          }
+        }
+      }
+
+      const topicAccuracies: TopicAccuracy[] = Array.from(topicMap.values()).map(t => ({
+        tagId: t.tagId,
+        tagName: t.tagName,
+        tagColor: t.tagColor,
+        accuracy: calculateAccuracy(t.correctCount, t.totalAttempts),
+        correctCount: t.correctCount,
+        totalAttempts: t.totalAttempts,
+        isLowConfidence: isLowConfidence(t.totalAttempts),
+      }))
+
+      topicAccuracies.sort((a, b) => {
+        if (a.accuracy === null) return 1
+        if (b.accuracy === null) return -1
+        return a.accuracy - b.accuracy
       })
+
+      const weakestTopic = findWeakestTopic(topicAccuracies)
+      const deckProgress: DeckProgress[] = Array.from(deckProgressMap.values())
+
+      return { ok: true, data: { topicAccuracies, deckProgress, weakestTopic } }
+    } catch (error) {
+      logger.error('getUserAnalytics', error)
+      return { ok: false, error: 'Failed to fetch analytics data' }
     }
-
-    // Batch count cards per deck in a single query (avoids N+1)
-    if (deckTemplateIds.length > 0) {
-      const { data: allCards } = await supabase
-        .from('card_templates')
-        .select('deck_template_id')
-        .in('deck_template_id', deckTemplateIds)
-
-      const countMap = new Map<string, number>()
-      for (const card of allCards ?? []) {
-        countMap.set(card.deck_template_id, (countMap.get(card.deck_template_id) ?? 0) + 1)
-      }
-      for (const deckId of deckTemplateIds) {
-        const existing = deckProgressMap.get(deckId)
-        if (existing) {
-          existing.totalCards = countMap.get(deckId) ?? 0
-        }
-      }
-    }
-
-
-    for (const progress of progressData || []) {
-      const cardTemplate = progress.card_templates as unknown as {
-        id: string
-        deck_template_id: string
-        card_template_tags: Array<{
-          tags: { id: string; name: string; color: string; category: string }
-        }>
-      }
-
-      if (!deckTemplateIds.includes(cardTemplate.deck_template_id)) {
-        continue
-      }
-
-      const deckProgress = deckProgressMap.get(cardTemplate.deck_template_id)
-      if (deckProgress && (progress.total_attempts ?? 0) > 0) {
-        deckProgress.cardsLearned++
-      }
-
-      for (const ctt of cardTemplate.card_template_tags || []) {
-        const tag = ctt.tags
-        if (tag.category !== 'topic') continue
-
-        const existing = topicMap.get(tag.id)
-        if (existing) {
-          existing.correctCount += progress.correct_count ?? 0
-          existing.totalAttempts += progress.total_attempts ?? 0
-        } else {
-          topicMap.set(tag.id, {
-            tagId: tag.id,
-            tagName: tag.name,
-            tagColor: tag.color,
-            correctCount: progress.correct_count ?? 0,
-            totalAttempts: progress.total_attempts ?? 0,
-          })
-        }
-      }
-    }
-
-    const topicAccuracies: TopicAccuracy[] = Array.from(topicMap.values()).map(t => ({
-      tagId: t.tagId,
-      tagName: t.tagName,
-      tagColor: t.tagColor,
-      accuracy: calculateAccuracy(t.correctCount, t.totalAttempts),
-      correctCount: t.correctCount,
-      totalAttempts: t.totalAttempts,
-      isLowConfidence: isLowConfidence(t.totalAttempts),
-    }))
-
-    topicAccuracies.sort((a, b) => {
-      if (a.accuracy === null) return 1
-      if (b.accuracy === null) return -1
-      return a.accuracy - b.accuracy
-    })
-
-    const weakestTopic = findWeakestTopic(topicAccuracies)
-    const deckProgress: DeckProgress[] = Array.from(deckProgressMap.values())
-
-    return { ok: true, data: { topicAccuracies, deckProgress, weakestTopic } }
-  } catch (error) {
-    logger.error('getUserAnalytics', error)
-    return { ok: false, error: 'Failed to fetch analytics data' }
-  }
+  }, RATE_LIMITS.standard)
 }
 
 
+/**
+ * #163: Migrated to withUser + RATE_LIMITS.standard.
+ */
 export async function getActivityData(days: number = 7): Promise<ActionResultV2<{ activity: DailyActivity[] }>> {
   // V20.6: Bounds validation — cap days to prevent expensive queries
   const safeDays = Math.max(1, Math.min(365, Math.floor(days)))
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    try {
+      const today = new Date()
+      const startDate = new Date(today)
+      startDate.setDate(startDate.getDate() - (safeDays - 1))
+      const startDateStr = startDate.toISOString().split('T')[0]
 
-  const supabase = await createSupabaseServerClient()
+      const { data: logs, error: logsError } = await supabase
+        .from('study_logs')
+        .select('study_date, cards_reviewed')
+        .eq('user_id', user.id)
+        .gte('study_date', startDateStr)
+        .order('study_date', { ascending: true })
 
-  try {
-    const today = new Date()
-    const startDate = new Date(today)
-    startDate.setDate(startDate.getDate() - (safeDays - 1))
-    const startDateStr = startDate.toISOString().split('T')[0]
+      if (logsError) {
+        return { ok: false, error: logsError.message }
+      }
 
-    const { data: logs, error: logsError } = await supabase
-      .from('study_logs')
-      .select('study_date, cards_reviewed')
-      .eq('user_id', user.id)
-      .gte('study_date', startDateStr)
-      .order('study_date', { ascending: true })
+      const logMap = new Map<string, number>()
+      for (const log of logs || []) {
+        logMap.set(log.study_date, log.cards_reviewed)
+      }
 
-    if (logsError) {
-      return { ok: false, error: logsError.message }
+      const activity: DailyActivity[] = []
+      for (let i = safeDays - 1; i >= 0; i--) {
+        const date = new Date(today)
+        date.setDate(date.getDate() - i)
+        const dateStr = date.toISOString().split('T')[0]
+
+        activity.push({
+          date: dateStr,
+          dayName: formatDayName(date),
+          cardsReviewed: logMap.get(dateStr) ?? 0,
+        })
+      }
+
+      return { ok: true, data: { activity } }
+    } catch (error) {
+      logger.error('getActivityData', error)
+      return { ok: false, error: 'Failed to fetch activity data' }
     }
-
-    const logMap = new Map<string, number>()
-    for (const log of logs || []) {
-      logMap.set(log.study_date, log.cards_reviewed)
-    }
-
-    const activity: DailyActivity[] = []
-    for (let i = safeDays - 1; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
-      
-      activity.push({
-        date: dateStr,
-        dayName: formatDayName(date),
-        cardsReviewed: logMap.get(dateStr) ?? 0,
-      })
-    }
-
-    return { ok: true, data: { activity } }
-  } catch (error) {
-    logger.error('getActivityData', error)
-    return { ok: false, error: 'Failed to fetch activity data' }
-  }
+  }, RATE_LIMITS.standard)
 }
 
 
 /**
  * Gets the user's current subject from their first active deck.
  * Returns "General" as default if no decks found.
+ * #163: Migrated to withUser + RATE_LIMITS.standard.
  *
  * Requirements: 2.2, 2.3
  */
 export async function getUserSubject(): Promise<ActionResultV2<{ subject: string }>> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    try {
+      const { data: userDecks, error: userDecksError } = await supabase
+        .from('user_decks')
+        .select(`deck_template_id, deck_templates!inner(id, title, subject)`)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
 
-  const supabase = await createSupabaseServerClient()
+      if (userDecksError) {
+        return { ok: false, error: userDecksError.message }
+      }
 
-  try {
-    const { data: userDecks, error: userDecksError } = await supabase
-      .from('user_decks')
-      .select(`deck_template_id, deck_templates!inner(id, title, subject)`)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .limit(1)
+      const decks = userDecks?.map(ud => {
+        const deck = ud.deck_templates as unknown as { title: string; subject?: string | null }
+        return { title: deck.title, subject: deck.subject }
+      }) || []
 
-    if (userDecksError) {
-      return { ok: false, error: userDecksError.message }
+      const subject = deriveSubjectFromDecks(decks)
+
+      return { ok: true, data: { subject } }
+    } catch (error) {
+      logger.error('getUserSubject', error)
+      return { ok: false, error: 'Failed to fetch subject' }
     }
-
-    const decks = userDecks?.map(ud => {
-      const deck = ud.deck_templates as unknown as { title: string; subject?: string | null }
-      return { title: deck.title, subject: deck.subject }
-    }) || []
-
-    const subject = deriveSubjectFromDecks(decks)
-
-    return { ok: true, data: { subject } }
-  } catch (error) {
-    logger.error('getUserSubject', error)
-    return { ok: false, error: 'Failed to fetch subject' }
-  }
+  }, RATE_LIMITS.standard)
 }
 
 
@@ -270,41 +259,46 @@ export async function getUserSubject(): Promise<ActionResultV2<{ subject: string
 // ============================================
 
 /**
+ * Sanitize a CSV cell to prevent formula injection.
+ * Cells starting with =, +, -, @, \t, \r are prefixed with a single quote.
+ */
+function sanitizeCsvCell(val: string): string {
+  if (/^[=+\-@\t\r]/.test(val)) return "'" + val
+  return val
+}
+
+/**
  * Export study data as CSV: card stem, correct count, total attempts, accuracy, last reviewed.
+ * #163: Migrated to withUser + RATE_LIMITS.standard.
  */
 export async function exportStudyData(): Promise<ActionResultV2<{ csv: string }>> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }: AuthContext) => {
+    try {
+      const { data: progress, error } = await supabase
+        .from('user_card_progress')
+        .select('card_template_id, correct_count, total_attempts, last_reviewed, card_templates!inner(stem, deck_template_id, deck_templates!inner(title))')
+        .eq('user_id', user.id)
+        .order('last_reviewed', { ascending: false })
 
-  const supabase = await createSupabaseServerClient()
+      if (error) {
+        return { ok: false, error: error.message }
+      }
 
-  try {
-    const { data: progress, error } = await supabase
-      .from('user_card_progress')
-      .select('card_template_id, correct_count, total_attempts, last_reviewed, card_templates!inner(stem, deck_template_id, deck_templates!inner(title))')
-      .eq('user_id', user.id)
-      .order('last_reviewed', { ascending: false })
+      const rows: string[] = ['Deck,Question Stem,Correct,Attempts,Accuracy %,Last Reviewed']
+      for (const p of progress || []) {
+        const card = p.card_templates as unknown as { stem: string; deck_templates: { title: string } }
+        const acc = p.total_attempts > 0 ? Math.round((p.correct_count / p.total_attempts) * 100) : 0
+        const stem = sanitizeCsvCell((card?.stem || '').replace(/"/g, '""').slice(0, 200))
+        const deckTitle = sanitizeCsvCell((card?.deck_templates?.title || '').replace(/"/g, '""'))
+        rows.push(`"${deckTitle}","${stem}",${p.correct_count},${p.total_attempts},${acc},${p.last_reviewed || ''}`)
+      }
 
-    if (error) {
-      return { ok: false, error: error.message }
+      return { ok: true, data: { csv: rows.join('\n') } }
+    } catch (err) {
+      logger.error('exportStudyData', err)
+      return { ok: false, error: 'Failed to export study data' }
     }
-
-    const rows: string[] = ['Deck,Question Stem,Correct,Attempts,Accuracy %,Last Reviewed']
-    for (const p of progress || []) {
-      const card = p.card_templates as unknown as { stem: string; deck_templates: { title: string } }
-      const acc = p.total_attempts > 0 ? Math.round((p.correct_count / p.total_attempts) * 100) : 0
-      const stem = (card?.stem || '').replace(/"/g, '""').slice(0, 200)
-      const deckTitle = (card?.deck_templates?.title || '').replace(/"/g, '""')
-      rows.push(`"${deckTitle}","${stem}",${p.correct_count},${p.total_attempts},${acc},${p.last_reviewed || ''}`)
-    }
-
-    return { ok: true, data: { csv: rows.join('\n') } }
-  } catch (err) {
-    logger.error('exportStudyData', err)
-    return { ok: false, error: 'Failed to export study data' }
-  }
+  }, RATE_LIMITS.standard)
 }
 
 // ============================================
@@ -383,7 +377,7 @@ export async function getSetupChecklistData(): Promise<
 /**
  * V11.7: Get dashboard insights including due count and weakest concepts.
  * Uses withUser helper and returns ActionResultV2.
- * 
+ *
  * **Feature: v11.7-companion-dashboard-tag-filtered-study**
  * **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5**
  */
@@ -426,7 +420,7 @@ export async function getDashboardInsights(): Promise<DashboardInsightsResult> {
     // Calculate total attempts across all concept tags
     const conceptTags = (tags || []).filter(t => t.category === 'concept')
     const conceptTagIds = new Set(conceptTags.map(t => t.id))
-    
+
     // Map card progress to concept tags
     const cardTagMap = new Map<string, string[]>()
     for (const ct of cardTags || []) {
@@ -448,7 +442,7 @@ export async function getDashboardInsights(): Promise<DashboardInsightsResult> {
 
     // If total attempts < LOW_CONFIDENCE_THRESHOLD, return empty weakest concepts
     let weakestConcepts: WeakestConceptSummary[] = []
-    
+
     if (totalConceptAttempts >= LOW_CONFIDENCE_THRESHOLD) {
       // Use findWeakestConcepts utility
       const progressForConcepts = (progressData || []).map(p => ({

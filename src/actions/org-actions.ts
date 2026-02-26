@@ -408,6 +408,8 @@ export async function switchOrganization(
       path: '/',
       maxAge: 60 * 60 * 24 * 365,
       sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
     })
 
     revalidatePath('/', 'layout')
@@ -438,6 +440,8 @@ export async function transferOwnership(
     if (!target) return { ok: false, error: 'Member not found' }
     if (target.user_id === user.id) return { ok: false, error: 'Already the owner' }
 
+    const originalRole = target.role as string
+
     // Promote target to owner
     const { error: promoteErr } = await supabase
       .from('organization_members')
@@ -454,7 +458,15 @@ export async function transferOwnership(
       .eq('org_id', org.id)
       .eq('user_id', user.id)
 
-    if (demoteErr) return { ok: false, error: demoteErr.message }
+    if (demoteErr) {
+      // Rollback: revert the promote
+      await supabase
+        .from('organization_members')
+        .update({ role: originalRole })
+        .eq('id', targetMemberId)
+        .eq('org_id', org.id)
+      return { ok: false, error: 'Transfer failed — changes reverted' }
+    }
 
     logAuditEvent(supabase, org.id, user.id, 'ownership.transferred', {
       targetType: 'user', targetId: target.user_id,
@@ -544,6 +556,8 @@ export async function joinOrgBySlug(
       path: '/',
       maxAge: 60 * 60 * 24 * 365,
       sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
     })
 
     revalidatePath('/', 'layout')

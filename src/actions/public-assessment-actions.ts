@@ -249,16 +249,27 @@ export async function registerAndStartSession(
           .eq('id', userId)
       }
     } else {
-      // User exists — update profile with latest name/phone
-      const updates: Record<string, string> = { full_name: input.name.trim() }
-      if (candidatePhone) {
+      // User exists — only update fields that are currently empty
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', userId)
+        .single()
+
+      const updates: Record<string, string> = {}
+      if (!existingProfile?.full_name) {
+        updates.full_name = input.name.trim()
+      }
+      if (candidatePhone && !existingProfile?.phone) {
         updates.phone = candidatePhone
       }
 
-      await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId)
+      if (Object.keys(updates).length > 0) {
+        await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', userId)
+      }
     }
 
     // Add to org as 'candidate' if not already a member
@@ -402,8 +413,10 @@ export async function getPublicQuestions(
   shuffleOptions: boolean
 }>> {
   try {
-    // Accept both signed tokens and raw session IDs (backwards compat)
-    const sessionId = verifySessionToken(sessionIdOrToken) ?? sessionIdOrToken
+    const sessionId = verifySessionToken(sessionIdOrToken)
+    if (!sessionId) {
+      return { ok: false, error: 'Token sesi tidak valid' }
+    }
 
     const supabase = await createSupabaseServiceClient()
 
@@ -497,7 +510,10 @@ export async function submitPublicAnswer(
   timeSpentSeconds?: number
 ): Promise<ActionResultV2<{ isCorrect: boolean }>> {
   try {
-    const sessionId = verifySessionToken(sessionIdOrToken) ?? sessionIdOrToken
+    const sessionId = verifySessionToken(sessionIdOrToken)
+    if (!sessionId) {
+      return { ok: false, error: 'Token sesi tidak valid' }
+    }
 
     const supabase = await createSupabaseServiceClient()
 
@@ -579,7 +595,10 @@ export async function completePublicSession(
   correct: number
 }>> {
   try {
-    const sessionId = verifySessionToken(sessionIdOrToken) ?? sessionIdOrToken
+    const sessionId = verifySessionToken(sessionIdOrToken)
+    if (!sessionId) {
+      return { ok: false, error: 'Token sesi tidak valid' }
+    }
 
     const supabase = await createSupabaseServiceClient()
 

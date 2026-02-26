@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock, FileText, Target, Shield, AlertCircle, Loader2 } from 'lucide-react'
 import { registerAndStartSession } from '@/actions/public-assessment-actions'
@@ -250,51 +250,134 @@ export function PublicTestLanding({ code, assessment, orgName }: PublicTestLandi
 
       {/* Confirmation dialog */}
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-sm w-full space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Konfirmasi Data Anda
-            </h2>
-
-            <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <div>
-                <span className="font-medium">Nama:</span> {name.trim()}
-              </div>
-              {hasEmail && (
-                <div>
-                  <span className="font-medium">Email:</span> {email.trim()}
-                </div>
-              )}
-              {hasPhone && (
-                <div>
-                  <span className="font-medium">No. HP:</span> {phone.trim()}
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Pastikan data Anda benar. Data ini tidak bisa diubah setelah tes dimulai.
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition"
-              >
-                Batalkan
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 active:scale-95 transition"
-              >
-                Mulai Tes
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          name={name}
+          email={email}
+          phone={phone}
+          hasEmail={hasEmail}
+          hasPhone={hasPhone}
+          onCancel={() => setShowConfirm(false)}
+          onConfirm={handleConfirm}
+        />
       )}
+    </div>
+  )
+}
+
+// ----- Confirm Modal with ARIA + focus trap -----
+
+interface ConfirmModalProps {
+  name: string
+  email: string
+  phone: string
+  hasEmail: boolean
+  hasPhone: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+function ConfirmModal({ name, email, phone, hasEmail, hasPhone, onCancel, onConfirm }: ConfirmModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const cancelBtnRef = useRef<HTMLButtonElement>(null)
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  const headingId = 'confirm-modal-heading'
+
+  // Focus first button on mount
+  useEffect(() => {
+    cancelBtnRef.current?.focus()
+  }, [])
+
+  // Focus trap + Escape handler
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onCancel()
+        return
+      }
+
+      if (e.key === 'Tab') {
+        const focusable = [cancelBtnRef.current, confirmBtnRef.current].filter(
+          Boolean
+        ) as HTMLElement[]
+        if (focusable.length === 0) return
+
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
+      }
+    },
+    [onCancel]
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      onKeyDown={handleKeyDown}
+      ref={modalRef}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-sm w-full space-y-4">
+        <h2
+          id={headingId}
+          className="text-lg font-semibold text-gray-900 dark:text-gray-100"
+        >
+          Konfirmasi Data Anda
+        </h2>
+
+        <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          <div>
+            <span className="font-medium">Nama:</span> {name.trim()}
+          </div>
+          {hasEmail && (
+            <div>
+              <span className="font-medium">Email:</span> {email.trim()}
+            </div>
+          )}
+          {hasPhone && (
+            <div>
+              <span className="font-medium">No. HP:</span> {phone.trim()}
+            </div>
+          )}
+        </div>
+
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Pastikan data Anda benar. Data ini tidak bisa diubah setelah tes dimulai.
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            ref={cancelBtnRef}
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition"
+          >
+            Batalkan
+          </button>
+          <button
+            ref={confirmBtnRef}
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 active:scale-95 transition"
+          >
+            Mulai Tes
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
