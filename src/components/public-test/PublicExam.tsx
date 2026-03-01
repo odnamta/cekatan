@@ -87,8 +87,20 @@ export function PublicExam({ code }: { code: string }) {
       sessionIdRef.current = sessionId
       sessionTokenRef.current = sessionToken || sessionId
 
-      // Load questions from server (use signed token)
-      const result = await getPublicQuestions(sessionTokenRef.current)
+      // Load questions from server (use signed token) with 15s timeout
+      let result: Awaited<ReturnType<typeof getPublicQuestions>>
+      try {
+        result = await Promise.race([
+          getPublicQuestions(sessionTokenRef.current),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 15_000)
+          ),
+        ])
+      } catch {
+        setError('Koneksi terputus. Silakan muat ulang halaman.')
+        setPhase('exam')
+        return
+      }
       if (!result.ok || !result.data) {
         setError(result.ok ? 'Gagal memuat soal' : result.error)
         setPhase('exam')

@@ -80,7 +80,8 @@ export async function getCustomSessionCardsV2(
   input: CustomSessionInput
 ): Promise<ActionResultV2<{ cards: Card[]; totalMatching: number }>> {
   const result = await withOrgUser(async ({ user, supabase, org }) => {
-    const { tagIds = [], deckIds = [], mode, limit, flaggedOnly = false } = input
+    const { tagIds = [], deckIds = [], mode, limit: rawLimit, flaggedOnly = false } = input
+    const limit = Math.min(Math.max(1, rawLimit), 500)
     const now = new Date().toISOString()
 
     // Must have at least one filter

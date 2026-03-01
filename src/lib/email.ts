@@ -11,9 +11,19 @@ function getResend(): Resend {
 
 const MAX_RETRIES = 3
 const BACKOFF_BASE_MS = 1000
+const SEND_TIMEOUT_MS = 8000
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Email send timed out after ${ms}ms`)), ms)
+    ),
+  ])
 }
 
 export async function sendEmail({
@@ -33,18 +43,25 @@ export async function sendEmail({
   let lastError: string = 'Unknown error'
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const { error } = await getResend().emails.send({
-      from: 'Cekatan <noreply@cekatan.com>',
-      to,
-      subject,
-      react,
-    })
+    try {
+      const { error } = await withTimeout(
+        getResend().emails.send({
+          from: 'Cekatan <noreply@cekatan.com>',
+          to,
+          subject,
+          react,
+        }),
+        SEND_TIMEOUT_MS
+      )
 
-    if (!error) {
-      return { ok: true as const }
+      if (!error) {
+        return { ok: true as const }
+      }
+
+      lastError = error.message
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : 'Unknown error'
     }
-
-    lastError = error.message
 
     if (attempt < MAX_RETRIES - 1) {
       const delayMs = BACKOFF_BASE_MS * Math.pow(2, attempt)

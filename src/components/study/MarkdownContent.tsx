@@ -43,10 +43,10 @@ export function sanitizeMarkdown(content: string): string {
  */
 export function MarkdownContent({ content }: MarkdownContentProps) {
   const sanitizedContent = sanitizeMarkdown(content)
-  
+
   return (
     <div className="prose dark:prose-invert prose-slate max-w-none prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none">
-      <ReactMarkdown>{sanitizedContent}</ReactMarkdown>
+      <ReactMarkdown skipHtml>{sanitizedContent}</ReactMarkdown>
     </div>
   )
 }

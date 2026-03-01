@@ -145,18 +145,22 @@ export async function getOrgAssessments(): Promise<ActionResultV2<AssessmentWith
       return { ok: false, error: error.message }
     }
 
-    // Get session counts per assessment using grouped counting
+    // Get session counts per assessment — fetch only IDs (minimal payload)
     const assessmentIds = (data ?? []).map((a) => a.id)
     const countMap = new Map<string, number>()
     if (assessmentIds.length > 0) {
-      const { data: sessionRows } = await supabase
-        .from('assessment_sessions')
-        .select('assessment_id')
-        .in('assessment_id', assessmentIds)
-        .limit(10000)
+      // Batch in chunks of 50 to avoid oversized IN clauses
+      const CHUNK_SIZE = 50
+      for (let i = 0; i < assessmentIds.length; i += CHUNK_SIZE) {
+        const chunk = assessmentIds.slice(i, i + CHUNK_SIZE)
+        const { data: sessionRows } = await supabase
+          .from('assessment_sessions')
+          .select('assessment_id')
+          .in('assessment_id', chunk)
 
-      for (const s of sessionRows ?? []) {
-        countMap.set(s.assessment_id, (countMap.get(s.assessment_id) ?? 0) + 1)
+        for (const s of sessionRows ?? []) {
+          countMap.set(s.assessment_id, (countMap.get(s.assessment_id) ?? 0) + 1)
+        }
       }
     }
 

@@ -143,31 +143,3 @@ export async function withOrgUser<T>(
 
   return fn({ user, supabase, org: orgData, role })
 }
-
-/**
- * Type guard to check if a result is an AuthError.
- */
-export function isAuthError(result: unknown): result is AuthError {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'ok' in result &&
-    result.ok === false &&
-    'error' in result &&
-    result.error === 'AUTH_REQUIRED'
-  )
-}
-
-/**
- * Type guard to check if a result is a NoOrgError.
- */
-export function isNoOrgError(result: unknown): result is NoOrgError {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'ok' in result &&
-    result.ok === false &&
-    'error' in result &&
-    result.error === 'NO_ORGANIZATION'
-  )
-}

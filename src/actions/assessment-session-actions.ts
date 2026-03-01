@@ -387,40 +387,52 @@ export async function completeSession(
 
         if (skillMappings && skillMappings.length > 0) {
           const serviceClient = await createSupabaseServiceClient()
+          const nowIso = new Date().toISOString()
 
-          // Batch-fetch all existing skill scores for this user+org in one query
-          const skillDomainIds = skillMappings.map((m) => m.skill_domain_id)
-          const { data: existingScores } = await serviceClient
-            .from('employee_skill_scores')
-            .select('skill_domain_id, score, assessments_taken')
-            .eq('org_id', assessment.org_id)
-            .eq('user_id', user.id)
-            .in('skill_domain_id', skillDomainIds)
+          // Atomic upsert: insert new rows or update existing ones sequentially
+          // to avoid race conditions from concurrent session completions.
+          // Each upsert reads the current DB value, not a stale in-memory copy.
+          await Promise.all(skillMappings.map(async (mapping) => {
+            // Try insert first (new skill score)
+            const { error: insertError } = await serviceClient
+              .from('employee_skill_scores')
+              .insert({
+                org_id: assessment.org_id,
+                user_id: user.id,
+                skill_domain_id: mapping.skill_domain_id,
+                score: Math.round(score * 10) / 10,
+                assessments_taken: 1,
+                last_assessed_at: nowIso,
+                updated_at: nowIso,
+              })
 
-          const existingScoreMap = new Map(
-            (existingScores ?? []).map((s) => [s.skill_domain_id, { score: s.score, assessments_taken: s.assessments_taken }])
-          )
+            if (insertError) {
+              // Row exists — fetch current values and update atomically
+              const { data: current } = await serviceClient
+                .from('employee_skill_scores')
+                .select('score, assessments_taken')
+                .eq('org_id', assessment.org_id)
+                .eq('user_id', user.id)
+                .eq('skill_domain_id', mapping.skill_domain_id)
+                .single()
 
-          const upsertRows = skillMappings.map((mapping) => {
-            const existing = existingScoreMap.get(mapping.skill_domain_id)
-            const oldScore = existing?.score ?? 0
-            const oldCount = existing?.assessments_taken ?? 0
-            const newScore = (oldScore * oldCount + score) / (oldCount + 1)
-
-            return {
-              org_id: assessment.org_id,
-              user_id: user.id,
-              skill_domain_id: mapping.skill_domain_id,
-              score: Math.round(newScore * 10) / 10,
-              assessments_taken: oldCount + 1,
-              last_assessed_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
+              if (current) {
+                const newCount = current.assessments_taken + 1
+                const newScore = (current.score * current.assessments_taken + score) / newCount
+                await serviceClient
+                  .from('employee_skill_scores')
+                  .update({
+                    score: Math.round(newScore * 10) / 10,
+                    assessments_taken: newCount,
+                    last_assessed_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq('org_id', assessment.org_id)
+                  .eq('user_id', user.id)
+                  .eq('skill_domain_id', mapping.skill_domain_id)
+              }
             }
-          })
-
-          await serviceClient.from('employee_skill_scores').upsert(upsertRows, {
-            onConflict: 'org_id,user_id,skill_domain_id',
-          })
+          }))
         }
       }
     } catch (skillError) {
