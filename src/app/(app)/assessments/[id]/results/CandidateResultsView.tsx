@@ -259,7 +259,7 @@ export function CandidateResultsView({ assessmentId, sessionId }: { assessmentId
   .incorrect { color: #dc2626; font-weight: bold; }
   @media print { body { padding: 0; } }
 </style></head><body>
-<h1>${assessment?.title ?? 'Laporan Asesmen'}</h1>
+<h1>${(assessment?.title ?? 'Laporan Asesmen').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}</h1>
 <p class="meta">Tanggal: ${session.completed_at ? new Date(session.completed_at).toLocaleDateString('id-ID') : '—'} · Skor Lulus: ${assessment?.pass_score ?? 0}%</p>
 <div style="text-align:center;margin:24px 0;">
   <div class="score">${score}%</div>
@@ -532,7 +532,7 @@ ${answers.map((a, i) => `<tr>
                       onClick={() => router.push(`/assessments/${assessmentId}/results?sessionId=${att.id}`)}
                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                      View
+                      Lihat
                     </button>
                   )}
                 </div>

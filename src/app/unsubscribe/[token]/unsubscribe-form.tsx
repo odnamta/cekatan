@@ -42,7 +42,7 @@ export function UnsubscribeForm({ token }: { token: string }) {
         <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Untuk mengaktifkan kembali, buka halaman{' '}
-            <span className="font-medium text-slate-700 dark:text-slate-300">Profile</span>{' '}
+            <span className="font-medium text-slate-700 dark:text-slate-300">Profil</span>{' '}
             di aplikasi Cekatan.
           </p>
         </div>

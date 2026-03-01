@@ -87,7 +87,6 @@ export default function TakeAssessmentPage() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfirmFinish, setShowConfirmFinish] = useState(false)
-  const [showReview, setShowReview] = useState(false)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [showTabWarning, setShowTabWarning] = useState(false)
   const [showTimeWarning, setShowTimeWarning] = useState(false)

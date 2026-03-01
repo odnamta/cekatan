@@ -47,18 +47,18 @@ export async function startAssessmentSession(
       .single()
 
     if (aError || !assessment) {
-      return { ok: false, error: 'Assessment not found or not published' }
+      return { ok: false, error: 'Asesmen tidak ditemukan atau belum dipublikasi' }
     }
 
     // Validate access code if set (constant-time comparison to prevent timing attacks)
     if (assessment.access_code) {
       if (!accessCode) {
-        return { ok: false, error: 'Invalid access code' }
+        return { ok: false, error: 'Kode akses tidak valid' }
       }
       const expected = Buffer.from(assessment.access_code, 'utf8')
       const provided = Buffer.from(accessCode, 'utf8')
       if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
-        return { ok: false, error: 'Invalid access code' }
+        return { ok: false, error: 'Kode akses tidak valid' }
       }
     }
 
@@ -118,7 +118,7 @@ export async function startAssessmentSession(
       .eq('deck_template_id', assessment.deck_template_id)
 
     if (cError || !cards || cards.length === 0) {
-      return { ok: false, error: 'No questions available' }
+      return { ok: false, error: 'Tidak ada soal tersedia' }
     }
 
     // Shuffle and pick
@@ -150,7 +150,7 @@ export async function startAssessmentSession(
       .single()
 
     if (sError || !session) {
-      return { ok: false, error: 'Failed to start session' }
+      return { ok: false, error: 'Gagal memulai sesi' }
     }
 
     // Create empty answer rows
@@ -197,13 +197,13 @@ export async function submitAnswer(
       .single()
 
     if (!session) {
-      return { ok: false, error: 'Session not found or already completed' }
+      return { ok: false, error: 'Sesi tidak ditemukan atau sudah selesai' }
     }
 
     // Verify the card belongs to this session's question set
     const questionOrder = session.question_order as string[]
     if (!questionOrder.includes(cardTemplateId)) {
-      return { ok: false, error: 'Question not part of this session' }
+      return { ok: false, error: 'Soal bukan bagian dari sesi ini' }
     }
 
     // Get the correct answer + options for bound check
@@ -214,7 +214,7 @@ export async function submitAnswer(
       .single()
 
     if (!card) {
-      return { ok: false, error: 'Question not found' }
+      return { ok: false, error: 'Soal tidak ditemukan' }
     }
 
     // Validate selectedIndex against actual option count
@@ -269,7 +269,7 @@ export async function completeSession(
       .single()
 
     if (!session) {
-      return { ok: false, error: 'Session not found or already completed' }
+      return { ok: false, error: 'Sesi tidak ditemukan atau sudah selesai' }
     }
 
     // Get answers

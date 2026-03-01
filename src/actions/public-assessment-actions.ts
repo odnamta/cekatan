@@ -12,7 +12,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { publicRegistrationSchema } from '@/lib/validations'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
-import { generateCertificate } from '@/actions/certificate-actions'
+import { generateCertificateForSession } from '@/actions/certificate-actions'
 import type { ActionResultV2 } from '@/types/actions'
 import type { Assessment } from '@/types/database'
 
@@ -61,6 +61,11 @@ export async function getPublicAssessment(
   orgSlug: string
 }>> {
   try {
+    // Validate code param: 4-20 alphanumeric chars
+    if (!code || code.length < 4 || code.length > 20 || !/^[A-Za-z0-9]+$/.test(code)) {
+      return { ok: false, error: 'Kode asesmen tidak valid' }
+    }
+
     const supabase = await createSupabaseServiceClient()
 
     const { data, error } = await supabase
@@ -129,6 +134,11 @@ export async function registerAndStartSession(
   questionCount: number
 }>> {
   try {
+    // Validate code param: 4-20 alphanumeric chars
+    if (!code || code.length < 4 || code.length > 20 || !/^[A-Za-z0-9]+$/.test(code)) {
+      return { ok: false, error: 'Kode asesmen tidak valid' }
+    }
+
     // Rate limit by IP
     const hdrs = await headers()
     const clientIp = hdrs.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -164,7 +174,7 @@ export async function registerAndStartSession(
 
     // Validate access code if required (constant-time comparison)
     if (assessment.access_code) {
-      if (!input.accessCode) {
+      if (!input.accessCode || input.accessCode.length > 50) {
         return { ok: false, error: 'Kode akses diperlukan' }
       }
       const expected = Buffer.from(assessment.access_code, 'utf8')
@@ -668,7 +678,7 @@ export async function completePublicSession(
     // Generate certificate for passing candidates
     if (passed) {
       try {
-        await generateCertificate(sessionId)
+        await generateCertificateForSession(sessionId)
       } catch {
         // Non-fatal: certificate generation may fail
         logger.warn('completePublicSession.certificate', 'Certificate generation failed for session ' + sessionId)
@@ -699,6 +709,12 @@ export async function reportPublicTabSwitch(
       return { ok: false, error: 'Token sesi tidak valid' }
     }
 
+    // Rate limit: max 30 tab switch reports per minute per session
+    const rl = await checkRateLimit(`pub-tabswitch:${sessionId}`, RATE_LIMITS.standard)
+    if (!rl.allowed) {
+      return { ok: true } // silently drop excess reports
+    }
+
     const supabase = await createSupabaseServiceClient()
 
     const { data: session } = await supabase
@@ -714,7 +730,10 @@ export async function reportPublicTabSwitch(
 
     const newCount = ((session.tab_switch_count as number) ?? 0) + 1
     const log = Array.isArray(session.tab_switch_log) ? session.tab_switch_log : []
-    log.push({ timestamp: new Date().toISOString(), type: 'tab_hidden' })
+    // Cap log at 100 entries to prevent unbounded JSONB growth
+    if (log.length < 100) {
+      log.push({ timestamp: new Date().toISOString(), type: 'tab_hidden' })
+    }
 
     await supabase
       .from('assessment_sessions')
@@ -768,7 +787,7 @@ export async function getPublicResults(
         )
       `)
       .eq('id', sessionId)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'timed_out'])
       .single()
 
     if (sError || !session) {

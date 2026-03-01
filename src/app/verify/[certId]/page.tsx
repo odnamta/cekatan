@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function VerifyCertificatePage({ params }: Props) {
   const { certId } = await params
 
-  if (!certId || certId.length < 6) {
+  if (!certId || certId.length < 6 || certId.length > 36 || !/^[a-zA-Z0-9-]+$/.test(certId)) {
     return <InvalidCertificate message="ID sertifikat tidak valid" />
   }
 
