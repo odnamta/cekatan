@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (HEALTH_API_KEY) {
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${HEALTH_API_KEY}`) {
-      return NextResponse.json({ status: 'ok' }, { status: 200 })
+      return NextResponse.json({ status: 'unauthorized' }, { status: 401 })
     }
   }
 

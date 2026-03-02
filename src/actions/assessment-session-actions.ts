@@ -184,7 +184,7 @@ export async function submitAnswer(
   return withOrgUser(async ({ user, supabase }) => {
     const validation = submitAnswerSchema.safeParse({ sessionId, cardTemplateId, selectedIndex })
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message ?? 'Validation failed' }
+      return { ok: false, error: validation.error.issues[0]?.message ?? 'Data tidak valid' }
     }
 
     // Verify session is active and belongs to user
@@ -218,7 +218,7 @@ export async function submitAnswer(
     }
 
     // Validate selectedIndex against actual option count
-    if (Array.isArray(card.options) && selectedIndex >= card.options.length) {
+    if (!Array.isArray(card.options) || selectedIndex < 0 || selectedIndex >= card.options.length) {
       return { ok: false, error: 'Jawaban tidak valid' }
     }
 

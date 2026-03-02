@@ -43,7 +43,7 @@ export interface DuplicateCardResult {
 export async function getSessionCards(sessionId: string): Promise<SessionCardsResult> {
   // V20.6: Validate sessionId format
   if (!sessionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
-    return { ok: false, error: { message: 'Invalid session ID', code: 'VALIDATION_ERROR' } }
+    return { ok: false, error: { message: 'ID sesi tidak valid', code: 'VALIDATION_ERROR' } }
   }
 
   return withUser(async ({ user, supabase }) => {
@@ -79,7 +79,7 @@ export async function getSessionCards(sessionId: string): Promise<SessionCardsRe
       }
 
       if (!cardTemplates || cardTemplates.length === 0) {
-        return { ok: false, error: { message: 'Session not found', code: 'NOT_FOUND' } }
+        return { ok: false, error: { message: 'Sesi tidak ditemukan', code: 'NOT_FOUND' } }
       }
 
       // Verify author authorization (check first card's deck author)
@@ -87,7 +87,7 @@ export async function getSessionCards(sessionId: string): Promise<SessionCardsRe
         deck_templates: { author_id: string; title: string }
       }
       if (firstCard.deck_templates.author_id !== user.id) {
-        return { ok: false, error: { message: 'Not authorized to view this session', code: 'UNAUTHORIZED' } }
+        return { ok: false, error: { message: 'Tidak diizinkan melihat sesi ini', code: 'UNAUTHORIZED' } }
       }
 
       // Transform to SessionCard format
@@ -168,7 +168,7 @@ export async function getSessionCards(sessionId: string): Promise<SessionCardsRe
  */
 export async function publishCards(cardIds: string[]): Promise<PublishCardsResult> {
   if (!cardIds || cardIds.length === 0) {
-    return { ok: false, error: { message: 'No cards selected', code: 'VALIDATION_ERROR' } }
+    return { ok: false, error: { message: 'Tidak ada kartu yang dipilih', code: 'VALIDATION_ERROR' } }
   }
 
   return withUser(async ({ user, supabase }) => {
@@ -180,7 +180,7 @@ export async function publishCards(cardIds: string[]): Promise<PublishCardsResul
         .in('id', cardIds)
 
       if (fetchError || !cards) {
-        return { ok: false, error: { message: 'Failed to verify card ownership', code: 'DB_ERROR' } }
+        return { ok: false, error: { message: 'Gagal memverifikasi kepemilikan kartu', code: 'DB_ERROR' } }
       }
 
       // Check all cards belong to user
@@ -190,7 +190,7 @@ export async function publishCards(cardIds: string[]): Promise<PublishCardsResul
       })
 
       if (unauthorized) {
-        return { ok: false, error: { message: 'Not authorized to publish these cards', code: 'UNAUTHORIZED' } }
+        return { ok: false, error: { message: 'Tidak diizinkan menerbitkan kartu ini', code: 'UNAUTHORIZED' } }
       }
 
       // Update status to published (preserves import_session_id)
@@ -220,7 +220,7 @@ export async function publishCards(cardIds: string[]): Promise<PublishCardsResul
  */
 export async function archiveCards(cardIds: string[]): Promise<ArchiveCardsResult> {
   if (!cardIds || cardIds.length === 0) {
-    return { ok: false, error: { message: 'No cards selected', code: 'VALIDATION_ERROR' } }
+    return { ok: false, error: { message: 'Tidak ada kartu yang dipilih', code: 'VALIDATION_ERROR' } }
   }
 
   return withUser(async ({ user, supabase }) => {
@@ -232,7 +232,7 @@ export async function archiveCards(cardIds: string[]): Promise<ArchiveCardsResul
         .in('id', cardIds)
 
       if (fetchError || !cards) {
-        return { ok: false, error: { message: 'Failed to verify card ownership', code: 'DB_ERROR' } }
+        return { ok: false, error: { message: 'Gagal memverifikasi kepemilikan kartu', code: 'DB_ERROR' } }
       }
 
       const unauthorized = cards.some((card) => {
@@ -241,7 +241,7 @@ export async function archiveCards(cardIds: string[]): Promise<ArchiveCardsResul
       })
 
       if (unauthorized) {
-        return { ok: false, error: { message: 'Not authorized to archive these cards', code: 'UNAUTHORIZED' } }
+        return { ok: false, error: { message: 'Tidak diizinkan mengarsipkan kartu ini', code: 'UNAUTHORIZED' } }
       }
 
       // Update status to archived
@@ -285,7 +285,7 @@ export async function duplicateCard(cardId: string): Promise<DuplicateCardResult
         .single()
 
       if (fetchError || !original) {
-        return { ok: false, error: { message: 'Card not found', code: 'NOT_FOUND' } }
+        return { ok: false, error: { message: 'Kartu tidak ditemukan', code: 'NOT_FOUND' } }
       }
 
       // Verify author authorization
@@ -305,7 +305,7 @@ export async function duplicateCard(cardId: string): Promise<DuplicateCardResult
       }
 
       if (card.deck_templates.author_id !== user.id) {
-        return { ok: false, error: { message: 'Not authorized to duplicate this card', code: 'UNAUTHORIZED' } }
+        return { ok: false, error: { message: 'Tidak diizinkan menduplikasi kartu ini', code: 'UNAUTHORIZED' } }
       }
 
       // Create duplicate with draft status
@@ -329,7 +329,7 @@ export async function duplicateCard(cardId: string): Promise<DuplicateCardResult
         .single()
 
       if (insertError || !newCard) {
-        return { ok: false, error: { message: 'Failed to create duplicate', code: 'DB_ERROR' } }
+        return { ok: false, error: { message: 'Gagal membuat duplikat', code: 'DB_ERROR' } }
       }
 
       // Copy tags to new card
@@ -386,7 +386,7 @@ export async function getSessionStats(sessionId: string): Promise<{
       // Verify author authorization
       const firstCard = cards[0] as unknown as { deck_templates: { author_id: string } }
       if (firstCard.deck_templates.author_id !== user.id) {
-        return { ok: false, error: { message: 'Not authorized', code: 'UNAUTHORIZED' } }
+        return { ok: false, error: { message: 'Tidak diizinkan', code: 'UNAUTHORIZED' } }
       }
 
       // Calculate stats

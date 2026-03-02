@@ -26,7 +26,7 @@ export async function createOrganization(
   return withUser(async ({ user, supabase }) => {
     const validation = createOrgSchema.safeParse({ name, slug })
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message ?? 'Validation failed' }
+      return { ok: false, error: validation.error.issues[0]?.message ?? 'Data tidak valid' }
     }
 
     // Use SECURITY DEFINER function to atomically create org + add owner.
@@ -164,7 +164,7 @@ export async function updateOrgSettings(
 
     const validation = updateOrgSettingsSchema.safeParse({ orgId, ...updates })
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message ?? 'Validation failed' }
+      return { ok: false, error: validation.error.issues[0]?.message ?? 'Data tidak valid' }
     }
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }

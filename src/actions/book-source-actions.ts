@@ -28,7 +28,7 @@ export async function createBookSource(
   // Validate input before auth to fail fast
   const validation = createBookSourceSchema.safeParse(input)
   if (!validation.success) {
-    return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+    return { ok: false, error: validation.error.issues[0]?.message || 'Input tidak valid' }
   }
 
   return withOrgUser(async ({ user, supabase, org }) => {
@@ -118,7 +118,7 @@ export async function updateBookSource(
     // Validate input
     const validation = updateBookSourceSchema.safeParse(input)
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+      return { ok: false, error: validation.error.issues[0]?.message || 'Input tidak valid' }
     }
 
     const { id, ...updates } = validation.data

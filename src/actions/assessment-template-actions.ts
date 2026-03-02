@@ -7,6 +7,7 @@
 import { withOrgUser } from '@/actions/_helpers'
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { hasMinimumRole } from '@/lib/org-authorization'
+import { logger } from '@/lib/logger'
 import type { ActionResultV2 } from '@/types/actions'
 import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 
@@ -205,12 +206,17 @@ export async function getAssessmentPreviewQuestions(
 
     if (error) return { ok: false, error: error.message }
 
-    const questions: PreviewQuestion[] = (cards ?? []).map((c) => ({
-      id: c.id,
-      stem: c.stem,
-      options: c.options ?? [],
-      correctIndex: c.correct_index ?? 0,
-    }))
+    const questions: PreviewQuestion[] = (cards ?? []).map((c) => {
+      if (c.correct_index === null) {
+        logger.warn('getPreviewQuestions', `Card ${c.id} has null correct_index, defaulting to 0`)
+      }
+      return {
+        id: c.id,
+        stem: c.stem,
+        options: c.options ?? [],
+        correctIndex: c.correct_index ?? 0,
+      }
+    })
 
     return { ok: true, data: questions }
   })

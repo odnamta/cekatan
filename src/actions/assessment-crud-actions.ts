@@ -42,12 +42,12 @@ export async function createAssessment(
 ): Promise<ActionResultV2<Assessment>> {
   return withOrgUser(async ({ user, supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Only creators and above can create assessments' }
+      return { ok: false, error: 'Hanya pembuat dan di atasnya yang dapat membuat asesmen' }
     }
 
     const validation = createAssessmentSchema.safeParse(input)
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message ?? 'Validation failed' }
+      return { ok: false, error: validation.error.issues[0]?.message ?? 'Data tidak valid' }
     }
 
     // Verify deck belongs to org
@@ -59,7 +59,7 @@ export async function createAssessment(
       .single()
 
     if (!deck) {
-      return { ok: false, error: 'Deck not found' }
+      return { ok: false, error: 'Dek tidak ditemukan' }
     }
 
     // Count available questions
@@ -77,7 +77,7 @@ export async function createAssessment(
 
     // Validate scheduling dates
     if (input.startDate && input.endDate && new Date(input.startDate) >= new Date(input.endDate)) {
-      return { ok: false, error: 'Start date must be before end date' }
+      return { ok: false, error: 'Tanggal mulai harus sebelum tanggal selesai' }
     }
 
     const { data: assessment, error } = await supabase
@@ -189,7 +189,7 @@ export async function getAssessment(
       .single()
 
     if (error || !data) {
-      return { ok: false, error: 'Assessment not found' }
+      return { ok: false, error: 'Asesmen tidak ditemukan' }
     }
 
     return { ok: true, data: data as Assessment }
@@ -205,7 +205,7 @@ export async function publishAssessment(
 ): Promise<ActionResultV2<void>> {
   return withOrgUser(async ({ user, supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     // Get assessment title before updating
@@ -218,7 +218,7 @@ export async function publishAssessment(
       .single()
 
     if (!assessment) {
-      return { ok: false, error: 'Assessment not found or not in draft' }
+      return { ok: false, error: 'Asesmen tidak ditemukan atau bukan draft' }
     }
 
     const { error } = await supabase
@@ -269,7 +269,7 @@ export async function archiveAssessment(
 ): Promise<ActionResultV2<void>> {
   return withOrgUser(async ({ user, supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     const { error } = await supabase
@@ -302,7 +302,7 @@ export async function unpublishAssessment(
 ): Promise<ActionResultV2<void>> {
   return withOrgUser(async ({ user, supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     // Check for active in-progress sessions
@@ -314,7 +314,7 @@ export async function unpublishAssessment(
       .limit(1)
 
     if (activeSessions && activeSessions.length > 0) {
-      return { ok: false, error: 'Cannot revert — there are active sessions in progress' }
+      return { ok: false, error: 'Tidak dapat mengembalikan — ada sesi aktif yang sedang berlangsung' }
     }
 
     const { error } = await supabase
@@ -348,7 +348,7 @@ export async function batchPublishAssessments(
 
   return withOrgUser(async ({ supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     const { data, error } = await supabase
@@ -386,7 +386,7 @@ export async function batchArchiveAssessments(
 ): Promise<ActionResultV2<{ archived: number }>> {
   return withOrgUser(async ({ supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     const { data, error } = await supabase
@@ -413,7 +413,7 @@ export async function batchDeleteAssessments(
 ): Promise<ActionResultV2<{ deleted: number }>> {
   return withOrgUser(async ({ user, supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     // Only allow deleting draft/archived assessments (not published with active sessions)
@@ -447,7 +447,7 @@ export async function duplicateAssessment(
 ): Promise<ActionResultV2<Assessment>> {
   return withOrgUser(async ({ user, supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     const { data: source } = await supabase
@@ -458,7 +458,7 @@ export async function duplicateAssessment(
       .single()
 
     if (!source) {
-      return { ok: false, error: 'Assessment not found' }
+      return { ok: false, error: 'Asesmen tidak ditemukan' }
     }
 
     const { data: clone, error } = await supabase
@@ -520,19 +520,19 @@ export async function updateAssessment(
   // Validate inputs
   const validation = updateAssessmentSchema.safeParse({ assessmentId, ...input })
   if (!validation.success) {
-    return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+    return { ok: false, error: validation.error.issues[0]?.message || 'Input tidak valid' }
   }
 
   return withOrgUser(async ({ supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions' }
+      return { ok: false, error: 'Izin tidak cukup' }
     }
 
     // Validate scheduling dates
     const effectiveStart = input.startDate !== undefined ? input.startDate : null
     const effectiveEnd = input.endDate !== undefined ? input.endDate : null
     if (effectiveStart && effectiveEnd && new Date(effectiveStart) >= new Date(effectiveEnd)) {
-      return { ok: false, error: 'Start date must be before end date' }
+      return { ok: false, error: 'Tanggal mulai harus sebelum tanggal selesai' }
     }
 
     // Build update object, mapping camelCase to snake_case

@@ -54,11 +54,11 @@ export async function createCardAction(
       .single()
 
     if (deckError || !deckTemplate) {
-      return { ok: false, error: 'Deck not found in V2 schema. Please run migration.' }
+      return { ok: false, error: 'Dek tidak ditemukan' }
     }
 
     if (deckTemplate.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // V8.0: Create card_template (flashcards stored as MCQ with front/back as stem/explanation)
@@ -77,7 +77,7 @@ export async function createCardAction(
       .single()
 
     if (insertError || !cardTemplate) {
-      return { ok: false, error: insertError?.message || 'Failed to create card' }
+      return { ok: false, error: insertError?.message || 'Gagal membuat kartu' }
     }
 
     // V8.0: Create user_card_progress with default SM-2 values
@@ -151,13 +151,13 @@ export async function updateCard(input: UpdateCardInput): Promise<ActionResultV2
 
     if (cardError || !cardTemplate) {
       // V8.0: No fallback to legacy cards table
-      return { ok: false, error: 'Card not found in V2 schema' }
+      return { ok: false, error: 'Kartu tidak ditemukan' }
     }
 
     // Check ownership via deck_template
     const deckData = cardTemplate.deck_templates as unknown as { author_id: string }
     if (deckData.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // Build update payload based on card type
@@ -166,7 +166,7 @@ export async function updateCard(input: UpdateCardInput): Promise<ActionResultV2
     if (input.type === 'flashcard') {
       // Validate flashcard fields
       if (!input.front?.trim() || !input.back?.trim()) {
-        return { ok: false, error: 'Front and back are required' }
+        return { ok: false, error: 'Sisi depan dan belakang wajib diisi' }
       }
       updatePayload = {
         stem: input.front.trim(),
@@ -175,13 +175,13 @@ export async function updateCard(input: UpdateCardInput): Promise<ActionResultV2
     } else {
       // Validate MCQ fields
       if (!input.stem?.trim()) {
-        return { ok: false, error: 'Question stem is required' }
+        return { ok: false, error: 'Soal wajib diisi' }
       }
       if (!input.options || input.options.length < 2) {
-        return { ok: false, error: 'At least 2 options are required' }
+        return { ok: false, error: 'Minimal 2 opsi wajib diisi' }
       }
       if (input.correctIndex < 0 || input.correctIndex >= input.options.length) {
-        return { ok: false, error: 'Invalid correct answer index' }
+        return { ok: false, error: 'Indeks jawaban benar tidak valid' }
       }
       updatePayload = {
         stem: input.stem.trim(),
@@ -224,13 +224,13 @@ export async function deleteCard(cardId: string): Promise<ActionResultV2> {
 
     if (cardError || !cardTemplate) {
       // V8.0: No fallback to legacy cards table
-      return { ok: false, error: 'Card not found in V2 schema' }
+      return { ok: false, error: 'Kartu tidak ditemukan' }
     }
 
     // Check ownership via deck_template
     const deckData = cardTemplate.deck_templates as unknown as { author_id: string }
     if (deckData.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // V8.0: Delete user_card_progress first (for all users who have progress on this card)
@@ -272,13 +272,13 @@ export async function duplicateCard(cardId: string): Promise<ActionResultV2> {
       .single()
 
     if (cardError || !cardTemplate) {
-      return { ok: false, error: 'Card not found in V2 schema' }
+      return { ok: false, error: 'Kartu tidak ditemukan' }
     }
 
     // Check ownership via deck_template
     const deckData = cardTemplate.deck_templates as unknown as { author_id: string }
     if (deckData.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // V8.0: Create new card_template with "(copy)" suffix
@@ -297,7 +297,7 @@ export async function duplicateCard(cardId: string): Promise<ActionResultV2> {
       .single()
 
     if (insertError || !newCardTemplate) {
-      return { ok: false, error: insertError?.message || 'Failed to duplicate card' }
+      return { ok: false, error: insertError?.message || 'Gagal menduplikasi kartu' }
     }
 
     // V8.0: Create user_card_progress for the duplicate
@@ -329,7 +329,7 @@ export async function duplicateCard(cardId: string): Promise<ActionResultV2> {
  */
 export async function bulkDeleteCards(cardIds: string[]): Promise<ActionResultV2<{ count: number }>> {
   if (!cardIds.length) {
-    return { ok: false, error: 'No cards selected' }
+    return { ok: false, error: 'Tidak ada kartu yang dipilih' }
   }
 
   return withOrgUser(async ({ user, supabase }) => {
@@ -340,7 +340,7 @@ export async function bulkDeleteCards(cardIds: string[]): Promise<ActionResultV2
       .in('id', cardIds)
 
     if (fetchError || !cardTemplates) {
-      return { ok: false, error: 'Could not verify card ownership' }
+      return { ok: false, error: 'Gagal memverifikasi kepemilikan kartu' }
     }
 
     // Check all cards belong to user
@@ -350,7 +350,7 @@ export async function bulkDeleteCards(cardIds: string[]): Promise<ActionResultV2
     })
 
     if (unauthorized) {
-      return { ok: false, error: 'Access denied to one or more cards' }
+      return { ok: false, error: 'Akses ditolak untuk satu atau lebih kartu' }
     }
 
     // V8.0: Delete user_card_progress for all cards
@@ -389,7 +389,7 @@ export async function bulkMoveCards(
   targetDeckId: string
 ): Promise<ActionResultV2<{ count: number }>> {
   if (!cardIds.length) {
-    return { ok: false, error: 'No cards selected' }
+    return { ok: false, error: 'Tidak ada kartu yang dipilih' }
   }
 
   return withOrgUser(async ({ user, supabase }) => {
@@ -401,11 +401,11 @@ export async function bulkMoveCards(
       .single()
 
     if (targetError || !targetDeck) {
-      return { ok: false, error: 'Target deck not found in V2 schema' }
+      return { ok: false, error: 'Dek tujuan tidak ditemukan' }
     }
 
     if (targetDeck.author_id !== user.id) {
-      return { ok: false, error: 'Access denied to target deck' }
+      return { ok: false, error: 'Akses ditolak ke dek tujuan' }
     }
 
     // V8.0: Verify ownership of all source card_templates
@@ -415,7 +415,7 @@ export async function bulkMoveCards(
       .in('id', cardIds)
 
     if (fetchError || !cardTemplates) {
-      return { ok: false, error: 'Could not verify card ownership' }
+      return { ok: false, error: 'Gagal memverifikasi kepemilikan kartu' }
     }
 
     const unauthorized = cardTemplates.some((ct) => {
@@ -424,7 +424,7 @@ export async function bulkMoveCards(
     })
 
     if (unauthorized) {
-      return { ok: false, error: 'Access denied to one or more cards' }
+      return { ok: false, error: 'Akses ditolak untuk satu atau lebih kartu' }
     }
 
     // V8.0: Move all card_templates to target deck_template
@@ -534,11 +534,11 @@ export async function removeDuplicateCards(deckId: string): Promise<Deduplicatio
       .single()
 
     if (deckError || !deckTemplate) {
-      return { ok: false, error: 'Deck not found' }
+      return { ok: false, error: 'Dek tidak ditemukan' }
     }
 
     if (deckTemplate.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // Fetch all cards in the deck (V2 schema: all card_templates are MCQ-style)
@@ -624,7 +624,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
         .in('id', cardIdsToPublish)
 
       if (fetchError || !cardTemplates) {
-        return { ok: false, error: 'Could not verify card ownership' }
+        return { ok: false, error: 'Gagal memverifikasi kepemilikan kartu' }
       }
 
       // Check all cards belong to user
@@ -634,7 +634,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
       })
 
       if (unauthorized) {
-        return { ok: false, error: 'Access denied to one or more cards' }
+        return { ok: false, error: 'Akses ditolak untuk satu atau lebih kartu' }
       }
 
       // Filter to only draft cards
@@ -661,11 +661,11 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
         .single()
 
       if (deckError || !deckTemplate) {
-        return { ok: false, error: 'Deck not found' }
+        return { ok: false, error: 'Dek tidak ditemukan' }
       }
 
       if (deckTemplate.author_id !== user.id) {
-        return { ok: false, error: 'Access denied' }
+        return { ok: false, error: 'Akses ditolak' }
       }
 
       // Build query for draft cards in this deck
@@ -680,7 +680,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
       const { data: draftCards, error: cardsError } = await query
 
       if (cardsError || !draftCards) {
-        return { ok: false, error: 'Could not fetch cards' }
+        return { ok: false, error: 'Gagal mengambil daftar kartu' }
       }
 
       cardIdsToPublish = draftCards.map(c => c.id)
@@ -694,7 +694,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
           .in('tag_id', tagIds)
 
         if (tagError) {
-          return { ok: false, error: 'Could not filter by tags' }
+          return { ok: false, error: 'Gagal memfilter berdasarkan tag' }
         }
 
         const taggedCardIds = new Set(taggedCards?.map(tc => tc.card_template_id) || [])
@@ -706,7 +706,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
       }
 
     } else {
-      return { ok: false, error: 'No cards specified' }
+      return { ok: false, error: 'Tidak ada kartu yang ditentukan' }
     }
 
     // Update status to published

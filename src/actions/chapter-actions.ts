@@ -32,7 +32,7 @@ export async function createChapter(
       // Validate input
       const validation = createChapterSchema.safeParse(input)
       if (!validation.success) {
-        return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+        return { ok: false, error: validation.error.issues[0]?.message || 'Input tidak valid' }
       }
 
       const { book_source_id, chapter_number, title, expected_question_count } = validation.data
@@ -46,7 +46,7 @@ export async function createChapter(
         .single()
 
       if (bookError || !bookSource) {
-        return { ok: false, error: 'Book source not found or not owned by user' }
+        return { ok: false, error: 'Sumber buku tidak ditemukan atau bukan milik pengguna' }
       }
 
       // Insert chapter
@@ -66,7 +66,7 @@ export async function createChapter(
           return { ok: false, error: `Chapter ${chapter_number} already exists in this book` }
         }
         logger.error('createChapter', error)
-        return { ok: false, error: 'Failed to create chapter' }
+        return { ok: false, error: 'Gagal membuat bab' }
       }
 
       return { ok: true, data: data as BookChapter }
@@ -101,7 +101,7 @@ export async function getChaptersByBook(
 
     if (error) {
       logger.error('getChaptersByBook', error)
-      return { ok: false, error: 'Failed to fetch chapters' }
+      return { ok: false, error: 'Gagal mengambil daftar bab' }
     }
 
     // Strip the joined book_sources data
@@ -130,7 +130,7 @@ export async function getChapter(id: string): Promise<ActionResultV2<BookChapter
 
     if (error) {
       logger.error('getChapter', error)
-      return { ok: false, error: 'Chapter not found' }
+      return { ok: false, error: 'Bab tidak ditemukan' }
     }
 
     // Strip the joined book_sources data
@@ -150,7 +150,7 @@ export async function updateChapter(
     // Validate input
     const validation = updateChapterSchema.safeParse(input)
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+      return { ok: false, error: validation.error.issues[0]?.message || 'Input tidak valid' }
     }
 
     const { id, ...updates } = validation.data
@@ -164,7 +164,7 @@ export async function updateChapter(
     }
 
     if (Object.keys(updateData).length === 0) {
-      return { ok: false, error: 'No fields to update' }
+      return { ok: false, error: 'Tidak ada data yang diubah' }
     }
 
     // First verify ownership
@@ -176,7 +176,7 @@ export async function updateChapter(
       .single()
 
     if (!existing) {
-      return { ok: false, error: 'Chapter not found or not owned by user' }
+      return { ok: false, error: 'Bab tidak ditemukan atau bukan milik pengguna' }
     }
 
     // Update chapter
@@ -192,7 +192,7 @@ export async function updateChapter(
         return { ok: false, error: `Chapter ${updates.chapter_number} already exists in this book` }
       }
       logger.error('updateChapter', error)
-      return { ok: false, error: 'Failed to update chapter' }
+      return { ok: false, error: 'Gagal memperbarui bab' }
     }
 
     return { ok: true, data: data as BookChapter }
@@ -214,7 +214,7 @@ export async function deleteChapter(id: string): Promise<ActionResultV2> {
       .single()
 
     if (!existing) {
-      return { ok: false, error: 'Chapter not found or not owned by user' }
+      return { ok: false, error: 'Bab tidak ditemukan atau bukan milik pengguna' }
     }
 
     // Delete chapter (card_templates.chapter_id will be set to NULL)
@@ -225,7 +225,7 @@ export async function deleteChapter(id: string): Promise<ActionResultV2> {
 
     if (error) {
       logger.error('deleteChapter', error)
-      return { ok: false, error: 'Failed to delete chapter' }
+      return { ok: false, error: 'Gagal menghapus bab' }
     }
 
     return { ok: true }
@@ -243,7 +243,7 @@ export async function createMatchingGroup(
     // Validate input
     const validation = createMatchingGroupSchema.safeParse(input)
     if (!validation.success) {
-      return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+      return { ok: false, error: validation.error.issues[0]?.message || 'Input tidak valid' }
     }
 
     const { chapter_id, common_options, instruction_text } = validation.data
@@ -258,7 +258,7 @@ export async function createMatchingGroup(
         .single()
 
       if (!chapter) {
-        return { ok: false, error: 'Chapter not found or not owned by user' }
+        return { ok: false, error: 'Bab tidak ditemukan atau bukan milik pengguna' }
       }
     }
 
@@ -275,7 +275,7 @@ export async function createMatchingGroup(
 
     if (error) {
       logger.error('createMatchingGroup', error)
-      return { ok: false, error: 'Failed to create matching group' }
+      return { ok: false, error: 'Gagal membuat grup pencocokan' }
     }
 
     return { ok: true, data: data as MatchingGroup }
@@ -302,7 +302,7 @@ export async function getCardsByChapter(
 
     if (error) {
       logger.error('getCardsByChapter', error)
-      return { ok: false, error: 'Failed to fetch cards' }
+      return { ok: false, error: 'Gagal mengambil daftar kartu' }
     }
 
     return { ok: true, data: data as CardTemplateV11[] }
@@ -324,7 +324,7 @@ export async function getCardCountByChapter(
 
     if (error) {
       logger.error('getCardCountByChapter', error)
-      return { ok: false, error: 'Failed to count cards' }
+      return { ok: false, error: 'Gagal menghitung kartu' }
     }
 
     return { ok: true, data: count ?? 0 }

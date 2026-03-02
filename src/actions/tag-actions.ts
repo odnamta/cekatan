@@ -56,7 +56,7 @@ export async function createTag(
   return withOrgUser(async ({ user, supabase, org, role }: OrgAuthContext) => {
     // V20.6: Candidates cannot create tags — require at least 'member' (creator) role
     if (!hasMinimumRole(role, 'creator')) {
-      return { ok: false, error: 'Insufficient permissions to create tags' }
+      return { ok: false, error: 'Izin tidak cukup untuk membuat tag' }
     }
 
     // Check for duplicate name within org (case-insensitive)
@@ -158,7 +158,7 @@ export async function updateTag(
       .single()
 
     if (!existingTag) {
-      return { ok: false, error: 'Tag not found' }
+      return { ok: false, error: 'Tag tidak ditemukan' }
     }
 
     // Check for duplicate name (excluding current tag, case-insensitive)
@@ -201,7 +201,7 @@ export async function updateTag(
  */
 export async function deleteTag(tagId: string): Promise<ActionResultV2> {
   if (!tagId) {
-    return { ok: false, error: 'Tag ID is required' }
+    return { ok: false, error: 'ID tag wajib diisi' }
   }
 
   return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
@@ -214,7 +214,7 @@ export async function deleteTag(tagId: string): Promise<ActionResultV2> {
       .single()
 
     if (!existingTag) {
-      return { ok: false, error: 'Tag not found' }
+      return { ok: false, error: 'Tag tidak ditemukan' }
     }
 
     // Delete the tag (cascades to card_tags)
@@ -246,7 +246,7 @@ export async function assignTagsToCard(
   tagIds: string[]
 ): Promise<ActionResultV2> {
   if (!cardId) {
-    return { ok: false, error: 'Card ID is required' }
+    return { ok: false, error: 'ID kartu wajib diisi' }
   }
 
   return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
@@ -258,12 +258,12 @@ export async function assignTagsToCard(
       .single()
 
     if (!card) {
-      return { ok: false, error: 'Card not found' }
+      return { ok: false, error: 'Kartu tidak ditemukan' }
     }
 
     const deckData = card.deck_templates as unknown as { author_id: string }
     if (deckData.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // Remove existing tags
@@ -305,7 +305,7 @@ export async function removeTagFromCard(
   tagId: string
 ): Promise<ActionResultV2> {
   if (!cardId || !tagId) {
-    return { ok: false, error: 'Card ID and Tag ID are required' }
+    return { ok: false, error: 'ID kartu dan ID tag wajib diisi' }
   }
 
   return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
@@ -317,12 +317,12 @@ export async function removeTagFromCard(
       .single()
 
     if (!card) {
-      return { ok: false, error: 'Card not found' }
+      return { ok: false, error: 'Kartu tidak ditemukan' }
     }
 
     const deckData = card.deck_templates as unknown as { author_id: string }
     if (deckData.author_id !== user.id) {
-      return { ok: false, error: 'Access denied' }
+      return { ok: false, error: 'Akses ditolak' }
     }
 
     // Remove the tag association
@@ -404,11 +404,11 @@ export async function bulkAddTagToCards(
   tagId: string
 ): Promise<BulkTagResult> {
   if (!cardIds.length) {
-    return { ok: false, error: 'No cards selected' }
+    return { ok: false, error: 'Tidak ada kartu yang dipilih' }
   }
 
   if (!tagId) {
-    return { ok: false, error: 'Tag ID is required' }
+    return { ok: false, error: 'ID tag wajib diisi' }
   }
 
   return withOrgUser(async ({ user, supabase }: OrgAuthContext) => {
@@ -421,7 +421,7 @@ export async function bulkAddTagToCards(
       .single()
 
     if (tagError || !tag) {
-      return { ok: false, error: 'Tag not found' }
+      return { ok: false, error: 'Tag tidak ditemukan' }
     }
 
     // Verify user is author of all cards via deck_template.author_id
@@ -432,12 +432,12 @@ export async function bulkAddTagToCards(
       .in('id', cardIds)
 
     if (fetchError || !cardTemplates) {
-      return { ok: false, error: 'Could not verify card ownership' }
+      return { ok: false, error: 'Gagal memverifikasi kepemilikan kartu' }
     }
 
     // Check that we found all requested cards
     if (cardTemplates.length !== cardIds.length) {
-      return { ok: false, error: 'Some cards were not found' }
+      return { ok: false, error: 'Beberapa kartu tidak ditemukan' }
     }
 
     // Check all cards belong to user (author check)
@@ -447,7 +447,7 @@ export async function bulkAddTagToCards(
     })
 
     if (unauthorized) {
-      return { ok: false, error: 'Only the author can tag these cards' }
+      return { ok: false, error: 'Hanya penulis yang dapat menandai kartu ini' }
     }
 
     // Batch inserts in chunks of 100 to prevent timeout
@@ -472,7 +472,7 @@ export async function bulkAddTagToCards(
 
       if (insertError) {
         logger.error('bulkAddTagToCards', insertError)
-        return { ok: false, error: 'Failed to tag cards. Please try again.' }
+        return { ok: false, error: 'Gagal menandai kartu. Silakan coba lagi.' }
       }
 
       totalTagged += count || 0
@@ -527,11 +527,11 @@ export async function autoTagCards(
 ): Promise<AutoTagResult> {
   // V9.3: Chunk limit validation - reject if > 5 cards
   if (cardIds.length > 5) {
-    return { ok: false, error: 'Maximum 5 cards per request' }
+    return { ok: false, error: 'Maksimal 5 kartu per permintaan' }
   }
 
   if (!cardIds.length) {
-    return { ok: false, error: 'No cards selected' }
+    return { ok: false, error: 'Tidak ada kartu yang dipilih' }
   }
 
   return withOrgUser(async ({ user, supabase, org }: OrgAuthContext) => {
@@ -542,11 +542,11 @@ export async function autoTagCards(
       .in('id', cardIds)
 
     if (fetchError || !cardTemplates) {
-      return { ok: false, error: 'Could not fetch cards' }
+      return { ok: false, error: 'Gagal mengambil daftar kartu' }
     }
 
     if (cardTemplates.length === 0) {
-      return { ok: false, error: 'No cards found' }
+      return { ok: false, error: 'Tidak ada kartu yang ditemukan' }
     }
 
     // Verify user is author of all cards
@@ -556,7 +556,7 @@ export async function autoTagCards(
     })
 
     if (unauthorized) {
-      return { ok: false, error: 'Only the author can auto-tag these cards' }
+      return { ok: false, error: 'Hanya penulis yang dapat menandai otomatis kartu ini' }
     }
 
     // V9.3: Use provided subject or fall back to deck subject or default
@@ -681,7 +681,7 @@ export async function autoTagCards(
     const totalSkipped = results.filter((r) => !r.success).length
 
     if (totalTagged === 0 && totalSkipped > 0) {
-      return { ok: false, error: 'AI classification failed. Please try again.' }
+      return { ok: false, error: 'Klasifikasi AI gagal. Silakan coba lagi.' }
     }
 
     const deckIds = [...new Set(cardTemplates.map((ct) => ct.deck_template_id))]

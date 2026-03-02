@@ -104,8 +104,8 @@ export function useAutoTag(options: UseAutoTagOptions = {}): UseAutoTagReturn {
   const startTagging = useCallback(
     async (cardIds: string[], subject?: string) => {
       if (cardIds.length === 0) {
-        setError('No cards selected')
-        onError?.('No cards selected')
+        setError('Tidak ada kartu yang dipilih')
+        onError?.('Tidak ada kartu yang dipilih')
         return
       }
 
@@ -179,9 +179,9 @@ export function useAutoTag(options: UseAutoTagOptions = {}): UseAutoTagReturn {
       setIsTagging(false)
 
       if (cancelledRef.current) {
-        setError('Tagging cancelled')
+        setError('Penandaan dibatalkan')
       } else if (runningTagged === 0 && runningSkipped > 0) {
-        const errorMsg = 'All cards failed to tag'
+        const errorMsg = 'Semua kartu gagal ditandai'
         setError(errorMsg)
         onError?.(errorMsg)
       }

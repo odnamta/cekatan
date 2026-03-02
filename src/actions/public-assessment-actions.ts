@@ -570,7 +570,7 @@ export async function submitPublicAnswer(
     }
 
     // Validate selectedIndex against actual option count
-    if (Array.isArray(card.options) && selectedIndex >= card.options.length) {
+    if (!Array.isArray(card.options) || selectedIndex < 0 || selectedIndex >= card.options.length) {
       return { ok: false, error: 'Jawaban tidak valid' }
     }
 

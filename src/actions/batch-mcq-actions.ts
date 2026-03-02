@@ -53,7 +53,7 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
   const validationResult = draftBatchInputSchema.safeParse(input)
   if (!validationResult.success) {
     const firstError = validationResult.error.issues[0]
-    return { ok: false, error: { message: firstError?.message || 'Invalid input', code: 'VALIDATION_ERROR' } }
+    return { ok: false, error: { message: firstError?.message || 'Input tidak valid', code: 'VALIDATION_ERROR' } }
   }
   
   const { text, defaultTags, mode = 'extract', subject, imageBase64, imageUrl } = validationResult.data
