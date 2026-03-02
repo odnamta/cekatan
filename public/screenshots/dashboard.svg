@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
   <rect width="1280" height="720" fill="#f8fafc"/>
-  <rect width="1280" height="56" fill="#1e40af"/>
+  <rect width="1280" height="56" fill="#0066FF"/>
   <text x="24" y="36" fill="white" font-family="system-ui" font-size="20" font-weight="600">Cekatan</text>
   <rect x="40" y="80" width="280" height="160" rx="12" fill="white" stroke="#e2e8f0"/>
   <text x="60" y="120" fill="#1e293b" font-family="system-ui" font-size="14" font-weight="600">Assessments</text>
-  <text x="60" y="200" fill="#1e40af" font-family="system-ui" font-size="32" font-weight="700">24</text>
+  <text x="60" y="200" fill="#0066FF" font-family="system-ui" font-size="32" font-weight="700">24</text>
   <rect x="340" y="80" width="280" height="160" rx="12" fill="white" stroke="#e2e8f0"/>
   <text x="360" y="120" fill="#1e293b" font-family="system-ui" font-size="14" font-weight="600">Candidates</text>
   <text x="360" y="200" fill="#7c3aed" font-family="system-ui" font-size="32" font-weight="700">156</text>

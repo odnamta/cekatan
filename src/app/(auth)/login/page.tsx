@@ -59,10 +59,12 @@ function AppLogo() {
   return (
     <div className="flex flex-col items-center mb-8">
       <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-        <span className="text-4xl font-bold text-white">C</span>
+        <svg width="48" height="48" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 21L15 30L34 10" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-        Selamat Datang di Cekatan
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100" style={{ fontFamily: 'var(--font-space-grotesk), "Space Grotesk", sans-serif' }}>
+        Selamat Datang di cekatan
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
         Platform asesmen & pemetaan kompetensi

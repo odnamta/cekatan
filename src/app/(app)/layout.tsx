@@ -15,6 +15,7 @@ import { CommandPalette } from '@/components/navigation/CommandPalette'
 import { DesktopNavLinks } from '@/components/navigation/DesktopNavLinks'
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
 import { AuthGuard } from '@/components/providers/AuthGuard'
+import { Logo } from '@/components/ui/Logo'
 
 export default async function AppLayout({
   children,
@@ -55,8 +56,8 @@ export default async function AppLayout({
           <header className="sticky top-0 z-40 border-b border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg pt-safe" role="banner">
             <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <a href="/dashboard" className="text-xl font-semibold text-slate-900 dark:text-slate-100" aria-label="Cekatan — Go to dashboard">
-                  Cekatan
+                <a href="/dashboard" aria-label="Cekatan — Go to dashboard">
+                  <Logo size="md" />
                 </a>
                 <DesktopNavLinks />
               </div>
