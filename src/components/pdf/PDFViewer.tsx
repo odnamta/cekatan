@@ -116,7 +116,7 @@ export function PDFViewer({
 
   const onDocumentLoadError = useCallback((err: Error) => {
     console.error('PDF load error:', err)
-    setError(err.message || 'Failed to load PDF')
+    setError(err.message || 'Gagal memuat PDF')
     setIsLoading(false)
   }, [])
 
@@ -182,7 +182,7 @@ export function PDFViewer({
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-slate-100 dark:bg-slate-800/50 rounded-lg">
         <AlertCircle className="w-8 h-8 text-slate-400" />
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">No PDF file selected</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Tidak ada file PDF yang dipilih</p>
       </div>
     )
   }
@@ -192,14 +192,14 @@ export function PDFViewer({
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-slate-100 dark:bg-slate-800/50 rounded-lg p-4">
         <AlertCircle className="w-8 h-8 text-red-500" />
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">Cannot load PDF</p>
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">Tidak dapat memuat PDF</p>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center max-w-xs">{error}</p>
         <button
           onClick={handleRetry}
           className="mt-4 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
-          Retry
+          Coba Lagi
         </button>
       </div>
     )
@@ -208,7 +208,7 @@ export function PDFViewer({
   return (
     <div className="flex flex-col h-full">
       {/* PDF Document container - use ref for width measurement */}
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-800/50 rounded-lg p-4"
         onMouseUp={handleTextSelection}
@@ -221,19 +221,19 @@ export function PDFViewer({
           loading={
             <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Loading PDF...</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Memuat PDF...</p>
             </div>
           }
           error={
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-4">
               <AlertCircle className="w-8 h-8 text-red-500" />
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">Failed to load PDF</p>
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">Gagal memuat PDF</p>
               <button
                 onClick={handleRetry}
                 className="mt-3 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
-                Retry
+                Coba Lagi
               </button>
             </div>
           }

@@ -38,7 +38,7 @@ export function BulkTagModal({
 
   const handleApplyTag = async () => {
     if (selectedTagIds.length === 0) {
-      showToast('Please select a tag to apply', 'error')
+      showToast('Silakan pilih tag untuk diterapkan', 'error')
       return
     }
 
@@ -56,11 +56,11 @@ export function BulkTagModal({
         setSelectedTagIds([])
         onClose()
       } else {
-        showToast(result.error || 'Failed to tag cards', 'error')
+        showToast(result.error || 'Gagal menandai kartu', 'error')
       }
     } catch (error) {
       console.error('Bulk tag error:', error)
-      showToast('An unexpected error occurred', 'error')
+      showToast('Terjadi kesalahan yang tidak terduga', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -89,7 +89,7 @@ export function BulkTagModal({
           <div className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Add Tag to Cards
+              Tambahkan Tag ke Kartu
             </h2>
           </div>
           <button
@@ -104,13 +104,13 @@ export function BulkTagModal({
 
         {/* Card count info */}
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          Apply a tag to <span className="font-medium text-slate-900 dark:text-slate-100">{selectedCardIds.length}</span> selected card{selectedCardIds.length !== 1 ? 's' : ''}.
+          Terapkan tag ke <span className="font-medium text-slate-900 dark:text-slate-100">{selectedCardIds.length}</span> kartu yang dipilih.
         </p>
 
         {/* Tag selector */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Select Tag
+            Pilih Tag
           </label>
           <TagSelector
             selectedTagIds={selectedTagIds}
@@ -119,7 +119,7 @@ export function BulkTagModal({
           />
           {selectedTagIds.length === 0 && (
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Choose a tag from your existing tags or create a new one first.
+              Pilih tag dari tag yang sudah ada atau buat yang baru terlebih dahulu.
             </p>
           )}
         </div>

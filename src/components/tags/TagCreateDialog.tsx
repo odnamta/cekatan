@@ -63,7 +63,7 @@ export function TagCreateDialog({
     
     const trimmedName = name.trim()
     if (!trimmedName) {
-      setError('Tag name is required')
+      setError('Nama tag wajib diisi')
       return
     }
 
@@ -93,7 +93,7 @@ export function TagCreateDialog({
         }
       }
     } catch {
-      setError('An unexpected error occurred')
+      setError('Terjadi kesalahan yang tidak terduga')
     } finally {
       setIsSubmitting(false)
     }
@@ -114,7 +114,7 @@ export function TagCreateDialog({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {isEditMode ? 'Edit Tag' : 'Buat Tag'}
+            {isEditMode ? 'Edit Tag' : 'Buat Tag Baru'}
           </h2>
           <button
             onClick={onClose}
@@ -131,14 +131,14 @@ export function TagCreateDialog({
               htmlFor="tag-name" 
               className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
             >
-              Name
+              Nama
             </label>
             <input
               id="tag-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter tag name..."
+              placeholder="Masukkan nama tag..."
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
               maxLength={50}
@@ -152,7 +152,7 @@ export function TagCreateDialog({
               htmlFor="tag-category" 
               className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
             >
-              Category
+              Kategori
             </label>
             <select
               id="tag-category"
@@ -160,23 +160,23 @@ export function TagCreateDialog({
               onChange={(e) => setCategory(e.target.value as TagCategory)}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="source">Source (Textbook origins)</option>
-              <option value="topic">Topic (Medical domains)</option>
-              <option value="concept">Concept (Specific concepts)</option>
+              <option value="source">Sumber (Asal buku)</option>
+              <option value="topic">Topik (Domain)</option>
+              <option value="concept">Konsep (Konsep spesifik)</option>
             </select>
           </div>
 
           {/* Color preview (read-only, enforced by category) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Color Preview
+              Pratinjau Warna
             </label>
             <div className="flex items-center gap-3">
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${bgClass} ${textClass}`}>
-                {name.trim() || 'Tag Preview'}
+                {name.trim() || 'Pratinjau Tag'}
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Color is determined by category ({CATEGORY_COLORS[category]})
+                Warna ditentukan oleh kategori ({CATEGORY_COLORS[category]})
               </span>
             </div>
           </div>
@@ -204,7 +204,7 @@ export function TagCreateDialog({
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEditMode ? 'Simpan Perubahan' : 'Buat Tag'}
+              {isEditMode ? 'Simpan Perubahan' : 'Buat Tag Baru'}
             </button>
           </div>
         </form>

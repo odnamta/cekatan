@@ -66,7 +66,7 @@ export function RepairButton() {
         setHealedCount(result.data?.healedCount ?? 0)
       } else {
         setStatus('error')
-        setErrorMessage(result.error || 'Unknown error')
+        setErrorMessage(result.error || 'Terjadi kesalahan')
       }
     })
   }
@@ -80,7 +80,7 @@ export function RepairButton() {
         setMergeResult(result.data ?? { mergedCount: 0, movedCards: 0, deletedDuplicates: 0 })
       } else {
         setDuplicateStatus('error')
-        setErrorMessage(result.error || 'Merge failed')
+        setErrorMessage(result.error || 'Gagal menggabungkan')
       }
     })
   }
@@ -98,7 +98,7 @@ export function RepairButton() {
     return (
       <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
         <CheckCircle className="w-4 h-4" />
-        <span>Repair Complete: {healedCount} missing cards added to your study queue.</span>
+        <span>Perbaikan Selesai: {healedCount} kartu yang hilang ditambahkan ke antrian studi Anda.</span>
       </div>
     )
   }
@@ -108,7 +108,7 @@ export function RepairButton() {
     return (
       <div className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
         <AlertCircle className="w-4 h-4" />
-        <span>Repair failed: {errorMessage}</span>
+        <span>Perbaikan gagal: {errorMessage}</span>
       </div>
     )
   }
@@ -122,7 +122,7 @@ export function RepairButton() {
           <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-amber-800 dark:text-amber-200">
-              {missingCount} card{missingCount !== 1 ? 's' : ''} missing from your study queue.
+              {missingCount} kartu hilang dari antrian studi Anda.
             </p>
           </div>
           <Button
@@ -133,7 +133,7 @@ export function RepairButton() {
             className="flex-shrink-0"
           >
             <Wrench className="w-4 h-4 mr-1" />
-            {isPending ? 'Repairing...' : 'Run Repair'}
+            {isPending ? 'Memperbaiki...' : 'Jalankan Perbaikan'}
           </Button>
         </div>
       )}
@@ -144,7 +144,7 @@ export function RepairButton() {
           <Merge className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              {duplicateInfo.duplicateCount} duplicate deck{duplicateInfo.duplicateCount !== 1 ? 's' : ''} found. Merge to combine cards.
+              {duplicateInfo.duplicateCount} dek duplikat ditemukan. Gabungkan untuk menggabungkan kartu.
             </p>
           </div>
           <Button
@@ -155,7 +155,7 @@ export function RepairButton() {
             className="flex-shrink-0"
           >
             <Merge className="w-4 h-4 mr-1" />
-            {isPending ? 'Merging...' : 'Merge Duplicates'}
+            {isPending ? 'Menggabungkan...' : 'Gabungkan Duplikat'}
           </Button>
         </div>
       )}
@@ -165,7 +165,7 @@ export function RepairButton() {
         <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
           <CheckCircle className="w-4 h-4" />
           <span>
-            Merge Complete: {mergeResult.movedCards} cards moved, {mergeResult.deletedDuplicates} duplicates removed.
+            Penggabungan Selesai: {mergeResult.movedCards} kartu dipindahkan, {mergeResult.deletedDuplicates} duplikat dihapus.
           </span>
         </div>
       )}

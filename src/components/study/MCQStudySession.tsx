@@ -57,7 +57,7 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
     setIsLoading(false)
 
     if (!result.ok) {
-      setError(result.error || 'Failed to submit answer')
+      setError(result.error || 'Gagal mengirim jawaban')
       return
     }
 
@@ -117,10 +117,10 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
       <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-xl">
         <div className="text-4xl mb-4">🎉</div>
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-          MCQ Session Complete!
+          Sesi MCQ Selesai!
         </h2>
         <p className="text-slate-600 dark:text-slate-400 mb-4">
-          You scored <span className="font-bold text-blue-600 dark:text-blue-400">{sessionState.correctCount}</span> out of <span className="font-bold">{totalCards}</span> ({scorePercent}%)
+          Skor Anda <span className="font-bold text-blue-600 dark:text-blue-400">{sessionState.correctCount}</span> dari <span className="font-bold">{totalCards}</span> ({scorePercent}%)
         </p>
         
         {/* Score breakdown */}
@@ -129,13 +129,13 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
               {sessionState.correctCount}
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">Correct</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">Benar</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">
               {sessionState.incorrectCount}
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">Incorrect</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">Salah</div>
           </div>
         </div>
 
@@ -143,7 +143,7 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
           href={`/decks/${deckId}`}
           className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
         >
-          Back to Deck
+          Kembali ke Dek
         </Link>
       </div>
     )
@@ -154,7 +154,7 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
       {/* Progress indicator (Requirement 2.7) */}
       <div className="mb-6 text-center" aria-live="polite">
         <span className="text-sm text-slate-600 dark:text-slate-400">
-          Question {sessionState.currentIndex + 1} of {totalCards}
+          Soal {sessionState.currentIndex + 1} dari {totalCards}
         </span>
         {/* Progress bar */}
         <div className="mt-2 w-full max-w-md mx-auto bg-slate-200 dark:bg-slate-700 rounded-full h-2">
@@ -185,10 +185,10 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
       {sessionState.isAnswered && (
         <div className="mt-6 flex flex-col items-center gap-2">
           <Button onClick={handleNextQuestion} size="lg">
-            {sessionState.currentIndex + 1 >= totalCards ? 'Finish Session' : 'Next Question'}
+            {sessionState.currentIndex + 1 >= totalCards ? 'Selesai' : 'Soal Berikutnya'}
           </Button>
           <span className="hidden sm:flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-            Press <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 font-mono text-[10px]">Enter</kbd> to continue
+            Tekan <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 font-mono text-[10px]">Enter</kbd> untuk melanjutkan
           </span>
         </div>
       )}
@@ -196,7 +196,7 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
       {/* Loading indicator */}
       {isLoading && (
         <div className="mt-4 text-center text-slate-500 dark:text-slate-400">
-          Submitting answer...
+          Mengirim jawaban...
         </div>
       )}
     </div>

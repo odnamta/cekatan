@@ -37,20 +37,20 @@ export function PDFUploadSection({ deckId, linkedSource }: PDFUploadSectionProps
       const result = await uploadSourceAction(formData)
 
       if (!result.ok) {
-        setError(result.error || 'Upload failed')
+        setError(result.error || 'Gagal mengunggah')
       } else if (result.data) {
         setCurrentSource(result.data.source)
       }
     } catch (err) {
       // Extract meaningful error message from the exception
       console.error('PDF upload error:', err)
-      let errorMessage = 'An unexpected error occurred'
+      let errorMessage = 'Terjadi kesalahan yang tidak terduga'
       if (err instanceof Error) {
         // Check for common Next.js/network errors
         if (err.message.includes('Body exceeded') || err.message.includes('413')) {
-          errorMessage = 'File too large. Maximum size is 50MB.'
+          errorMessage = 'File terlalu besar. Ukuran maksimal 50MB.'
         } else if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
-          errorMessage = 'Network error. Please check your connection and try again.'
+          errorMessage = 'Kesalahan jaringan. Periksa koneksi Anda dan coba lagi.'
         } else {
           errorMessage = err.message
         }
@@ -89,7 +89,7 @@ export function PDFUploadSection({ deckId, linkedSource }: PDFUploadSectionProps
           
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
-              Source PDF Linked
+              PDF Sumber Terhubung
             </h4>
             <p className="text-sm text-green-700 dark:text-green-300 font-medium truncate">
               {currentSource.title}
@@ -115,7 +115,7 @@ export function PDFUploadSection({ deckId, linkedSource }: PDFUploadSectionProps
         </div>
         
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-          Upload your PDF source document to reference while creating MCQs
+          Unggah dokumen PDF sumber Anda sebagai referensi saat membuat MCQ
         </p>
         
         {/* Hidden file input */}
@@ -134,7 +134,7 @@ export function PDFUploadSection({ deckId, linkedSource }: PDFUploadSectionProps
           disabled={isUploading}
           variant="secondary"
         >
-          {isUploading ? 'Uploading...' : 'Upload PDF'}
+          {isUploading ? 'Mengunggah...' : 'Unggah PDF'}
         </Button>
         
         {error && (
@@ -144,7 +144,7 @@ export function PDFUploadSection({ deckId, linkedSource }: PDFUploadSectionProps
         )}
         
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          PDF files only, max 50MB
+          Hanya file PDF, maks 50MB
         </p>
       </div>
     </div>

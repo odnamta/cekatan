@@ -122,7 +122,7 @@ export function GlobalStudySession({
   useEffect(() => {
     if (isComplete) {
       clearSessionState()
-      showToast('Great work today!', 'success')
+      showToast('Kerja bagus hari ini!', 'success')
     }
   }, [isComplete, showToast])
 
@@ -156,7 +156,7 @@ export function GlobalStudySession({
     const result = await rateCardAction(currentCard.id, rating)
 
     if (!result.ok) {
-      setError(result.error || 'Failed to rate card')
+      setError(result.error || 'Gagal menilai kartu')
       return
     }
 
@@ -199,7 +199,7 @@ export function GlobalStudySession({
     const result = await rateCardAction(currentCard.id, rating as 1 | 2 | 3 | 4)
 
     if (!result.ok) {
-      setError(result.error || 'Failed to rate card')
+      setError(result.error || 'Gagal menilai kartu')
     }
 
     // V8.2: Auto-advance after 2s delay if enabled (increased from 1.5s)
@@ -247,7 +247,7 @@ export function GlobalStudySession({
           
           {/* Auto-advance toggle */}
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Auto-advance</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Otomatis lanjut</span>
             <button
               type="button"
               role="switch"
@@ -303,14 +303,14 @@ export function GlobalStudySession({
             <div className="mt-6 flex justify-center">
               {isShowingFeedback && autoAdvance ? (
                 <span className="text-sm text-slate-500 dark:text-slate-400">
-                  Next card in 2s...
+                  Kartu berikutnya dalam 2 detik...
                 </span>
               ) : (
                 <button
                   onClick={handleMCQContinue}
                   className="min-h-[44px] px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Continue
+                  Lanjut
                 </button>
               )}
             </div>

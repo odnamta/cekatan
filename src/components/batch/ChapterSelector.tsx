@@ -84,12 +84,12 @@ export function ChapterSelector({
     
     const chapterNum = parseInt(newChapterNumber, 10)
     if (isNaN(chapterNum) || chapterNum <= 0) {
-      setError('Chapter number must be a positive integer')
+      setError('Nomor bab harus berupa bilangan positif')
       return
     }
 
     if (!newTitle.trim()) {
-      setError('Title is required')
+      setError('Judul wajib diisi')
       return
     }
 
@@ -117,7 +117,7 @@ export function ChapterSelector({
       setNewTitle('')
       setNewExpectedCount('')
     } else if (!result.ok) {
-      setError(result.error || 'Failed to create chapter')
+      setError(result.error || 'Gagal membuat bab')
     }
 
     setIsCreating(false)
@@ -145,12 +145,12 @@ export function ChapterSelector({
       >
         <span className={selectedChapter ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500'}>
           {isDisabled
-            ? 'Select a book first'
+            ? 'Pilih buku terlebih dahulu'
             : isLoading
             ? 'Memuat...'
             : selectedChapter
-            ? `Ch. ${selectedChapter.chapter_number}: ${selectedChapter.title}`
-            : 'Select a chapter...'}
+            ? `Bab ${selectedChapter.chapter_number}: ${selectedChapter.title}`
+            : 'Pilih bab...'}
         </span>
         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -168,7 +168,7 @@ export function ChapterSelector({
             className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Create New Chapter
+            Buat Bab Baru
           </button>
 
           {/* Divider */}
@@ -183,7 +183,7 @@ export function ChapterSelector({
               onClick={() => handleSelect(null)}
               className="w-full px-3 py-2 text-left text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
-              Clear selection
+              Hapus pilihan
             </button>
           )}
 
@@ -198,11 +198,11 @@ export function ChapterSelector({
               }`}
             >
               <div className="text-slate-900 dark:text-slate-100">
-                Ch. {chapter.chapter_number}: {chapter.title}
+                Bab {chapter.chapter_number}: {chapter.title}
               </div>
               {chapter.expected_question_count && (
                 <div className="text-xs text-slate-500">
-                  Expected: {chapter.expected_question_count} questions
+                  Target: {chapter.expected_question_count} soal
                 </div>
               )}
             </button>
@@ -210,7 +210,7 @@ export function ChapterSelector({
 
           {chapters.length === 0 && (
             <div className="px-3 py-2 text-sm text-slate-500">
-              No chapters yet. Create one to get started.
+              Belum ada bab. Buat satu untuk memulai.
             </div>
           )}
         </div>
@@ -221,7 +221,7 @@ export function ChapterSelector({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-xl shadow-xl p-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-              Create New Chapter
+              Buat Bab Baru
             </h3>
 
             {error && (
@@ -233,7 +233,7 @@ export function ChapterSelector({
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Chapter Number *
+                  Nomor Bab *
                 </label>
                 <input
                   type="number"
@@ -260,7 +260,7 @@ export function ChapterSelector({
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Expected Question Count
+                  Target Jumlah Soal
                 </label>
                 <input
                   type="number"
@@ -271,7 +271,7 @@ export function ChapterSelector({
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Used for QA to detect missing questions
+                  Digunakan untuk QA mendeteksi soal yang hilang
                 </p>
               </div>
             </div>

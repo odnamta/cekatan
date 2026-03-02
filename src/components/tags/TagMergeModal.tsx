@@ -33,7 +33,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
 
   const handleMerge = async () => {
     if (!targetTagId) {
-      setError('Please select a target tag')
+      setError('Silakan pilih tag tujuan')
       return
     }
 
@@ -44,7 +44,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
       await onMerge(targetTagId)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Merge failed')
+      setError(err instanceof Error ? err.message : 'Gagal menggabungkan')
     } finally {
       setIsMerging(false)
     }
@@ -86,7 +86,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
         {/* Selected tags */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Tags to merge ({sourceTags.length} selected)
+            Tag untuk digabungkan ({sourceTags.length} dipilih)
           </label>
           <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
             {sourceTags.map(tag => (
@@ -102,7 +102,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
         {/* Target selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Merge into (select target)
+            Gabungkan ke (pilih target)
           </label>
           <select
             value={targetTagId}
@@ -128,7 +128,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-amber-800 dark:text-amber-300">
-                <p className="font-medium mb-1">This will:</p>
+                <p className="font-medium mb-1">Tindakan ini akan:</p>
                 <ul className="list-disc list-inside space-y-1 text-amber-700 dark:text-amber-400">
                   <li>
                     Move all cards from {tagsToMerge.length === 1 ? (

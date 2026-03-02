@@ -29,8 +29,9 @@ export const RoleProfileCard = memo(function RoleProfileCard({
       className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => onClick?.(profile)}
       role="button"
+      aria-label={profile.name}
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter') onClick?.(profile) }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(profile) } }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

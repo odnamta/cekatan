@@ -25,7 +25,7 @@ export function ImageDropZone({ onImageProcessed, disabled = false }: ImageDropZ
     setError(null)
     
     if (!isValidImageType(file)) {
-      setError('Please use JPEG, PNG, GIF, or WebP images')
+      setError('Gunakan gambar JPEG, PNG, GIF, atau WebP')
       return
     }
 
@@ -43,7 +43,7 @@ export function ImageDropZone({ onImageProcessed, disabled = false }: ImageDropZ
       onImageProcessed(processed)
     } catch (err) {
       console.error('Image processing error:', err)
-      setError('Failed to process image')
+      setError('Gagal memproses gambar')
       onImageProcessed(null)
     } finally {
       setIsProcessing(false)
@@ -104,14 +104,14 @@ export function ImageDropZone({ onImageProcessed, disabled = false }: ImageDropZ
       <div className="relative inline-block">
         <img
           src={preview}
-          alt="Selected image"
+          alt="Gambar yang dipilih"
           className="max-h-24 rounded-lg border border-slate-200 dark:border-slate-700"
         />
         <button
           type="button"
           onClick={handleClear}
           className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-          aria-label="Remove image"
+          aria-label="Hapus gambar"
         >
           <X className="w-3 h-3" />
         </button>
@@ -147,13 +147,13 @@ export function ImageDropZone({ onImageProcessed, disabled = false }: ImageDropZ
       {isProcessing ? (
         <>
           <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
-          <span className="text-xs text-slate-500">Processing...</span>
+          <span className="text-xs text-slate-500">Memproses...</span>
         </>
       ) : (
         <>
           <ImageIcon className="w-4 h-4 text-slate-400" />
           <span className="text-xs text-slate-500">
-            {error || 'Drop image or click to add'}
+            {error || 'Seret gambar atau klik untuk menambahkan'}
           </span>
         </>
       )}

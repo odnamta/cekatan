@@ -56,7 +56,7 @@ export function SingleCardPreviewModal({
       if (result.ok && result.data) {
         setCard(result.data)
       } else if (!result.ok) {
-        setError(result.error || 'Failed to load card')
+        setError(result.error || 'Gagal memuat kartu')
       }
 
       setIsLoading(false)
@@ -112,7 +112,7 @@ export function SingleCardPreviewModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <h2 id="preview-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Card Preview
+            Pratinjau Kartu
           </h2>
           <div className="flex items-center gap-2">
             {card && (
@@ -125,7 +125,7 @@ export function SingleCardPreviewModal({
             <button
               onClick={onClose}
               className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              aria-label="Close preview"
+              aria-label="Tutup pratinjau"
             >
               <X className="w-5 h-5 text-slate-500" />
             </button>
@@ -156,7 +156,7 @@ export function SingleCardPreviewModal({
               {/* Question/Stem */}
               <div>
                 <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
-                  Question
+                  Pertanyaan
                 </h3>
                 <div className="text-slate-900 dark:text-slate-100">
                   <MarkdownContent content={card.stem} />
@@ -167,7 +167,7 @@ export function SingleCardPreviewModal({
               {card.options && card.options.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
-                    Options
+                    Pilihan
                   </h3>
                   <div className="space-y-2">
                     {card.options.map((option, index) => (
@@ -205,7 +205,7 @@ export function SingleCardPreviewModal({
               {card.explanation && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                   <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
-                    Explanation
+                    Penjelasan
                   </h3>
                   <div className="text-blue-700 dark:text-blue-200 text-sm">
                     <MarkdownContent content={card.explanation} />

@@ -56,7 +56,7 @@ export function OnboardingModal({ isOpen, userName, onComplete }: OnboardingModa
       onComplete?.();
       router.push('/dashboard');
     } catch {
-      setError('Failed to save. Please try again.');
+      setError('Gagal menyimpan. Silakan coba lagi.');
       setIsLoading(false);
     }
   }
@@ -77,14 +77,14 @@ export function OnboardingModal({ isOpen, userName, onComplete }: OnboardingModa
         <div className="text-center">
           <div className="text-5xl mb-4">👋</div>
           <h2 className="text-2xl font-semibold text-slate-900 mb-2">
-            Welcome to Cekatan
+            Selamat Datang di Cekatan
           </h2>
-          <p className="text-slate-600 mb-6">Confirm your display name to get started</p>
+          <p className="text-slate-600 mb-6">Konfirmasi nama tampilan Anda untuk memulai</p>
           <input
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Your name"
+            placeholder="Nama Anda"
             className="w-full p-3 border border-slate-200 rounded-lg mb-6 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <Button
@@ -93,7 +93,7 @@ export function OnboardingModal({ isOpen, userName, onComplete }: OnboardingModa
             disabled={!displayName.trim()}
             className="w-full"
           >
-            Get Started
+            Mulai
           </Button>
         </div>
       </div>

@@ -52,11 +52,11 @@ export function EditableDeckTitle({ deckId, initialTitle }: EditableDeckTitlePro
     
     // Validate
     if (!trimmed) {
-      showToast('Title cannot be empty', 'error')
+      showToast('Judul tidak boleh kosong', 'error')
       return
     }
     if (trimmed.length > 100) {
-      showToast('Title must be at most 100 characters', 'error')
+      showToast('Judul maksimal 100 karakter', 'error')
       return
     }
     
@@ -76,18 +76,18 @@ export function EditableDeckTitle({ deckId, initialTitle }: EditableDeckTitlePro
       
       if (result.ok) {
         setState('viewing')
-        showToast('Title updated', 'success')
+        showToast('Judul diperbarui', 'success')
       } else {
         // Revert on error
         setTitle(previousTitle)
         setState('viewing')
-        showToast(result.error || 'Failed to update title', 'error')
+        showToast(result.error || 'Gagal memperbarui judul', 'error')
       }
     } catch {
       // Revert on error
       setTitle(previousTitle)
       setState('viewing')
-      showToast('Failed to update title', 'error')
+      showToast('Gagal memperbarui judul', 'error')
     }
   }
 

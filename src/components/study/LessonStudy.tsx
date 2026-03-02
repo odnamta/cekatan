@@ -75,7 +75,7 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
     setIsLoading(false)
 
     if (!result.ok) {
-      setError(result.error || 'Failed to submit answer')
+      setError(result.error || 'Gagal mengirim jawaban')
       return
     }
 
@@ -110,7 +110,7 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
     setIsLoading(false)
 
     if (!result.ok) {
-      setError(result.error || 'Failed to rate card')
+      setError(result.error || 'Gagal menilai kartu')
       return
     }
 
@@ -152,7 +152,7 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
     return (
       <div className="text-center py-8">
         <p className="text-slate-600 dark:text-slate-400">
-          This lesson has no items yet.
+          Pelajaran ini belum memiliki item.
         </p>
       </div>
     )
@@ -163,7 +163,7 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
       {/* Progress indicator */}
       <div className="mb-6 text-center">
         <span className="text-sm text-slate-600 dark:text-slate-400">
-          Question {state.currentIndex + 1} of {totalItems}
+          Soal {state.currentIndex + 1} dari {totalItems}
         </span>
         {/* Progress bar */}
         <div className="mt-2 w-full max-w-md mx-auto bg-slate-200 dark:bg-slate-700 rounded-full h-2">
@@ -223,7 +223,7 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
       {state.isAnswered && (
         <div className="mt-6 flex justify-center">
           <Button onClick={handleNext} size="lg">
-            {state.currentIndex + 1 >= totalItems ? 'Finish Lesson' : 'Next'}
+            {state.currentIndex + 1 >= totalItems ? 'Selesai' : 'Berikutnya'}
           </Button>
         </div>
       )}
@@ -231,7 +231,7 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
       {/* Loading indicator */}
       {isLoading && (
         <div className="mt-4 text-center text-slate-500 dark:text-slate-400">
-          Processing...
+          Memproses...
         </div>
       )}
     </div>

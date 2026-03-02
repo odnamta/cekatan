@@ -45,16 +45,16 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
     } else {
       switch (result.error) {
         case 'NOT_CONFIGURED':
-          setError('AI is not configured. Please set OPENAI_API_KEY in .env.local')
+          setError('AI belum dikonfigurasi. Silakan atur OPENAI_API_KEY di .env.local')
           break
         case 'AUTH_ERROR':
-          setError('Authentication required')
+          setError('Autentikasi diperlukan')
           break
         case 'PARSE_ERROR':
-          setError('Failed to parse AI response. Please try again.')
+          setError('Gagal memproses respons AI. Silakan coba lagi.')
           break
         default:
-          setError('AI service unavailable. Please try again later.')
+          setError('Layanan AI tidak tersedia. Silakan coba lagi nanti.')
       }
     }
   }
@@ -141,10 +141,10 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
       <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
         <div>
           <h3 className="font-medium text-slate-900 dark:text-white">
-            AI-Powered Tag Cleanup
+            Pembersihan Tag dengan AI
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Automatically identify typos, synonyms, and casing issues
+            Identifikasi otomatis typo, sinonim, dan masalah huruf besar/kecil
           </p>
         </div>
         
@@ -157,12 +157,12 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
           {isAnalyzing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Analyzing...
+              Menganalisis...
             </>
           ) : (
             <>
               <Sparkles className="w-4 h-4" />
-              Analyze Tags
+              Analisis Tag
             </>
           )}
         </button>
@@ -181,10 +181,10 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
         <div className="text-center py-12">
           <Check className="w-12 h-12 text-green-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900 dark:text-white">
-            All tags look clean!
+            Semua tag sudah bersih!
           </h3>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            No duplicates, typos, or synonyms detected.
+            Tidak ditemukan duplikat, typo, atau sinonim.
           </p>
         </div>
       )}
@@ -199,10 +199,10 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
                 onClick={toggleSelectAll}
                 className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
               >
-                {selectedGroups.size === suggestions.length ? 'Deselect All' : 'Select All'}
+                {selectedGroups.size === suggestions.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
               </button>
               <span className="text-sm text-slate-500 dark:text-slate-400">
-                {selectedGroups.size} of {suggestions.length} selected
+                {selectedGroups.size} dari {suggestions.length} dipilih
               </span>
             </div>
             
@@ -215,12 +215,12 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
               {isMerging ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Merging...
+                  Menggabungkan...
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Approve Selected
+                  Setujui yang Dipilih
                 </>
               )}
             </button>
@@ -244,7 +244,7 @@ export function SmartCleanupTab({ onMergeComplete }: SmartCleanupTabProps) {
       {suggestions === null && !error && !isAnalyzing && (
         <div className="text-center py-12 text-slate-500 dark:text-slate-400">
           <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>Click &quot;Analyze Tags&quot; to scan for duplicates and typos</p>
+          <p>Klik &quot;Analisis Tag&quot; untuk memindai duplikat dan typo</p>
         </div>
       )}
     </div>
@@ -288,7 +288,7 @@ function MergeGroupCard({ group, isSelected, onToggle }: MergeGroupCardProps) {
               {group.masterTagName}
             </span>
             <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
-              Keep
+              Pertahankan
             </span>
           </div>
 

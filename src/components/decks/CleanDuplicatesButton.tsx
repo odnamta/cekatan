@@ -30,17 +30,17 @@ export function CleanDuplicatesButton({ deckId }: CleanDuplicatesButtonProps) {
       if (result.ok) {
         const deletedCount = result.data?.deletedCount ?? 0
         if (deletedCount === 0) {
-          showToast('No duplicate cards found', 'info')
+          showToast('Tidak ditemukan kartu duplikat', 'info')
         } else {
           showToast(`Removed ${deletedCount} duplicate card${deletedCount === 1 ? '' : 's'}`, 'success')
           router.refresh()
         }
       } else {
-        showToast(result.error || 'Failed to clean duplicates', 'error')
+        showToast(result.error || 'Gagal membersihkan duplikat', 'error')
       }
     } catch (err) {
       console.error('Clean duplicates error:', err)
-      showToast('An error occurred', 'error')
+      showToast('Terjadi kesalahan', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -57,12 +57,12 @@ export function CleanDuplicatesButton({ deckId }: CleanDuplicatesButtonProps) {
       {isLoading ? (
         <>
           <Loader2 className="w-4 h-4 animate-spin" />
-          Cleaning...
+          Membersihkan...
         </>
       ) : (
         <>
           <Trash2 className="w-4 h-4" />
-          Clean Duplicates
+          Bersihkan Duplikat
         </>
       )}
     </Button>

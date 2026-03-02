@@ -20,12 +20,12 @@ export function DeckBrowseCard({ deck, onSubscribeSuccess }: DeckBrowseCardProps
     startTransition(async () => {
       const result = await subscribeToDeck(deck.id)
       if (result.ok) {
-        showToast(`Added "${deck.title}" to your library!`, 'success')
+        showToast(`"${deck.title}" ditambahkan ke perpustakaan Anda!`, 'success')
         if (onSubscribeSuccess) {
           onSubscribeSuccess()
         }
       } else {
-        showToast(result.error || 'Failed to subscribe', 'error')
+        showToast(result.error || 'Gagal berlangganan', 'error')
       }
     })
   }
@@ -39,7 +39,7 @@ export function DeckBrowseCard({ deck, onSubscribeSuccess }: DeckBrowseCardProps
           </h3>
           {deck.isAuthor && (
             <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
-              Created by you
+              Dibuat oleh Anda
             </span>
           )}
         </div>
@@ -52,13 +52,13 @@ export function DeckBrowseCard({ deck, onSubscribeSuccess }: DeckBrowseCardProps
         
         <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-700">
           <span className="text-sm text-slate-500 dark:text-slate-400">
-            {deck.card_count} {deck.card_count === 1 ? 'card' : 'cards'}
+            {deck.card_count} kartu
           </span>
           
           {deck.isSubscribed ? (
             <Link href="/library/my">
               <Button variant="ghost" size="sm">
-                Go to My Library
+                Ke Perpustakaan Saya
               </Button>
             </Link>
           ) : (
@@ -68,7 +68,7 @@ export function DeckBrowseCard({ deck, onSubscribeSuccess }: DeckBrowseCardProps
               onClick={handleSubscribe}
               disabled={isPending}
             >
-              {isPending ? 'Adding...' : 'Add to My Studies'}
+              {isPending ? 'Menambahkan...' : 'Tambah ke Studi Saya'}
             </Button>
           )}
         </div>

@@ -81,7 +81,7 @@ function EditableTagItem({
 
     // Validate: reject empty names
     if (!trimmedValue) {
-      setError('Tag name cannot be empty')
+      setError('Nama tag wajib diisi')
       return
     }
 
@@ -108,7 +108,7 @@ function EditableTagItem({
         setError(result.error)
       }
     } catch {
-      setError('Failed to rename tag')
+      setError('Gagal mengubah nama tag')
     } finally {
       setIsSaving(false)
     }

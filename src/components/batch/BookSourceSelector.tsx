@@ -54,7 +54,7 @@ export function BookSourceSelector({
 
   const handleCreateNew = async () => {
     if (!newTitle.trim()) {
-      setError('Title is required')
+      setError('Judul wajib diisi')
       return
     }
 
@@ -75,7 +75,7 @@ export function BookSourceSelector({
       setNewEdition('')
       setNewSpecialty('')
     } else if (!result.ok) {
-      setError(result.error || 'Failed to create book source')
+      setError(result.error || 'Gagal membuat sumber buku')
     }
 
     setIsCreating(false)
@@ -101,7 +101,7 @@ export function BookSourceSelector({
         className="w-full flex items-center justify-between px-3 py-2 text-left bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg hover:border-slate-400 dark:hover:border-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
       >
         <span className={selectedBook ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500'}>
-          {selectedBook ? `${selectedBook.title}${selectedBook.edition ? ` (${selectedBook.edition})` : ''}` : 'Select a book...'}
+          {selectedBook ? `${selectedBook.title}${selectedBook.edition ? ` (${selectedBook.edition})` : ''}` : 'Pilih buku...'}
         </span>
         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -119,7 +119,7 @@ export function BookSourceSelector({
             className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Create New Book
+            Buat Buku Baru
           </button>
 
           {/* Divider */}
@@ -134,7 +134,7 @@ export function BookSourceSelector({
               onClick={() => handleSelect(null)}
               className="w-full px-3 py-2 text-left text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
-              Clear selection
+              Hapus pilihan
             </button>
           )}
 
@@ -159,7 +159,7 @@ export function BookSourceSelector({
 
           {bookSources.length === 0 && (
             <div className="px-3 py-2 text-sm text-slate-500">
-              No books yet. Create one to get started.
+              Belum ada buku. Buat satu untuk memulai.
             </div>
           )}
         </div>
@@ -170,7 +170,7 @@ export function BookSourceSelector({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-xl shadow-xl p-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-              Create New Book Source
+              Buat Sumber Buku Baru
             </h3>
 
             {error && (
@@ -228,10 +228,10 @@ export function BookSourceSelector({
                   setError(null)
                 }}
               >
-                Cancel
+                Batal
               </Button>
               <Button onClick={handleCreateNew} loading={isCreating}>
-                Create
+                Buat
               </Button>
             </div>
           </div>

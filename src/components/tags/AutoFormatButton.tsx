@@ -25,7 +25,7 @@ export function AutoFormatButton({ onComplete, className = '' }: AutoFormatButto
 
       if (result.ok) {
         if (result.updated === 0 && result.skipped.length === 0) {
-          showToast('All tags are already formatted', 'info')
+          showToast('Semua tag sudah terformat', 'info')
         } else {
           let message = `Formatted ${result.updated} tag${result.updated !== 1 ? 's' : ''}`
           if (result.skipped.length > 0) {
@@ -38,7 +38,7 @@ export function AutoFormatButton({ onComplete, className = '' }: AutoFormatButto
         showToast(result.error, 'error')
       }
     } catch {
-      showToast('Failed to auto-format tags', 'error')
+      showToast('Gagal memformat tag otomatis', 'error')
     } finally {
       setIsFormatting(false)
     }

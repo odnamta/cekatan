@@ -31,8 +31,9 @@ export const SkillDomainCard = memo(function SkillDomainCard({
       className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => onClick?.(domain)}
       role="button"
+      aria-label={domain.name}
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter') onClick?.(domain) }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(domain) } }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

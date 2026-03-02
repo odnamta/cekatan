@@ -70,7 +70,7 @@ export function SearchBar({ onResultClick }: SearchBarProps) {
       setResults(result.data.results)
       setIsOpen(true)
     } else if (!result.ok) {
-      setError(result.error || 'Search failed')
+      setError(result.error || 'Gagal mencari')
       setResults([])
     }
 
@@ -113,9 +113,9 @@ export function SearchBar({ onResultClick }: SearchBarProps) {
           value={query}
           onChange={(e) => handleInputChange(e.target.value)}
           onFocus={() => query.trim() && results.length > 0 && setIsOpen(true)}
-          placeholder="Search cards, decks, assessments..."
+          placeholder="Cari kartu, dek, asesmen..."
           className="w-full pl-10 pr-10 py-2 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-slate-100"
-          aria-label="Search cards, decks, and assessments"
+          aria-label="Cari kartu, dek, dan asesmen"
           aria-expanded={isOpen}
           aria-haspopup="listbox"
         />
@@ -127,7 +127,7 @@ export function SearchBar({ onResultClick }: SearchBarProps) {
             <button
               onClick={handleClear}
               className="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
-              aria-label="Clear search"
+              aria-label="Hapus pencarian"
             >
               <X className="w-4 h-4 text-slate-400" />
             </button>

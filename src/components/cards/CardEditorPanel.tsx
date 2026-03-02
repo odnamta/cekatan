@@ -50,6 +50,7 @@ export function CardEditorPanel({
   const [correctIndex, setCorrectIndex] = useState(0)
   const [explanation, setExplanation] = useState('')
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [tagsError, setTagsError] = useState(false)
 
   const isLastCard = currentIndex >= cardIds.length - 1
   const isFirstCard = currentIndex <= 0
@@ -63,9 +64,10 @@ export function CardEditorPanel({
       setExplanation(card.explanation || '')
       
       // Load tags
+      setTagsError(false)
       getCardTags(card.id).then(tags => {
         setSelectedTagIds(tags.map(t => t.id))
-      }).catch(() => { /* tag load failure is non-critical */ })
+      }).catch(() => { setTagsError(true) })
     }
   }, [card])
 
@@ -260,6 +262,9 @@ export function CardEditorPanel({
                   selectedTagIds={selectedTagIds}
                   onChange={setSelectedTagIds}
                 />
+                {tagsError && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Gagal memuat tag</p>
+                )}
               </div>
             </>
           ) : (

@@ -82,18 +82,18 @@ export function EditableDeckSubject({ deckId, initialSubject }: EditableDeckSubj
       
       if (result.ok) {
         setState('viewing')
-        showToast('Subject updated', 'success')
+        showToast('Subjek diperbarui', 'success')
       } else {
         // Revert on error
         setSubject(previousSubject)
         setState('viewing')
-        showToast(result.error || 'Failed to update subject', 'error')
+        showToast(result.error || 'Gagal memperbarui subjek', 'error')
       }
     } catch {
       // Revert on error
       setSubject(previousSubject)
       setState('viewing')
-      showToast('Failed to update subject', 'error')
+      showToast('Gagal memperbarui subjek', 'error')
     }
   }
 

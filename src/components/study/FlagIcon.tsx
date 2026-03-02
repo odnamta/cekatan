@@ -55,7 +55,7 @@ export function FlagIcon({
       if (!result.ok) {
         // Rollback on error
         setIsFlagged(previousState)
-        setError(result.error || 'Failed to update flag')
+        setError(result.error || 'Gagal memperbarui penanda')
         return
       }
 
@@ -79,9 +79,9 @@ export function FlagIcon({
         ${isPending ? 'opacity-50 cursor-wait' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}
         focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800
       `}
-      aria-label={isFlagged ? 'Remove flag' : 'Flag card'}
+      aria-label={isFlagged ? 'Hapus penanda' : 'Tandai kartu'}
       aria-pressed={isFlagged}
-      title={error || (isFlagged ? 'Flagged for review' : 'Flag for later')}
+      title={error || (isFlagged ? 'Ditandai untuk ditinjau' : 'Tandai untuk nanti')}
     >
       <Bookmark
         className={`${sizeClasses[size]} ${isFlagged ? 'fill-current' : ''}`}

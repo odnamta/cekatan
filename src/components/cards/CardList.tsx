@@ -228,7 +228,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     } catch (error) {
       dispatch({ type: 'SELECT_ALL_IN_DECK_FAIL' })
       console.error('Failed to select all cards:', error)
-      showToast('Failed to select all cards', 'error')
+      showToast('Gagal memilih semua kartu', 'error')
     }
   }
 
@@ -270,7 +270,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       showToast('Card deleted', 'success')
       router.refresh()
     } else {
-      showToast(result.error || 'Could not delete card', 'error')
+      showToast(result.error || 'Gagal menghapus kartu', 'error')
     }
   }
 
@@ -280,7 +280,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       showToast('Card duplicated', 'success')
       router.refresh()
     } else {
-      showToast(result.error || 'Could not duplicate card', 'error')
+      showToast(result.error || 'Gagal menduplikasi kartu', 'error')
     }
   }
 
@@ -297,7 +297,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       clearSelection()
       router.refresh()
     } else {
-      showToast(result.error || 'Could not delete cards', 'error')
+      showToast(result.error || 'Gagal menghapus kartu', 'error')
     }
   }
 
@@ -309,7 +309,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       clearSelection()
       router.refresh()
     } else {
-      showToast(result.error || 'Could not move cards', 'error')
+      showToast(result.error || 'Gagal memindahkan kartu', 'error')
     }
   }
 
@@ -335,8 +335,8 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   if (cards.length === 0) {
     return (
       <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
-        <p className="text-slate-600 dark:text-slate-400">No cards yet</p>
-        <p className="text-slate-500 text-sm mt-1">Add your first card using the form above!</p>
+        <p className="text-slate-600 dark:text-slate-400">Belum ada kartu</p>
+        <p className="text-slate-500 text-sm mt-1">Tambahkan kartu pertama Anda menggunakan formulir di atas!</p>
       </div>
     )
   }
@@ -356,10 +356,10 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         clearSelection()
         router.refresh()
       } else {
-        showToast(result.error || 'Failed to publish cards', 'error')
+        showToast(result.error || 'Gagal menerbitkan kartu', 'error')
       }
     } catch {
-      showToast('Failed to publish cards', 'error')
+      showToast('Gagal menerbitkan kartu', 'error')
     } finally {
       dispatch({ type: 'SET_IS_PUBLISHING', publishing: false })
     }
@@ -377,10 +377,10 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         dispatch({ type: 'SET_STATUS_FILTER', filter: 'published' })
         router.refresh()
       } else {
-        showToast(result.error || 'Failed to publish cards', 'error')
+        showToast(result.error || 'Gagal menerbitkan kartu', 'error')
       }
     } catch {
-      showToast('Failed to publish cards', 'error')
+      showToast('Gagal menerbitkan kartu', 'error')
     } finally {
       dispatch({ type: 'SET_IS_PUBLISHING', publishing: false })
     }
@@ -439,7 +439,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
           type="text"
           value={searchQuery}
           onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', query: e.target.value })}
-          placeholder="Search cards by stem, options, explanation..."
+          placeholder="Cari kartu berdasarkan soal, pilihan, penjelasan..."
           className="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {searchQuery && (
@@ -485,7 +485,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       {allTags.length > 0 && (
         <div className="mb-4">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Filter by tags
+            Filter berdasarkan tag
           </label>
           <TagSelector
             selectedTagIds={filterTagIds}
@@ -532,7 +532,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
             onClick={selectedIds.size === filteredCards.length ? clearSelection : selectAll}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
-            {selectedIds.size === filteredCards.length ? 'Deselect all' : 'Select all'}
+            {selectedIds.size === filteredCards.length ? 'Batal pilih semua' : 'Pilih semua'}
           </button>
           {/* V9.1: Select All in Deck button for bulk operations */}
           {isAuthor && cards.length > filteredCards.length && (
@@ -547,7 +547,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
                   Memuat...
                 </>
               ) : (
-                'Select all in deck'
+                'Pilih semua di dek'
               )}
             </button>
           )}
@@ -566,13 +566,13 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       {filteredCards.length === 0 && (filterTagIds.length > 0 || searchQuery.trim()) && (
         <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
           <p className="text-slate-600 dark:text-slate-400">
-            {searchQuery.trim() ? `No cards match "${searchQuery}"` : 'No cards match the selected tags'}
+            {searchQuery.trim() ? `Tidak ada kartu yang cocok dengan "${searchQuery}"` : 'Tidak ada kartu yang cocok dengan tag yang dipilih'}
           </p>
           <button
             onClick={() => dispatch({ type: 'CLEAR_FILTERS' })}
             className="text-blue-600 dark:text-blue-400 text-sm mt-2 hover:underline"
           >
-            Clear filters
+            Hapus filter
           </button>
         </div>
       )}

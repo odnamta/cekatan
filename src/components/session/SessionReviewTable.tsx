@@ -85,11 +85,11 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
     startTransition(async () => {
       const result = await publishCards(Array.from(selectedIds))
       if (result.ok) {
-        setMessage({ type: 'success', text: `Published ${result.publishedCount} cards` })
+        setMessage({ type: 'success', text: `${result.publishedCount} kartu diterbitkan` })
         setSelectedIds(new Set())
         router.refresh()
       } else {
-        setMessage({ type: 'error', text: result.error?.message || 'Failed to publish' })
+        setMessage({ type: 'error', text: result.error?.message || 'Gagal menerbitkan' })
       }
       setTimeout(() => setMessage(null), 3000)
     })
@@ -101,11 +101,11 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
     startTransition(async () => {
       const result = await archiveCards(Array.from(selectedIds))
       if (result.ok) {
-        setMessage({ type: 'success', text: `Archived ${result.archivedCount} cards` })
+        setMessage({ type: 'success', text: `${result.archivedCount} kartu diarsipkan` })
         setSelectedIds(new Set())
         router.refresh()
       } else {
-        setMessage({ type: 'error', text: result.error?.message || 'Failed to archive' })
+        setMessage({ type: 'error', text: result.error?.message || 'Gagal mengarsipkan' })
       }
       setTimeout(() => setMessage(null), 3000)
     })
@@ -115,10 +115,10 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
     startTransition(async () => {
       const result = await duplicateCard(cardId)
       if (result.ok) {
-        setMessage({ type: 'success', text: 'Card duplicated' })
+        setMessage({ type: 'success', text: 'Kartu diduplikasi' })
         router.refresh()
       } else {
-        setMessage({ type: 'error', text: result.error?.message || 'Failed to duplicate' })
+        setMessage({ type: 'error', text: result.error?.message || 'Gagal menduplikasi' })
       }
       setTimeout(() => setMessage(null), 3000)
     })
@@ -153,14 +153,14 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
       {/* Bulk actions bar */}
       <div className="flex items-center gap-3 mb-4 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
         <span className="text-sm text-slate-600 dark:text-slate-400">
-          {selectedIds.size} selected
+          {selectedIds.size} dipilih
         </span>
         <Button
           size="sm"
           onClick={handlePublish}
           disabled={selectedIds.size === 0 || isPending}
         >
-          Publish Selected
+          Terbitkan yang Dipilih
         </Button>
         <Button
           size="sm"
@@ -168,7 +168,7 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
           onClick={handleArchive}
           disabled={selectedIds.size === 0 || isPending}
         >
-          Archive Selected
+          Arsipkan yang Dipilih
         </Button>
       </div>
 
@@ -205,7 +205,7 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
                   Status {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </button>
               </th>
-              <th className="p-3 text-left">Actions</th>
+              <th className="p-3 text-left">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -243,7 +243,7 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
                       disabled={isPending}
                       className="text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                     >
-                      Duplicate
+                      Duplikasi
                     </button>
                   </div>
                 </td>
@@ -255,7 +255,7 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
 
       {cards.length === 0 && (
         <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-          No cards in this session
+          Tidak ada kartu di sesi ini
         </div>
       )}
     </div>
