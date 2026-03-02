@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     description: "Platform asesmen & pemetaan kompetensi",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Cekatan",
     description: "Platform asesmen & pemetaan kompetensi",
   },
