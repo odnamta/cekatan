@@ -44,7 +44,7 @@ const QuestionPreviewPanel = dynamic(() => import('./QuestionPreviewPanel'), {
 })
 
 export default function EditAssessmentPage() {
-  usePageTitle('Edit Assessment')
+  usePageTitle('Edit Asesmen')
   const { org, role } = useOrg()
   const router = useRouter()
   const params = useParams()
@@ -106,7 +106,7 @@ export default function EditAssessmentPage() {
   if (!isCreator) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center text-slate-500">
-        You do not have permission to edit assessments.
+        Anda tidak memiliki izin untuk mengedit asesmen.
       </div>
     )
   }
@@ -134,7 +134,7 @@ export default function EditAssessmentPage() {
     })
 
     if (result.ok) {
-      setSuccess('Changes saved')
+      setSuccess('Perubahan disimpan')
       if (result.data) setAssessment(result.data)
     } else if (!result.ok) {
       setError(result.error)
@@ -158,7 +158,7 @@ export default function EditAssessmentPage() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center text-slate-500">
-        Loading assessment...
+        Memuat asesmen...
       </div>
     )
   }
@@ -166,7 +166,7 @@ export default function EditAssessmentPage() {
   if (!assessment) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center text-slate-500">
-        Assessment not found.
+        Asesmen tidak ditemukan.
       </div>
     )
   }
@@ -176,14 +176,14 @@ export default function EditAssessmentPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <Breadcrumbs items={[
-        { label: 'Assessments', href: '/assessments' },
+        { label: 'Asesmen', href: '/assessments' },
         { label: assessment.title, href: `/assessments/${assessmentId}/analytics` },
         { label: 'Edit' },
       ]} />
 
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          Edit Assessment
+          Edit Asesmen
         </h1>
         <Badge variant={assessment.status === 'published' ? 'default' : 'secondary'}>
           {assessment.status}
@@ -192,7 +192,7 @@ export default function EditAssessmentPage() {
 
       {!isDraft && (
         <div className="mb-6 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm">
-          This assessment is {assessment.status}. Settings can only be changed while in draft status.
+          Asesmen ini berstatus {assessment.status}. Pengaturan hanya dapat diubah saat berstatus draf.
         </div>
       )}
 
@@ -210,7 +210,7 @@ export default function EditAssessmentPage() {
 
       <form onSubmit={handleSave} className="space-y-6">
         <Input
-          label="Assessment Title *"
+          label="Judul Asesmen *"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={!isDraft}
@@ -219,7 +219,7 @@ export default function EditAssessmentPage() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Description
+            Deskripsi
           </label>
           <textarea
             value={description}
@@ -232,7 +232,7 @@ export default function EditAssessmentPage() {
 
         <div className="grid grid-cols-3 gap-4">
           <Input
-            label="Time Limit (min)"
+            label="Batas Waktu (menit)"
             type="number"
             value={timeLimitMinutes}
             onChange={(e) => setTimeLimitMinutes(Number(e.target.value))}
@@ -241,7 +241,7 @@ export default function EditAssessmentPage() {
             max={480}
           />
           <Input
-            label="Pass Score (%)"
+            label="Skor Lulus (%)"
             type="number"
             value={passScore}
             onChange={(e) => setPassScore(Number(e.target.value))}
@@ -250,7 +250,7 @@ export default function EditAssessmentPage() {
             max={100}
           />
           <Input
-            label="Questions"
+            label="Pertanyaan"
             type="number"
             value={questionCount}
             onChange={(e) => setQuestionCount(Number(e.target.value))}
@@ -263,7 +263,7 @@ export default function EditAssessmentPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Max Attempts (blank = unlimited)
+              Percobaan Maksimal (kosong = tak terbatas)
             </label>
             <input
               type="number"
@@ -273,13 +273,13 @@ export default function EditAssessmentPage() {
               }
               disabled={!isDraft}
               min={1}
-              placeholder="Unlimited"
+              placeholder="Tak terbatas"
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Cooldown (minutes, blank = none)
+              Waktu Tunggu (menit, kosong = tidak ada)
             </label>
             <input
               type="number"
@@ -289,7 +289,7 @@ export default function EditAssessmentPage() {
               }
               disabled={!isDraft}
               min={1}
-              placeholder="No cooldown"
+              placeholder="Tidak ada"
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
@@ -299,7 +299,7 @@ export default function EditAssessmentPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Start Date (optional)
+              Tanggal Mulai (opsional)
             </label>
             <input
               type="datetime-local"
@@ -311,7 +311,7 @@ export default function EditAssessmentPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              End Date (optional)
+              Tanggal Akhir (opsional)
             </label>
             <input
               type="datetime-local"
@@ -333,7 +333,7 @@ export default function EditAssessmentPage() {
               className="rounded border-slate-300"
             />
             <span className="text-sm text-slate-700 dark:text-slate-300">
-              Shuffle question order
+              Acak urutan pertanyaan
             </span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
@@ -345,7 +345,7 @@ export default function EditAssessmentPage() {
               className="rounded border-slate-300"
             />
             <span className="text-sm text-slate-700 dark:text-slate-300">
-              Shuffle answer options
+              Acak opsi jawaban
             </span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
@@ -357,7 +357,7 @@ export default function EditAssessmentPage() {
               className="rounded border-slate-300"
             />
             <span className="text-sm text-slate-700 dark:text-slate-300">
-              Show results to candidates after completion
+              Tampilkan hasil kepada peserta setelah selesai
             </span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
@@ -369,7 +369,7 @@ export default function EditAssessmentPage() {
               className="rounded border-slate-300"
             />
             <span className="text-sm text-slate-700 dark:text-slate-300">
-              Allow candidates to review answers after completion
+              Izinkan peserta meninjau jawaban setelah selesai
             </span>
           </label>
         </div>

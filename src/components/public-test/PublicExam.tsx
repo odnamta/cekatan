@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle,
-  Flag, Loader2, Send,
+  Flag, Loader2, Send, XCircle, ExternalLink,
 } from 'lucide-react'
 import {
   getPublicQuestions,
@@ -33,6 +33,13 @@ type QuestionData = {
   flagged: boolean
 }
 
+type CompletionResult = {
+  score: number
+  passed: boolean
+  total: number
+  correct: number
+}
+
 type SessionStorageData = {
   sessionId: string
   sessionToken: string
@@ -46,7 +53,7 @@ type SessionStorageData = {
 export function PublicExam({ code }: { code: string }) {
   const router = useRouter()
 
-  const [phase, setPhase] = useState<'loading' | 'exam' | 'review' | 'submitting'>('loading')
+  const [phase, setPhase] = useState<'loading' | 'exam' | 'review' | 'submitting' | 'completed'>('loading')
   const [questions, setQuestions] = useState<QuestionData[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
@@ -55,6 +62,7 @@ export function PublicExam({ code }: { code: string }) {
   const [error, setError] = useState<string | null>(null)
   const [showTabWarning, setShowTabWarning] = useState(false)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
+  const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
 
   const sessionIdRef = useRef<string>('')
   const sessionTokenRef = useRef<string>('')
@@ -152,9 +160,13 @@ export function PublicExam({ code }: { code: string }) {
     if (!token) return
 
     const result = await completePublicSession(token)
-    if (result.ok) {
-      router.push('/t/' + code + '/results/' + encodeURIComponent(token))
-    } else {
+    if (result.ok && result.data) {
+      const resultsUrl = '/t/' + code + '/results/' + encodeURIComponent(token)
+      // Show inline results immediately, then attempt redirect
+      setCompletionResult(result.data)
+      setPhase('completed')
+      router.push(resultsUrl)
+    } else if (!result.ok) {
       setError(result.error ?? 'Gagal mengirim jawaban')
       setPhase('exam')
       completingRef.current = false
@@ -358,10 +370,13 @@ export function PublicExam({ code }: { code: string }) {
 
     const token = sessionTokenRef.current
     const result = await completePublicSession(token)
-    if (result.ok) {
-      router.push('/t/' + code + '/results/' + encodeURIComponent(token))
+    if (result.ok && result.data) {
+      const resultsUrl = '/t/' + code + '/results/' + encodeURIComponent(token)
+      setCompletionResult(result.data)
+      setPhase('completed')
+      router.push(resultsUrl)
     } else {
-      setError(result.error ?? 'Gagal mengirim jawaban')
+      setError(!result.ok ? result.error : 'Gagal mengirim jawaban')
       setPhase('review')
       completingRef.current = false
     }
@@ -410,6 +425,60 @@ export function PublicExam({ code }: { code: string }) {
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
           Jangan tutup halaman ini
+        </p>
+      </div>
+    )
+  }
+
+  // ------------------------------------------
+  // Completed state (inline fallback)
+  // ------------------------------------------
+  if (phase === 'completed' && completionResult) {
+    const resultsUrl = '/t/' + code + '/results/' + encodeURIComponent(sessionTokenRef.current)
+    return (
+      <div className="max-w-lg mx-auto px-4 py-12 text-center space-y-6">
+        <div
+          className={`rounded-xl p-8 ${
+            completionResult.passed
+              ? 'bg-green-50 dark:bg-green-950'
+              : 'bg-red-50 dark:bg-red-950'
+          }`}
+        >
+          {completionResult.passed ? (
+            <CheckCircle2 className="mx-auto mb-3 h-16 w-16 text-green-600 dark:text-green-400" />
+          ) : (
+            <XCircle className="mx-auto mb-3 h-16 w-16 text-red-600 dark:text-red-400" />
+          )}
+
+          <p className="text-5xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            {completionResult.score}%
+          </p>
+
+          <p
+            className={`text-lg font-semibold tracking-wide ${
+              completionResult.passed
+                ? 'text-green-700 dark:text-green-300'
+                : 'text-red-700 dark:text-red-300'
+            }`}
+          >
+            {completionResult.passed ? 'LULUS' : 'TIDAK LULUS'}
+          </p>
+
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+            {completionResult.correct} benar dari {completionResult.total} soal
+          </p>
+        </div>
+
+        <a
+          href={resultsUrl}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Lihat hasil lengkap
+        </a>
+
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Mengalihkan ke halaman hasil...
         </p>
       </div>
     )

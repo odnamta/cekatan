@@ -27,7 +27,7 @@ interface LessonData {
  * Requirements: 5.1
  */
 export default function LessonStudyPage({ params }: LessonStudyPageProps) {
-  usePageTitle('Lesson')
+  usePageTitle('Pelajaran')
   const router = useRouter()
   const [lessonId, setLessonId] = useState<string | null>(null)
   const [lessonData, setLessonData] = useState<LessonData | null>(null)

@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "seed": "npx tsx scripts/seed-data.ts",
     "seed:iq": "npx tsx scripts/seed-iq-test.ts",
+    "seed:iq-id": "npx tsx scripts/seed-iq-test-id.ts",
     "seed:sca": "npx tsx scripts/seed-sca-test.ts",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",

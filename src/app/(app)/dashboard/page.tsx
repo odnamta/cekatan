@@ -1,4 +1,4 @@
-export const metadata = { title: 'Dashboard' }
+export const metadata = { title: 'Dasbor' }
 
 import { getUser } from '@/lib/supabase/server'
 import { OrgStatsCard } from '@/components/dashboard/OrgStatsCard'

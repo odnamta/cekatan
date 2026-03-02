@@ -20,7 +20,7 @@ import { CandidateResultsView } from './CandidateResultsView'
 import { CreatorResultsView } from './CreatorResultsView'
 
 export default function AssessmentResultsPage() {
-  usePageTitle('Assessment Results')
+  usePageTitle('Hasil Asesmen')
   const { role } = useOrg()
   const params = useParams()
   const searchParams = useSearchParams()

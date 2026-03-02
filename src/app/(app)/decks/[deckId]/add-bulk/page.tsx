@@ -1,4 +1,4 @@
-export const metadata = { title: 'Bulk Import' }
+export const metadata = { title: 'Impor Massal' }
 
 import { notFound, redirect } from 'next/navigation'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'

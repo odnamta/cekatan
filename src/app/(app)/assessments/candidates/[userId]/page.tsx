@@ -86,7 +86,7 @@ type SkillScore = {
 }
 
 export default function CandidateProgressPage() {
-  usePageTitle('Candidate Details')
+  usePageTitle('Detail Peserta')
   const { role } = useOrg()
   const router = useRouter()
   const params = useParams()

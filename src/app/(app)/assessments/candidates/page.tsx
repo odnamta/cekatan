@@ -35,7 +35,7 @@ type AssessmentOption = {
 }
 
 export default function CandidateListPage() {
-  usePageTitle('Candidates')
+  usePageTitle('Peserta')
   const { role } = useOrg()
   const router = useRouter()
   const { showToast } = useToast()
@@ -117,7 +117,7 @@ export default function CandidateListPage() {
     if (result.ok && result.data) {
       const { notified, alreadyStarted } = result.data
       showToast(
-        `Assigned to ${notified} candidate${notified !== 1 ? 's' : ''}${alreadyStarted > 0 ? ` (${alreadyStarted} already started)` : ''}`,
+        `Ditugaskan ke ${notified} peserta${alreadyStarted > 0 ? ` (${alreadyStarted} sudah memulai)` : ''}`,
         'success'
       )
       setShowAssignModal(false)
@@ -129,6 +129,9 @@ export default function CandidateListPage() {
 
   function handleCsvImport(file: File) {
     const reader = new FileReader()
+    reader.onerror = () => {
+      showToast('Gagal membaca file', 'error')
+    }
     reader.onload = (e) => {
       const text = e.target?.result as string
       if (!text) return
@@ -153,7 +156,7 @@ export default function CandidateListPage() {
   if (!isCreator) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-500">
-        You do not have permission to view this page.
+        Anda tidak memiliki izin untuk melihat halaman ini.
       </div>
     )
   }
@@ -199,10 +202,10 @@ export default function CandidateListPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
-            Candidate Progress
+            Progres Peserta
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            {candidates.length} candidate{candidates.length !== 1 ? 's' : ''} in your organization
+            {candidates.length} peserta di organisasi Anda
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -240,7 +243,7 @@ export default function CandidateListPage() {
                   a.download = 'candidates.csv'
                   a.click()
                   URL.revokeObjectURL(url)
-                  showToast('CSV exported', 'success')
+                  showToast('CSV diekspor', 'success')
                 } else if (!result.ok) {
                   showToast(result.error, 'error')
                 }
@@ -257,18 +260,18 @@ export default function CandidateListPage() {
       {selectedIds.size > 0 && (
         <div className="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 flex items-center justify-between">
           <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-            {selectedIds.size} candidate{selectedIds.size !== 1 ? 's' : ''} selected
+            {selectedIds.size} peserta dipilih
           </span>
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={openAssignModal}>
               <Send className="h-4 w-4 mr-1" />
-              Assign Assessment
+              Tugaskan Asesmen
             </Button>
             <button
               onClick={() => setSelectedIds(new Set())}
               className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             >
-              Clear
+              Bersihkan
             </button>
           </div>
         </div>
@@ -279,8 +282,8 @@ export default function CandidateListPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <input
           type="text"
-          aria-label="Search candidates"
-          placeholder="Search by name or email..."
+          aria-label="Cari peserta"
+          placeholder="Cari berdasarkan nama atau email..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -335,7 +338,7 @@ export default function CandidateListPage() {
       {importResult && (
         <div className="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-900/10 text-sm">
           <p className="font-medium text-slate-800 dark:text-slate-200">
-            Import complete: {importResult.imported} added, {importResult.skipped} skipped
+            Impor selesai: {importResult.imported} ditambahkan, {importResult.skipped} dilewati
           </p>
           {importResult.errors.length > 0 && (
             <ul className="mt-1 text-xs text-red-600 dark:text-red-400 list-disc pl-4">
@@ -343,7 +346,7 @@ export default function CandidateListPage() {
                 <li key={i}>{err}</li>
               ))}
               {importResult.errors.length > 5 && (
-                <li>...and {importResult.errors.length - 5} more</li>
+                <li>...dan {importResult.errors.length - 5} lainnya</li>
               )}
             </ul>
           )}
@@ -351,7 +354,7 @@ export default function CandidateListPage() {
             onClick={() => setImportResult(null)}
             className="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
-            Dismiss
+            Tutup
           </button>
         </div>
       )}
@@ -365,7 +368,7 @@ export default function CandidateListPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-slate-500 dark:text-slate-400">
           <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
-          <p>{searchQuery || passFilter !== 'all' || roleFilter !== 'all' ? 'No candidates match your filters.' : 'No candidates in this organization yet.'}</p>
+          <p>{searchQuery || passFilter !== 'all' || roleFilter !== 'all' ? 'Tidak ada peserta yang cocok dengan filter.' : 'Belum ada peserta di organisasi ini.'}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -382,7 +385,7 @@ export default function CandidateListPage() {
               }`}>
                 {allVisibleSelected && <CheckSquare className="h-3 w-3" />}
               </div>
-              {allVisibleSelected ? 'Deselect all' : 'Select all'}
+              {allVisibleSelected ? 'Batal pilih semua' : 'Pilih semua'}
             </button>
           </div>
 
@@ -401,7 +404,7 @@ export default function CandidateListPage() {
                 <button
                   onClick={() => toggleSelect(c.userId)}
                   className="shrink-0"
-                  aria-label={`Select ${c.fullName || c.email}`}
+                  aria-label={`Pilih ${c.fullName || c.email}`}
                 >
                   <div className={`h-5 w-5 rounded border flex items-center justify-center transition-colors ${
                     isSelected
@@ -429,12 +432,12 @@ export default function CandidateListPage() {
                     <div className="flex items-center gap-4 text-xs text-slate-500 flex-shrink-0">
                       <span className="inline-flex items-center gap-1">
                         <TrendingUp className="h-3 w-3" />
-                        {c.totalCompleted} exams
+                        {c.totalCompleted} ujian
                       </span>
                       {c.totalCompleted > 0 && (
                         <span className="inline-flex items-center gap-1">
                           <Target className="h-3 w-3" />
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{c.avgScore}%</span> avg
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{c.avgScore}%</span> rata-rata
                         </span>
                       )}
                       {c.lastActiveAt && (
@@ -454,7 +457,7 @@ export default function CandidateListPage() {
               onClick={() => setDisplayLimit((l) => l + 30)}
               className="w-full py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
-              Show more ({filtered.length - displayLimit} remaining)
+              Tampilkan lebih ({filtered.length - displayLimit} tersisa)
             </button>
           )}
         </div>
@@ -466,7 +469,7 @@ export default function CandidateListPage() {
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Assign Assessment
+                Tugaskan Asesmen
               </h2>
               <button
                 onClick={() => setShowAssignModal(false)}
@@ -477,18 +480,18 @@ export default function CandidateListPage() {
             </div>
 
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Assign to {selectedIds.size} selected candidate{selectedIds.size !== 1 ? 's' : ''}.
-              Candidates who already started will be skipped.
+              Tugaskan ke {selectedIds.size} peserta yang dipilih.
+              Peserta yang sudah memulai akan dilewati.
             </p>
 
             {publishedAssessments.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
-                No published assessments available.
+                Tidak ada asesmen yang diterbitkan.
               </p>
             ) : (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Select Assessment
+                  Pilih Asesmen
                 </label>
                 <select
                   value={selectedAssessmentId}
@@ -515,7 +518,7 @@ export default function CandidateListPage() {
                 onClick={handleAssign}
                 disabled={assigning || !selectedAssessmentId || publishedAssessments.length === 0}
               >
-                {assigning ? 'Assigning...' : 'Assign'}
+                {assigning ? 'Menugaskan...' : 'Tugaskan'}
               </Button>
             </div>
           </div>

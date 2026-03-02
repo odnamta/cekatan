@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle2, XCircle, Target, Trophy, Clock } from 'lucide-react'
+import { CheckCircle2, XCircle, Target, Trophy, Clock, Info } from 'lucide-react'
 
 interface Props {
   code: string
@@ -15,6 +15,8 @@ interface Props {
     passScore: number
     completedAt: string | null
     certificateUrl: string | null
+    resultsHidden?: boolean
+    resultsHiddenMessage?: string
   }
 }
 
@@ -29,7 +31,42 @@ export function PublicResults({ code: _code, data }: Props) {
     timeLimitMinutes,
     passScore,
     certificateUrl,
+    resultsHidden,
+    resultsHiddenMessage,
   } = data
+
+  // Results hidden by organizer
+  if (resultsHidden) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-lg w-full space-y-6">
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+            {orgName}
+          </p>
+
+          <h1 className="text-center text-xl font-bold text-gray-900 dark:text-gray-100">
+            {assessmentTitle}
+          </h1>
+
+          <div className="rounded-xl p-8 text-center bg-gray-50 dark:bg-gray-900">
+            <Info className="mx-auto mb-3 h-16 w-16 text-gray-400 dark:text-gray-500" />
+
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Asesmen Selesai
+            </p>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {resultsHiddenMessage ?? 'Hasil asesmen ini tidak dapat ditampilkan. Hubungi penyelenggara untuk informasi lebih lanjut.'}
+            </p>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+            Hasil ini telah dicatat oleh {orgName}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">

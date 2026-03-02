@@ -42,7 +42,7 @@ const ALL_TYPES = [
 const PAGE_SIZE = 20
 
 export default function NotificationsPage() {
-  usePageTitle('Notifications')
+  usePageTitle('Notifikasi')
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [total, setTotal] = useState(0)

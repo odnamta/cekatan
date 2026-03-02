@@ -54,7 +54,7 @@ export default function SkillDetailPage() {
   const canLink = canLinkDeckToSkill(role)
   const isAdmin = canManageSkillDomains(role)
 
-  usePageTitle(domain?.name || 'Skill Detail')
+  usePageTitle(domain?.name || 'Detail Keterampilan')
 
   async function loadData() {
     setLoading(true)

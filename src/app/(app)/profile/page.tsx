@@ -23,7 +23,7 @@ const COMMON_TIMEZONES = [
  * Allows users to view/update profile, timezone, notification prefs, and assessment history.
  */
 export default function ProfilePage() {
-  usePageTitle('Profile')
+  usePageTitle('Profil')
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)

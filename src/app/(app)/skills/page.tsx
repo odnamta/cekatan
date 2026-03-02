@@ -47,7 +47,7 @@ interface SkillFormState {
 }
 
 export default function SkillsPage() {
-  usePageTitle('Skills')
+  usePageTitle('Keterampilan')
   const { org, role } = useOrg()
   const router = useRouter()
   const [domains, setDomains] = useState<SkillDomain[]>([])

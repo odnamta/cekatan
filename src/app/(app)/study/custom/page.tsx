@@ -1,4 +1,4 @@
-export const metadata = { title: 'Custom Study' }
+export const metadata = { title: 'Belajar Kustom' }
 
 import { redirect } from 'next/navigation'
 import Link from 'next/link'

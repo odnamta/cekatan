@@ -27,7 +27,7 @@ type QuestionItem = {
 }
 
 export default function QuestionBankPage() {
-  usePageTitle('Question Bank')
+  usePageTitle('Bank Soal')
   const { role } = useOrg()
   const router = useRouter()
   const isCreator = hasMinimumRole(role, 'creator')

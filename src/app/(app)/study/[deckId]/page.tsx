@@ -1,4 +1,4 @@
-export const metadata = { title: 'Flashcard Study' }
+export const metadata = { title: 'Belajar Flashcard' }
 
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'

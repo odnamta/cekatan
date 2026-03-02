@@ -58,7 +58,7 @@ interface EmployeeRow {
 
 export default function RoleProfileDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  usePageTitle('Role Detail')
+  usePageTitle('Detail Peran')
   const { role } = useOrg()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()

@@ -36,7 +36,7 @@ const DEFAULT_CONFIG: AssessmentTemplateConfig = {
 }
 
 export default function AssessmentTemplatesPage() {
-  usePageTitle('Assessment Templates')
+  usePageTitle('Template Asesmen')
   const { role } = useOrg()
   const [templates, setTemplates] = useState<AssessmentTemplate[]>([])
   const [loading, setLoading] = useState(true)

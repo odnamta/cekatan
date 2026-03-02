@@ -51,7 +51,7 @@ const ALL_ACTIONS: AuditAction[] = [
 const PAGE_SIZE = 30
 
 export default function AuditLogPage() {
-  usePageTitle('Audit Log')
+  usePageTitle('Log Audit')
   const { org, role } = useOrg()
   const router = useRouter()
   const isAdmin = hasMinimumRole(role, 'admin')

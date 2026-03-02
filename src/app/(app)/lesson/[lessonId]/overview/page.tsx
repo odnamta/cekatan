@@ -1,4 +1,4 @@
-export const metadata = { title: 'Lesson Overview' }
+export const metadata = { title: 'Ringkasan Pelajaran' }
 
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';

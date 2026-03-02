@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function OrgAnalyticsPage() {
-  usePageTitle('Organization Analytics')
+  usePageTitle('Analitik Organisasi')
   const { org, role } = useOrg()
   const router = useRouter()
   const isCreator = hasMinimumRole(role, 'creator')
@@ -45,7 +45,7 @@ export default function OrgAnalyticsPage() {
   if (!isCreator) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-500">
-        You do not have permission to view this page.
+        Anda tidak memiliki izin untuk melihat halaman ini.
       </div>
     )
   }
@@ -67,7 +67,7 @@ export default function OrgAnalyticsPage() {
   if (!data) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-500">
-        Failed to load analytics.
+        Gagal memuat analitik.
       </div>
     )
   }
@@ -85,23 +85,23 @@ export default function OrgAnalyticsPage() {
       </button>
 
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
-        Organization Analytics
+        Analitik Organisasi
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{org.name}</p>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={<BarChart3 className="h-5 w-5 text-blue-500" />} value={data.totalAssessments} label="Assessments" sub={`${data.publishedAssessments} published`} />
-        <StatCard icon={<Users className="h-5 w-5 text-purple-500" />} value={data.uniqueCandidates} label="Candidates" sub={`${data.totalSessions} total attempts`} />
-        <StatCard icon={<TrendingUp className="h-5 w-5 text-green-500" />} value={`${data.avgScore}%`} label="Avg Score" sub={`${data.completedSessions} completed`} />
-        <StatCard icon={<Target className="h-5 w-5 text-amber-500" />} value={`${data.avgPassRate}%`} label="Pass Rate" sub={`${data.timedOutSessions} timed out`} />
+        <StatCard icon={<BarChart3 className="h-5 w-5 text-blue-500" />} value={data.totalAssessments} label="Asesmen" sub={`${data.publishedAssessments} diterbitkan`} />
+        <StatCard icon={<Users className="h-5 w-5 text-purple-500" />} value={data.uniqueCandidates} label="Peserta" sub={`${data.totalSessions} total percobaan`} />
+        <StatCard icon={<TrendingUp className="h-5 w-5 text-green-500" />} value={`${data.avgScore}%`} label="Skor Rata-rata" sub={`${data.completedSessions} selesai`} />
+        <StatCard icon={<Target className="h-5 w-5 text-amber-500" />} value={`${data.avgPassRate}%`} label="Tingkat Kelulusan" sub={`${data.timedOutSessions} kehabisan waktu`} />
       </div>
 
       {/* Weekly Trend */}
       {data.weeklyTrend.some((w) => w.completions > 0) && (
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">
-            Weekly Activity (Last 12 Weeks)
+            Aktivitas Mingguan (12 Minggu Terakhir)
           </h2>
           <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
             <div className="flex items-end gap-1 h-32">
@@ -110,7 +110,7 @@ export default function OrgAnalyticsPage() {
                   <div
                     className="w-full bg-blue-500/80 dark:bg-blue-400/60 rounded-t transition-all"
                     style={{ height: `${(w.completions / maxCompletions) * 100}%`, minHeight: w.completions > 0 ? '4px' : '0px' }}
-                    title={`${w.completions} completions, avg ${w.avgScore}%`}
+                    title={`${w.completions} penyelesaian, rata-rata ${w.avgScore}%`}
                   />
                 </div>
               ))}
@@ -125,7 +125,7 @@ export default function OrgAnalyticsPage() {
             <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
               <span className="inline-flex items-center gap-1">
                 <div className="w-3 h-3 bg-blue-500/80 rounded" />
-                Completions
+                Penyelesaian
               </span>
             </div>
           </div>
@@ -136,29 +136,29 @@ export default function OrgAnalyticsPage() {
       {data.cohort && data.completedSessions > 0 && (
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">
-            Cohort Performance
+            Kinerja Kohort
           </h2>
 
           {/* Score Band Distribution */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-center">
               <div className="text-xl font-bold text-red-600 dark:text-red-400">{data.cohort.scoreDistribution.below40}</div>
-              <div className="text-xs text-red-500">&lt;40% (Struggling)</div>
+              <div className="text-xs text-red-500">&lt;40% (Kesulitan)</div>
             </div>
             <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-center">
               <div className="text-xl font-bold text-amber-600 dark:text-amber-400">{data.cohort.scoreDistribution.between40_70}</div>
-              <div className="text-xs text-amber-500">40-70% (Developing)</div>
+              <div className="text-xs text-amber-500">40-70% (Berkembang)</div>
             </div>
             <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-center">
               <div className="text-xl font-bold text-green-600 dark:text-green-400">{data.cohort.scoreDistribution.above70}</div>
-              <div className="text-xs text-green-500">&ge;70% (Proficient)</div>
+              <div className="text-xs text-green-500">&ge;70% (Mahir)</div>
             </div>
           </div>
 
           {/* Pass Rate Trend */}
           {data.cohort.passRateTrend.some((w) => w.passRate > 0) && (
             <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 mb-4">
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Pass Rate Trend</h3>
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tren Tingkat Kelulusan</h3>
               <div className="flex items-end gap-1 h-20">
                 {data.cohort.passRateTrend.map((w, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
@@ -184,7 +184,7 @@ export default function OrgAnalyticsPage() {
               <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1">
                   <TrendingUp className="h-4 w-4 text-green-500" />
-                  Top Performers
+                  Peserta Terbaik
                 </h3>
                 <div className="space-y-1.5">
                   {data.cohort.topPerformers.map((p, i) => (
@@ -203,7 +203,7 @@ export default function OrgAnalyticsPage() {
               <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Need Attention
+                  Perlu Perhatian
                 </h3>
                 <div className="space-y-1.5">
                   {data.cohort.bottomPerformers.map((p, i) => (
@@ -225,18 +225,18 @@ export default function OrgAnalyticsPage() {
       {data.assessmentStats.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">
-            Assessment Breakdown
+            Rincian Asesmen
           </h2>
           <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]" aria-label="Assessment breakdown">
+            <table className="w-full text-sm min-w-[600px]" aria-label="Rincian asesmen">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50 text-left">
-                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Assessment</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Asesmen</th>
                   <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Status</th>
-                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Attempts</th>
-                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Completed</th>
-                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Avg Score</th>
-                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Pass Rate</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Percobaan</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Selesai</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Skor Rata-rata</th>
+                  <th scope="col" className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-right">Tingkat Kelulusan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -275,7 +275,7 @@ export default function OrgAnalyticsPage() {
       {data.totalAssessments === 0 && (
         <div className="text-center py-16 text-slate-500 dark:text-slate-400">
           <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p className="text-lg font-medium">No assessments yet</p>
+          <p className="text-lg font-medium">Belum ada asesmen</p>
           <p className="mt-1">Buat asesmen untuk melihat analitik di sini.</p>
         </div>
       )}

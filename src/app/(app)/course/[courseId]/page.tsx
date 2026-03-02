@@ -1,4 +1,4 @@
-export const metadata = { title: 'Course' }
+export const metadata = { title: 'Kursus' }
 
 import { redirect, notFound } from 'next/navigation';
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server';

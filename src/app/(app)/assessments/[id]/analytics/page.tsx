@@ -58,7 +58,7 @@ type QuestionStat = {
 }
 
 export default function AssessmentAnalyticsPage() {
-  usePageTitle('Assessment Analytics')
+  usePageTitle('Analitik Asesmen')
   const { role } = useOrg()
   const router = useRouter()
   const params = useParams()

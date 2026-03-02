@@ -1,4 +1,4 @@
-export const metadata = { title: 'Tag Manager' }
+export const metadata = { title: 'Kelola Tag' }
 
 import { TagManager } from '@/components/tags/TagManager'
 

@@ -767,6 +767,8 @@ export async function getPublicResults(
   passScore: number
   completedAt: string | null
   certificateUrl: string | null
+  resultsHidden?: boolean
+  resultsHiddenMessage?: string
 }>> {
   try {
     const sessionId = verifySessionToken(sessionIdOrToken)
@@ -782,7 +784,7 @@ export async function getPublicResults(
       .select(`
         id, score, passed, completed_at, certificate_url, status,
         assessments!inner(
-          title, time_limit_minutes, pass_score, org_id,
+          title, time_limit_minutes, pass_score, show_results, org_id,
           organizations!inner(name)
         )
       `)
@@ -798,8 +800,30 @@ export async function getPublicResults(
       title: string
       time_limit_minutes: number
       pass_score: number
+      show_results: boolean
       org_id: string
       organizations: { name: string }
+    }
+
+    // If show_results is false, return limited result without scores
+    if (!assessmentInfo.show_results) {
+      return {
+        ok: true,
+        data: {
+          score: 0,
+          passed: false,
+          total: 0,
+          correct: 0,
+          assessmentTitle: assessmentInfo.title,
+          orgName: assessmentInfo.organizations.name,
+          timeLimitMinutes: assessmentInfo.time_limit_minutes,
+          passScore: assessmentInfo.pass_score,
+          completedAt: session.completed_at,
+          certificateUrl: null,
+          resultsHidden: true,
+          resultsHiddenMessage: 'Hasil asesmen ini tidak dapat ditampilkan. Hubungi penyelenggara untuk informasi lebih lanjut.',
+        },
+      }
     }
 
     // Count answers

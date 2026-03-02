@@ -14,5 +14,6 @@ export default async function PublicResultsPage({ params }: Props) {
     notFound()
   }
 
+  // Even if resultsHidden, we still render PublicResults (it handles the hidden state)
   return <PublicResults code={code} data={result.data} />
 }

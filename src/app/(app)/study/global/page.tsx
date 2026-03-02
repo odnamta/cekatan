@@ -1,4 +1,4 @@
-export const metadata = { title: 'Global Study' }
+export const metadata = { title: 'Belajar Global' }
 
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/supabase/server'

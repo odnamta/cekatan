@@ -1,4 +1,4 @@
-export const metadata = { title: 'My Library' }
+export const metadata = { title: 'Perpustakaan Saya' }
 
 import Link from 'next/link'
 import { getUserSubscribedDecks } from '@/actions/library-actions'

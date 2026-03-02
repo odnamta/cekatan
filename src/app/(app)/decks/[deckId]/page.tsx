@@ -1,4 +1,4 @@
-export const metadata = { title: 'Deck Details' }
+export const metadata = { title: 'Detail Dek' }
 
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'

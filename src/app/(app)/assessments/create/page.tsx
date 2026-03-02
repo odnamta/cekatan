@@ -52,7 +52,7 @@ const SaveTemplateSection = dynamic(() => import('./SaveTemplateSection'), {
 })
 
 export default function CreateAssessmentPage() {
-  usePageTitle('Create Assessment')
+  usePageTitle('Buat Asesmen')
   const { org, role } = useOrg()
   const router = useRouter()
   const isCreator = hasMinimumRole(role, 'creator')
