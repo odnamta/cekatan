@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/ui/Logo'
 import { DashboardMockup, AssessmentMockup } from '@/components/landing/Mockups'
 import {
@@ -23,6 +23,115 @@ const stagger = {
 }
 
 const spring = { type: 'spring' as const, stiffness: 80, damping: 20 }
+
+/* ─── 3D Tilt Card ─── */
+
+function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+
+  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [6, -6]), { stiffness: 200, damping: 20 })
+  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-6, 6]), { stiffness: 200, damping: 20 })
+
+  const handleMouse = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    x.set((e.clientX - rect.left) / rect.width - 0.5)
+    y.set((e.clientY - rect.top) / rect.height - 0.5)
+  }, [x, y])
+
+  const handleLeave = useCallback(() => {
+    x.set(0)
+    y.set(0)
+  }, [x, y])
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={handleMouse}
+      onMouseLeave={handleLeave}
+      style={{ rotateX, rotateY, transformPerspective: 800 }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+/* ─── Controlled FAQ Item ─── */
+
+function FAQItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="border-b border-slate-200 dark:border-slate-800 last:border-b-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full py-5 text-left font-medium text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+      >
+        {q}
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="shrink-0 ml-4"
+        >
+          <ChevronDown className="h-5 w-5 text-slate-400" />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="pb-5 text-slate-600 dark:text-slate-400 leading-relaxed pr-8">
+              {a}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ─── Magnetic Button ─── */
+
+function MagneticButton({ children, className = '', href }: { children: React.ReactNode; className?: string; href: string }) {
+  const ref = useRef<HTMLAnchorElement>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const springX = useSpring(x, { stiffness: 150, damping: 15 })
+  const springY = useSpring(y, { stiffness: 150, damping: 15 })
+
+  const handleMouse = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    x.set((e.clientX - rect.left - rect.width / 2) * 0.3)
+    y.set((e.clientY - rect.top - rect.height / 2) * 0.3)
+  }, [x, y])
+
+  const handleLeave = useCallback(() => {
+    x.set(0)
+    y.set(0)
+  }, [x, y])
+
+  return (
+    <motion.a
+      ref={ref}
+      href={href}
+      onMouseMove={handleMouse}
+      onMouseLeave={handleLeave}
+      style={{ x: springX, y: springY }}
+      className={className}
+    >
+      {children}
+    </motion.a>
+  )
+}
 
 /* ─── Glass Navbar ─── */
 
@@ -69,11 +178,46 @@ function Hero() {
   const mockupY = useTransform(scrollYProgress, [0, 1], [0, -80])
   const mockupRotate = useTransform(scrollYProgress, [0, 1], [0, -3])
 
+  /* Cursor glow */
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }, [])
+
   return (
     <section
       ref={sectionRef}
+      onMouseMove={handleMouseMove}
       className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 text-white min-h-screen flex items-center"
     >
+      {/* Cursor glow */}
+      <div
+        className="absolute w-[500px] h-[500px] rounded-full opacity-[0.07] pointer-events-none transition-opacity duration-300 hidden lg:block"
+        style={{
+          background: 'radial-gradient(circle, rgba(77,148,255,1) 0%, transparent 70%)',
+          left: mousePos.x - 250,
+          top: mousePos.y - 250,
+        }}
+      />
+
+      {/* Floating particles */}
+      {[
+        { size: 3, x: '15%', y: '25%', dur: 6, delay: 0 },
+        { size: 2, x: '75%', y: '20%', dur: 8, delay: 1 },
+        { size: 4, x: '85%', y: '65%', dur: 7, delay: 2 },
+        { size: 2, x: '25%', y: '75%', dur: 9, delay: 0.5 },
+        { size: 3, x: '55%', y: '40%', dur: 10, delay: 3 },
+      ].map((p, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full bg-blue-400/30 hidden lg:block"
+          style={{ width: p.size, height: p.size, left: p.x, top: p.y }}
+          animate={{ y: [0, -20, 0], opacity: [0.3, 0.7, 0.3] }}
+          transition={{ duration: p.dur, repeat: Infinity, delay: p.delay, ease: 'easeInOut' }}
+        />
+      ))}
+
       {/* Animated gradient mesh */}
       <div className="absolute inset-0 animate-gradient-shift opacity-40" style={{
         background: 'radial-gradient(ellipse 80% 60% at 20% 60%, rgba(0,102,255,0.08) 0%, transparent 70%), radial-gradient(ellipse 60% 80% at 80% 20%, rgba(77,148,255,0.06) 0%, transparent 70%)',
@@ -114,7 +258,7 @@ function Hero() {
               style={{ fontFamily: 'var(--font-space-grotesk)' }}
             >
               Asesmen yang{' '}
-              <span className="bg-gradient-to-r from-blue-400 to-blue-300 bg-clip-text text-transparent">
+              <span className="animate-shimmer">
                 benar-benar
               </span>
               <br />
@@ -132,7 +276,7 @@ function Hero() {
 
             {/* CTA */}
             <motion.div variants={fadeIn} transition={spring} className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10">
-              <Link
+              <MagneticButton
                 href="/login"
                 className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold rounded-2xl bg-blue-600 text-white hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30 active:scale-[0.98] overflow-hidden"
               >
@@ -141,7 +285,7 @@ function Hero() {
                   Mulai Sekarang
                   <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
                 </span>
-              </Link>
+              </MagneticButton>
               <a
                 href="#fitur"
                 className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-2xl border border-white/15 text-white hover:bg-white/[0.07] transition-all active:scale-[0.98]"
@@ -181,6 +325,22 @@ function Hero() {
           className="lg:hidden mt-12 max-w-md mx-auto"
         >
           <DashboardMockup />
+        </motion.div>
+
+        {/* Scroll indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2"
+        >
+          <span className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Scroll</span>
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <ChevronDown className="h-5 w-5 text-slate-500" />
+          </motion.div>
         </motion.div>
       </div>
     </section>
@@ -395,18 +555,19 @@ function FeatureGrid() {
           className="grid sm:grid-cols-2 gap-4"
         >
           {features.map((f) => (
-            <motion.div
-              key={f.title}
-              variants={fadeIn}
-              transition={spring}
-              className={`group p-6 rounded-2xl border border-slate-200 dark:border-slate-800 ${f.border} bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800/30 dark:to-slate-900/30 hover:shadow-lg transition-all duration-300`}
-            >
-              <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${f.iconBg} mb-4 transition-transform duration-300 group-hover:scale-110`}>
-                {f.icon}
-              </div>
-              <h3 className="font-semibold text-slate-900 dark:text-white mb-1.5">{f.title}</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{f.description}</p>
-            </motion.div>
+            <TiltCard key={f.title}>
+              <motion.div
+                variants={fadeIn}
+                transition={spring}
+                className={`group p-6 rounded-2xl border border-slate-200 dark:border-slate-800 ${f.border} bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800/30 dark:to-slate-900/30 hover:shadow-lg transition-all duration-300`}
+              >
+                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${f.iconBg} mb-4 transition-transform duration-300 group-hover:scale-110`}>
+                  {f.icon}
+                </div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-1.5">{f.title}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{f.description}</p>
+              </motion.div>
+            </TiltCard>
           ))}
         </motion.div>
       </div>
@@ -455,9 +616,9 @@ function HowItWorks() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ ...spring, delay: i * 0.15 }}
-              className="text-center relative"
+              className="text-center relative group"
             >
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 text-white text-xl font-bold mb-5 relative z-[1] ring-4 ring-slate-50 dark:ring-slate-950">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 text-white text-xl font-bold mb-5 relative z-[1] ring-4 ring-slate-50 dark:ring-slate-950 transition-shadow duration-300 group-hover:shadow-[0_0_24px_rgba(77,148,255,0.4)] group-hover:ring-blue-500/20">
                 {item.step}
               </div>
               <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-2">{item.title}</h3>
@@ -505,18 +666,10 @@ function FAQ() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={spring}
-          className="divide-y divide-slate-200 dark:divide-slate-800 border-y border-slate-200 dark:border-slate-800"
+          className="border-t border-slate-200 dark:border-slate-800"
         >
           {faqs.map((faq) => (
-            <details key={faq.q} className="group">
-              <summary className="flex items-center justify-between py-5 cursor-pointer text-left font-medium text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors list-none [&::-webkit-details-marker]:hidden">
-                {faq.q}
-                <ChevronDown className="h-5 w-5 text-slate-400 transition-transform duration-200 group-open:rotate-180 shrink-0 ml-4" />
-              </summary>
-              <div className="pb-5 text-slate-600 dark:text-slate-400 leading-relaxed pr-8">
-                {faq.a}
-              </div>
-            </details>
+            <FAQItem key={faq.q} q={faq.q} a={faq.a} />
           ))}
         </motion.div>
       </div>
@@ -557,7 +710,7 @@ function CTABanner() {
         <p className="text-lg text-blue-100 mb-10 max-w-lg mx-auto">
           Mulai dalam 5 menit. Gratis, tanpa kartu kredit. Tanpa batas peserta.
         </p>
-        <Link
+        <MagneticButton
           href="/login"
           className="group relative inline-flex items-center justify-center gap-2 px-10 py-4 text-lg font-semibold rounded-2xl bg-white text-blue-700 hover:bg-blue-50 transition-all shadow-xl shadow-blue-900/20 active:scale-[0.98] overflow-hidden"
         >
@@ -566,7 +719,7 @@ function CTABanner() {
             Mulai Sekarang — Gratis
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
           </span>
-        </Link>
+        </MagneticButton>
       </motion.div>
     </section>
   )
