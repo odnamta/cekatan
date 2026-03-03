@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/ui/Logo'
-import { DashboardMockup, AssessmentMockup } from '@/components/landing/Mockups'
+import { DashboardMockup, AssessmentMockup, ResultsMockup, AnalyticsMockup } from '@/components/landing/Mockups'
 import {
   Brain, Shield, TrendingUp, BookOpen,
-  ArrowRight, ChevronDown, Check, Sparkles, Award, Lock,
+  ArrowRight, ChevronDown, Check, Sparkles, Award, Lock, Quote,
 } from 'lucide-react'
 
 /* ─── Animation variants ─── */
@@ -347,40 +347,73 @@ function Hero() {
   )
 }
 
-/* ─── Trusted By ─── */
+/* ─── Social Proof ─── */
 
-function TrustedBy() {
+function SocialProof() {
+  const stats = [
+    { value: '150+', label: 'Peserta asesmen' },
+    { value: '8', label: 'Asesmen aktif' },
+    { value: '78%', label: 'Tingkat kelulusan' },
+    { value: '< 5 menit', label: 'Waktu setup' },
+  ]
+
   const orgs = [
-    { name: 'PT. Gama Intisamudera', desc: 'Heavy Lift & Project Logistics' },
-    { name: 'PT. Gama Lintas Samudera', desc: 'International Freight Agency' },
+    { name: 'PT. Gama Intisamudera', desc: 'Heavy Lift & Project Logistics', initial: 'GI' },
+    { name: 'PT. Gama Lintas Samudera', desc: 'International Freight Agency', initial: 'GL' },
   ]
 
   return (
-    <section className="py-14 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+    <section className="py-16 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
       <div className="max-w-5xl mx-auto px-6">
-        <motion.p
+        {/* Stats row */}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={stagger}
+          className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-12"
+        >
+          {stats.map((s) => (
+            <motion.div key={s.label} variants={fadeIn} transition={spring} className="text-center">
+              <p className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+                {s.value}
+              </p>
+              <p className="text-sm text-slate-500 mt-1">{s.label}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Org logos */}
+        <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="text-center text-xs font-semibold text-slate-400 uppercase tracking-[0.15em] mb-8"
+          className="text-center"
         >
-          Dipercaya oleh
-        </motion.p>
-        <div className="flex flex-wrap justify-center gap-12 md:gap-20">
-          {orgs.map((org, i) => (
-            <motion.div
-              key={org.name}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ ...spring, delay: i * 0.15 }}
-              className="text-center"
-            >
-              <p className="font-semibold text-slate-700 dark:text-slate-200">{org.name}</p>
-              <p className="text-sm text-slate-400">{org.desc}</p>
-            </motion.div>
-          ))}
-        </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-[0.15em] mb-6">
+            Dipercaya oleh
+          </p>
+          <div className="flex flex-wrap justify-center gap-8 md:gap-14">
+            {orgs.map((org, i) => (
+              <motion.div
+                key={org.name}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ ...spring, delay: i * 0.12 }}
+                className="flex items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-lg bg-blue-600/10 dark:bg-blue-500/15 flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-400">
+                  {org.initial}
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm text-slate-700 dark:text-slate-200">{org.name}</p>
+                  <p className="text-xs text-slate-400">{org.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
       </div>
     </section>
   )
@@ -439,7 +472,7 @@ function FeatureSpotlight() {
           </motion.div>
         </div>
 
-        {/* Spotlight 2: Analytics (reversed) */}
+        {/* Spotlight 2: Results & Certification */}
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <motion.div
             initial={{ opacity: 0, x: -40 }}
@@ -448,7 +481,7 @@ function FeatureSpotlight() {
             transition={{ ...spring, delay: 0.2 }}
             className="order-2 lg:order-1"
           >
-            <DashboardMockup />
+            <ResultsMockup />
           </motion.div>
 
           <motion.div
@@ -459,6 +492,44 @@ function FeatureSpotlight() {
             className="order-1 lg:order-2"
           >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-semibold mb-4">
+              <Award className="h-3.5 w-3.5" />
+              SERTIFIKASI
+            </div>
+            <h2
+              className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4 leading-tight"
+              style={{ fontFamily: 'var(--font-space-grotesk)' }}
+            >
+              Skor instan, sertifikat otomatis
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+              Begitu peserta selesai, skor langsung muncul. Lulus? Sertifikat digital otomatis terbit
+              dengan kode verifikasi unik yang bisa dicek siapa saja.
+            </p>
+            <ul className="space-y-3">
+              {[
+                'Skor real-time begitu ujian selesai',
+                'Sertifikat PDF otomatis dengan kode unik',
+                'Halaman verifikasi publik',
+                'Riwayat lengkap per peserta',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-3 text-slate-600 dark:text-slate-400">
+                  <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        </div>
+
+        {/* Spotlight 3: Analytics */}
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={spring}
+          >
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-semibold mb-4">
               <TrendingUp className="h-3.5 w-3.5" />
               ANALITIK
             </div>
@@ -469,22 +540,31 @@ function FeatureSpotlight() {
               Lihat gap kompetensi sebelum jadi masalah
             </h2>
             <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
-              Dashboard analitik real-time menampilkan radar skill, heatmap aktivitas, dan tren skor.
-              Identifikasi area yang perlu ditingkatkan — per individu maupun per tim.
+              Dashboard analitik menampilkan distribusi skor, tren kelulusan, dan performa per asesmen.
+              Identifikasi siapa yang butuh pelatihan lanjutan — sebelum terlambat.
             </p>
             <ul className="space-y-3">
               {[
+                'Distribusi skor: kesulitan, berkembang, mahir',
+                'Tren kelulusan mingguan',
                 'Radar kompetensi per individu & tim',
-                'Heatmap aktivitas belajar',
-                'Tren skor dan progress tracking',
-                'Gap analysis untuk keputusan data-driven',
+                'Deteksi peserta yang perlu perhatian',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3 text-slate-600 dark:text-slate-400">
-                  <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  <Check className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
                   {item}
                 </li>
               ))}
             </ul>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ ...spring, delay: 0.2 }}
+          >
+            <AnalyticsMockup />
           </motion.div>
         </div>
       </div>
@@ -568,6 +648,89 @@ function FeatureGrid() {
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{f.description}</p>
               </motion.div>
             </TiltCard>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+/* ─── Testimonials ─── */
+
+function Testimonials() {
+  const testimonials = [
+    {
+      quote: 'Sebelum pakai Cekatan, ujian K3 kami masih pakai kertas dan dikoreksi manual. Sekarang 24 karyawan bisa ujian bersamaan, skor langsung keluar. Hemat waktu luar biasa.',
+      name: 'Hendra Wijaya',
+      role: 'HSE Manager',
+      org: 'PT. Gama Intisamudera',
+      initial: 'HW',
+    },
+    {
+      quote: 'Fitur sertifikat digital sangat membantu. Klien kami bisa langsung verifikasi kompetensi crew tanpa harus minta dokumen fisik. Profesional dan efisien.',
+      name: 'Ratna Kusuma',
+      role: 'Operations Director',
+      org: 'PT. Gama Lintas Samudera',
+      initial: 'RK',
+    },
+    {
+      quote: 'AI-nya bisa generate soal dari SOP perusahaan kami dalam hitungan menit. Yang biasanya butuh 2 hari buat bikin soal, sekarang cukup 30 menit review dan langsung publish.',
+      name: 'Agus Prasetyo',
+      role: 'Training Coordinator',
+      org: 'PT. Gama Intisamudera',
+      initial: 'AP',
+    },
+  ]
+
+  return (
+    <section className="py-24 bg-slate-50 dark:bg-slate-950">
+      <div className="max-w-5xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={spring}
+          className="text-center mb-14"
+        >
+          <h2
+            className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4"
+            style={{ fontFamily: 'var(--font-space-grotesk)' }}
+          >
+            Kata mereka
+          </h2>
+          <p className="text-lg text-slate-500 dark:text-slate-400 max-w-xl mx-auto">
+            Dari tim yang sudah menggunakan Cekatan setiap hari.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-50px' }}
+          variants={stagger}
+          className="grid md:grid-cols-3 gap-6"
+        >
+          {testimonials.map((t) => (
+            <motion.div
+              key={t.name}
+              variants={fadeIn}
+              transition={spring}
+              className="relative p-6 rounded-2xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 shadow-sm hover:shadow-md transition-shadow duration-300"
+            >
+              <Quote className="h-8 w-8 text-blue-500/20 mb-4" />
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-6 text-[15px]">
+                &ldquo;{t.quote}&rdquo;
+              </p>
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                  {t.initial}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-slate-900 dark:text-white">{t.name}</p>
+                  <p className="text-xs text-slate-500">{t.role}, {t.org}</p>
+                </div>
+              </div>
+            </motion.div>
           ))}
         </motion.div>
       </div>
@@ -773,9 +936,10 @@ export default function LandingPage() {
       />
       <div className="min-h-screen">
         <Hero />
-        <TrustedBy />
+        <SocialProof />
         <FeatureSpotlight />
         <FeatureGrid />
+        <Testimonials />
         <HowItWorks />
         <FAQ />
         <CTABanner />
