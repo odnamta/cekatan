@@ -4,8 +4,10 @@
 
 **Cekatan** is a domain-agnostic organizational assessment, study, and skills mapping platform.
 
-**Deployment:** Vercel project `prj_VzSkaTL6PpWj2qfxag7QNUoJ6L7B` — **PAUSED** (freed Supabase slot for GLS-ERP). Supabase `hltuqxtemjpwfwjolyey` also paused.
-**Pending deploy:** `ed20747` — fixed all 43 react-hooks/* lint errors (19 files, React Compiler compliance). Resume Vercel + Supabase to deploy.
+**Deployment:** Docker Compose on Office Mini (Arya) → `https://cekatan.com`
+**Deploy workflow:** Push to main → Mini's cron pulls every 2min → `docker compose build && up -d`
+**Port:** 3301 (host) → 3000 (container). Config: `output: 'standalone'` in next.config.ts.
+**Supabase:** `hltuqxtemjpwfwjolyey` — currently **PAUSED** (free tier limit: 2 active projects). Resume to enable auth/data.
 
 **Architecture:** ONE platform, TWO modes (Study Mode + Assessment Mode).
 **Multi-tenant:** Each organization is a tenant with its own content, users, and configuration.
@@ -198,7 +200,7 @@ NEXT_PUBLIC_APP_URL=https://cekatan.com
 
 ## PWA Configuration
 
-The `next.config.ts` **MUST** include this to prevent Vercel build crashes:
+The `next.config.ts` **MUST** include this (originally for Vercel, kept for compatibility):
 ```typescript
 buildExcludes: [/middleware-manifest\.json$/]
 ```
